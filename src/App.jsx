@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const standings = [
   { place: 1, team: "Редько / Kh", short: "RK", rating: 6.6, record: "6 - 0 - 1", points: "34 - 14", delta: 20 },
@@ -287,6 +287,54 @@ const forecastTournaments = [
     roster: [],
   },
 ];
+
+const authStorageKey = "padel-brazzers-auth";
+const emptyAuthState = { users: [], sessionUserId: null };
+
+function createUserId() {
+  return `user-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeEmail(email) {
+  return email.trim().toLowerCase();
+}
+
+function loadAuthState() {
+  if (typeof window === "undefined") {
+    return emptyAuthState;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(authStorageKey);
+    if (!stored) {
+      return emptyAuthState;
+    }
+
+    const parsed = JSON.parse(stored);
+    return {
+      users: Array.isArray(parsed.users) ? parsed.users : [],
+      sessionUserId: parsed.sessionUserId ?? null,
+    };
+  } catch {
+    return emptyAuthState;
+  }
+}
+
+function getInitials(user) {
+  if (!user) {
+    return "PB";
+  }
+
+  return `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "PB";
+}
+
+function getUserDisplayName(user) {
+  if (!user) {
+    return "";
+  }
+
+  return `${user.firstName} ${user.lastName}`.trim() || user.lundaNick;
+}
 
 function getStandingsAfterRound(round) {
   const table = new Map(
@@ -932,6 +980,181 @@ function MexicanoDescriptionPanel({ onClose }) {
   );
 }
 
+function AuthControls({ currentUser, onLogin, onLogout, onRegister }) {
+  if (currentUser) {
+    const isPending = currentUser.status === "pending";
+
+    return (
+      <div className="auth-user-card">
+        <span>{getInitials(currentUser)}</span>
+        <div>
+          <strong>{getUserDisplayName(currentUser)}</strong>
+          <small>{isPending ? "Ожидает подтверждения" : currentUser.role === "admin" ? "Админ" : "Участник"}</small>
+        </div>
+        <button type="button" onClick={onLogout}>Выйти</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="auth-actions">
+      <button type="button" onClick={onLogin}>Войти</button>
+      <button type="button" onClick={onRegister}>Зарегистрироваться</button>
+    </div>
+  );
+}
+
+function AuthModal({ mode, onClose, onLogin, onRegister, usersCount }) {
+  const isLogin = mode === "login";
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    lundaNick: "",
+    email: "",
+    phone: "",
+    password: "",
+  });
+  const [error, setError] = useState("");
+  const isFirstUser = usersCount === 0;
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  };
+
+  const submitForm = (event) => {
+    event.preventDefault();
+
+    const result = isLogin ? onLogin(form.email, form.password) : onRegister(form);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+
+    onClose();
+  };
+
+  return (
+    <div className="auth-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        aria-modal="true"
+        className="auth-modal surface"
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="auth-modal-head">
+          <div>
+            <span>{isLogin ? "Вход" : isFirstUser ? "Первый админ" : "Заявка участника"}</span>
+            <h2>{isLogin ? "Войти в прогнозы" : "Регистрация в клубе"}</h2>
+          </div>
+          <button aria-label="Закрыть" type="button" onClick={onClose}>×</button>
+        </div>
+
+        {!isLogin && (
+          <p className="auth-note">
+            {isFirstUser
+              ? "Первый зарегистрированный аккаунт получает права админа."
+              : "После регистрации админ подтвердит участника, и прогнозы откроются."}
+          </p>
+        )}
+
+        <form className="prediction-login-form auth-form" onSubmit={submitForm}>
+          {!isLogin && (
+            <>
+              <div className="auth-form-grid">
+                <label>
+                  <span>Имя</span>
+                  <input required value={form.firstName} onChange={(event) => updateField("firstName", event.target.value)} />
+                </label>
+                <label>
+                  <span>Фамилия</span>
+                  <input required value={form.lastName} onChange={(event) => updateField("lastName", event.target.value)} />
+                </label>
+              </div>
+              <label>
+                <span>Ник в Lunda</span>
+                <input required value={form.lundaNick} onChange={(event) => updateField("lundaNick", event.target.value)} />
+              </label>
+              <label>
+                <span>Телефон</span>
+                <input required inputMode="tel" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} />
+              </label>
+            </>
+          )}
+
+          <label>
+            <span>Почта</span>
+            <input required type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} />
+          </label>
+          <label>
+            <span>Пароль</span>
+            <input required minLength={6} type="password" value={form.password} onChange={(event) => updateField("password", event.target.value)} />
+          </label>
+
+          {error && <strong className="prediction-error">{error}</strong>}
+
+          <button type="submit">{isLogin ? "Войти" : "Отправить регистрацию"}</button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function PredictionAccessGate({ currentUser, onLogin, onRegister }) {
+  const isPending = currentUser?.status === "pending";
+
+  return (
+    <section className="surface prediction-access-gate" id="top">
+      <img src="/assets/hero-court.png" alt="" />
+      <div>
+        <span className="eyebrow">{isPending ? "Заявка на проверке" : "Требуется вход"}</span>
+        <h1>{isPending ? "Админ скоро подтвердит аккаунт" : "Прогнозы доступны только участникам"}</h1>
+        <p>
+          {isPending
+            ? "Аккаунт создан, но раздел прогнозов откроется после ручного подтверждения админом клуба."
+            : "Архив турниров можно смотреть свободно, а прогнозы закрыты, чтобы результаты оставались внутри сообщества."}
+        </p>
+        {!currentUser && (
+          <div className="home-actions">
+            <button type="button" onClick={onLogin}>Войти</button>
+            <button type="button" onClick={onRegister}>Зарегистрироваться</button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AdminApprovalPanel({ users, onApproveUser }) {
+  const pendingUsers = users.filter((user) => user.status === "pending");
+
+  return (
+    <section className="surface side-panel admin-approval-panel">
+      <div className="section-title">
+        <span>Админ</span>
+        <h2>Заявки участников</h2>
+      </div>
+
+      {pendingUsers.length === 0 ? (
+        <p>Новых заявок нет. Когда участники зарегистрируются, они появятся здесь.</p>
+      ) : (
+        <div className="approval-list">
+          {pendingUsers.map((user) => (
+            <article className="approval-row" key={user.id}>
+              <span>{getInitials(user)}</span>
+              <div>
+                <strong>{getUserDisplayName(user)}</strong>
+                <small>{user.lundaNick} · {user.email} · {user.phone}</small>
+              </div>
+              <button type="button" onClick={() => onApproveUser(user.id)}>Подтвердить</button>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function MainNav({ active = "home", onOpenHome, onOpenPredictions, label = "Club", action = null }) {
   const goHome = (event) => {
     event.preventDefault();
@@ -965,7 +1188,7 @@ function MainNav({ active = "home", onOpenHome, onOpenPredictions, label = "Club
   );
 }
 
-function ForecastRegistryScreen({ onOpenHome, onOpenPredictions, onOpenTournament }) {
+function LockedPredictionsScreen({ auth, onOpenHome, onOpenPredictions }) {
   return (
     <main className="predictions-shell">
       <MainNav
@@ -973,12 +1196,26 @@ function ForecastRegistryScreen({ onOpenHome, onOpenPredictions, onOpenTournamen
         label="Club"
         onOpenHome={onOpenHome}
         onOpenPredictions={onOpenPredictions}
-        action={(
-          <div className="profile-chip home-chip">
-            <span>PB</span>
-            <b>Forecast</b>
-          </div>
-        )}
+        action={<AuthControls {...auth} />}
+      />
+      <PredictionAccessGate
+        currentUser={auth.currentUser}
+        onLogin={auth.onLogin}
+        onRegister={auth.onRegister}
+      />
+    </main>
+  );
+}
+
+function ForecastRegistryScreen({ auth, onOpenHome, onOpenPredictions, onOpenTournament }) {
+  return (
+    <main className="predictions-shell">
+      <MainNav
+        active="predictions"
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
       />
 
       <section className="prediction-hero surface" id="top">
@@ -1043,13 +1280,16 @@ function ForecastRegistryScreen({ onOpenHome, onOpenPredictions, onOpenTournamen
               формат, состав и статус приема прогнозов.
             </p>
           </section>
+          {auth.currentUser?.role === "admin" && (
+            <AdminApprovalPanel users={auth.users} onApproveUser={auth.onApproveUser} />
+          )}
         </aside>
       </section>
     </main>
   );
 }
 
-function ForecastTournamentDetail({ tournament, onOpenHome, onOpenPredictions, onBack }) {
+function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredictions, onBack }) {
   return (
     <main className="predictions-shell">
       <MainNav
@@ -1058,9 +1298,9 @@ function ForecastTournamentDetail({ tournament, onOpenHome, onOpenPredictions, o
         onOpenHome={onOpenHome}
         onOpenPredictions={onOpenPredictions}
         action={(
-          <div className="profile-chip">
+          <div className="prediction-top-actions">
             <button className="back-link" type="button" onClick={onBack}>Все прогнозы</button>
-            <span>PB</span>
+            <AuthControls {...auth} />
           </div>
         )}
       />
@@ -1092,11 +1332,11 @@ function ForecastTournamentDetail({ tournament, onOpenHome, onOpenPredictions, o
         <section className="surface prediction-tournament-card">
           <div className="section-title">
             <span>Кабинет участника</span>
-            <h2>Вход появится после подключения авторизации</h2>
+            <h2>{getUserDisplayName(auth.currentUser)}</h2>
           </div>
           <p>
-            Здесь будет состояние участника: вошел в аккаунт, прогноз сохранен,
-            можно изменить до закрытия приема.
+            Вход выполнен. Прогноз можно будет сохранить и менять до закрытия
+            приема после публикации состава турнира.
           </p>
         </section>
       </section>
@@ -1131,7 +1371,7 @@ function ForecastTournamentDetail({ tournament, onOpenHome, onOpenPredictions, o
   );
 }
 
-function HomeScreen({ onOpenTournament, onOpenPredictions }) {
+function HomeScreen({ auth, onOpenTournament, onOpenPredictions }) {
   const [category, setCategory] = useState("pro");
   const tournaments = tournamentRegistry[category];
   const activeLabel = category.toUpperCase();
@@ -1150,10 +1390,7 @@ function HomeScreen({ onOpenTournament, onOpenPredictions }) {
           <button type="button" onClick={onOpenPredictions}>Прогнозы</button>
           <a href="#community">Сообщество</a>
         </nav>
-        <div className="profile-chip home-chip">
-          <span>PB</span>
-          <b>{activeLabel}</b>
-        </div>
+        <AuthControls {...auth} />
       </header>
 
       <section className="home-hero surface" id="top">
@@ -1564,27 +1801,176 @@ function TournamentDetail({ onBack }) {
 
 export function App() {
   const [screen, setScreen] = useState({ name: "home" });
+  const [authState, setAuthState] = useState(loadAuthState);
+  const [authMode, setAuthMode] = useState(null);
+  const currentUser = authState.users.find((user) => user.id === authState.sessionUserId) ?? null;
+  const canOpenPredictions = currentUser?.status === "active";
+
+  useEffect(() => {
+    window.localStorage.setItem(authStorageKey, JSON.stringify(authState));
+  }, [authState]);
+
+  const openPredictions = () => {
+    setScreen({ name: "predictions" });
+    if (!currentUser) {
+      setAuthMode("login");
+    }
+  };
+
+  const registerUser = (payload) => {
+    const email = normalizeEmail(payload.email);
+    const isFirstUser = authState.users.length === 0;
+    const emailTaken = authState.users.some((user) => user.email === email);
+    const nickTaken = authState.users.some((user) => user.lundaNick.trim().toLowerCase() === payload.lundaNick.trim().toLowerCase());
+
+    if (emailTaken) {
+      return { ok: false, message: "Аккаунт с такой почтой уже есть." };
+    }
+
+    if (nickTaken) {
+      return { ok: false, message: "Этот ник в Lunda уже занят." };
+    }
+
+    const user = {
+      id: createUserId(),
+      firstName: payload.firstName.trim(),
+      lastName: payload.lastName.trim(),
+      lundaNick: payload.lundaNick.trim(),
+      email,
+      phone: payload.phone.trim(),
+      password: payload.password,
+      role: isFirstUser ? "admin" : "member",
+      status: isFirstUser ? "active" : "pending",
+      createdAt: new Date().toISOString(),
+    };
+
+    setAuthState((state) => ({
+      users: [...state.users, user],
+      sessionUserId: user.id,
+    }));
+    setScreen({ name: "predictions" });
+
+    return { ok: true };
+  };
+
+  const loginUser = (emailInput, password) => {
+    const email = normalizeEmail(emailInput);
+    const user = authState.users.find((item) => item.email === email && item.password === password);
+
+    if (!user) {
+      return { ok: false, message: "Почта или пароль не совпали." };
+    }
+
+    setAuthState((state) => ({ ...state, sessionUserId: user.id }));
+    setScreen({ name: "predictions" });
+
+    return { ok: true };
+  };
+
+  const approveUser = (userId) => {
+    setAuthState((state) => ({
+      ...state,
+      users: state.users.map((user) => (
+        user.id === userId ? { ...user, status: "active", approvedAt: new Date().toISOString() } : user
+      )),
+    }));
+  };
+
+  const auth = {
+    currentUser,
+    users: authState.users,
+    onApproveUser: approveUser,
+    onLogin: () => setAuthMode("login"),
+    onLogout: () => setAuthState((state) => ({ ...state, sessionUserId: null })),
+    onRegister: () => setAuthMode("register"),
+  };
 
   if (screen.name === "forecast-detail") {
     const tournament = forecastTournaments.find((item) => item.id === screen.tournamentId) ?? forecastTournaments[0];
 
+    if (!canOpenPredictions) {
+      return (
+        <>
+          <LockedPredictionsScreen
+            auth={auth}
+            onOpenHome={() => setScreen({ name: "home" })}
+            onOpenPredictions={openPredictions}
+          />
+          {authMode && (
+            <AuthModal
+              mode={authMode}
+              onClose={() => setAuthMode(null)}
+              onLogin={loginUser}
+              onRegister={registerUser}
+              usersCount={authState.users.length}
+            />
+          )}
+        </>
+      );
+    }
+
     return (
-      <ForecastTournamentDetail
-        onBack={() => setScreen({ name: "predictions" })}
-        onOpenHome={() => setScreen({ name: "home" })}
-        onOpenPredictions={() => setScreen({ name: "predictions" })}
-        tournament={tournament}
-      />
+      <>
+        <ForecastTournamentDetail
+          auth={auth}
+          onBack={() => setScreen({ name: "predictions" })}
+          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenPredictions={openPredictions}
+          tournament={tournament}
+        />
+        {authMode && (
+          <AuthModal
+            mode={authMode}
+            onClose={() => setAuthMode(null)}
+            onLogin={loginUser}
+            onRegister={registerUser}
+            usersCount={authState.users.length}
+          />
+        )}
+      </>
     );
   }
 
   if (screen.name === "predictions") {
+    if (!canOpenPredictions) {
+      return (
+        <>
+          <LockedPredictionsScreen
+            auth={auth}
+            onOpenHome={() => setScreen({ name: "home" })}
+            onOpenPredictions={openPredictions}
+          />
+          {authMode && (
+            <AuthModal
+              mode={authMode}
+              onClose={() => setAuthMode(null)}
+              onLogin={loginUser}
+              onRegister={registerUser}
+              usersCount={authState.users.length}
+            />
+          )}
+        </>
+      );
+    }
+
     return (
-      <ForecastRegistryScreen
-        onOpenHome={() => setScreen({ name: "home" })}
-        onOpenPredictions={() => setScreen({ name: "predictions" })}
-        onOpenTournament={(tournamentId) => setScreen({ name: "forecast-detail", tournamentId })}
-      />
+      <>
+        <ForecastRegistryScreen
+          auth={auth}
+          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenPredictions={openPredictions}
+          onOpenTournament={(tournamentId) => setScreen({ name: "forecast-detail", tournamentId })}
+        />
+        {authMode && (
+          <AuthModal
+            mode={authMode}
+            onClose={() => setAuthMode(null)}
+            onLogin={loginUser}
+            onRegister={registerUser}
+            usersCount={authState.users.length}
+          />
+        )}
+      </>
     );
   }
 
@@ -1597,11 +1983,23 @@ export function App() {
   }
 
   return (
-    <HomeScreen
-      onOpenPredictions={() => setScreen({ name: "predictions" })}
-      onOpenTournament={(tournamentId) => {
-        setScreen({ name: "detail", tournamentId });
-      }}
-    />
+    <>
+      <HomeScreen
+        auth={auth}
+        onOpenPredictions={openPredictions}
+        onOpenTournament={(tournamentId) => {
+          setScreen({ name: "detail", tournamentId });
+        }}
+      />
+      {authMode && (
+        <AuthModal
+          mode={authMode}
+          onClose={() => setAuthMode(null)}
+          onLogin={loginUser}
+          onRegister={registerUser}
+          usersCount={authState.users.length}
+        />
+      )}
+    </>
   );
 }
