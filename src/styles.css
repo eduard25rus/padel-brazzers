@@ -552,32 +552,6 @@ main {
   text-transform: uppercase;
 }
 
-.registry-toggle {
-  background: rgba(255, 254, 250, 0.72);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-}
-
-.registry-toggle button {
-  background: transparent;
-  border-radius: 7px;
-  color: #5a665e;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 900;
-  min-width: 78px;
-  padding: 10px 13px;
-}
-
-.registry-toggle button.active {
-  background: var(--green);
-  box-shadow: 0 10px 24px rgba(29, 93, 42, 0.2);
-  color: #fffefa;
-}
-
 .tournament-list {
   display: grid;
 }
@@ -1466,7 +1440,9 @@ main {
 .prediction-roster-grid {
   display: grid;
   gap: 8px;
+  grid-auto-flow: column;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(50px, auto));
 }
 
 .prediction-roster-player {
@@ -1533,6 +1509,53 @@ main {
   font-size: 13px;
   font-weight: 750;
   margin-top: 12px;
+}
+
+.prediction-scoring-details {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.prediction-scoring-details > span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.prediction-scoring-details p {
+  color: #526054;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.prediction-scoring-details div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.prediction-scoring-details b {
+  background: rgba(29, 93, 42, 0.08);
+  border: 1px solid rgba(29, 93, 42, 0.14);
+  border-radius: 8px;
+  color: var(--green);
+  display: grid;
+  font-size: 15px;
+  gap: 4px;
+  padding: 10px;
+}
+
+.prediction-scoring-details small {
+  color: #526054;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .prediction-admin-actions {
@@ -2988,6 +3011,16 @@ p {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .prediction-roster-grid {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .prediction-scoring-details div {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -3043,14 +3076,12 @@ p {
   }
 
   .home-actions,
-  .registry-toggle,
   .auth-actions {
     width: 100%;
   }
 
   .home-actions a,
   .home-actions button,
-  .registry-toggle button,
   .auth-actions button {
     flex: 1;
     text-align: center;

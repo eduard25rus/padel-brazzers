@@ -238,40 +238,38 @@ const mexicanoStories = [
   },
 ];
 
-const tournamentRegistry = {
-  pro: [
-    {
-      id: "americano-brazzers-pro",
-      title: "Americano Brazzers PRO",
-      date: "17 июня",
-      club: "Padel Pro Club",
-      format: "Americano",
-      teams: "12 игроков",
-      rounds: "11 раундов",
-      matches: "33 матча",
-      winner: "Kh Ivan",
-      status: "Боевой турнир",
-      image: "/assets/handshake.png",
-      featured: true,
-    },
-  ],
-  lite: [
-    {
-      id: "mexicano-brazzers-lite",
-      title: "Mexicano Brazzers LITE",
-      date: "21 июня",
-      club: "Padel Pro Club",
-      format: "Mexicano",
-      teams: "12 игроков",
-      rounds: "11 раундов",
-      matches: "33 матча",
-      winner: "Искалдович Константин",
-      status: "Боевой турнир",
-      image: "/assets/trophy.png",
-      featured: true,
-    },
-  ],
-};
+const tournamentRegistry = [
+  {
+    id: "mexicano-brazzers-lite",
+    title: "Mexicano Brazzers LITE",
+    date: "21 июня",
+    dateOrder: "2026-06-21",
+    club: "Padel Pro Club",
+    format: "Mexicano",
+    teams: "12 игроков",
+    rounds: "11 раундов",
+    matches: "33 матча",
+    winner: "Искалдович Константин",
+    status: "Боевой турнир",
+    image: "/assets/trophy.png",
+    featured: true,
+  },
+  {
+    id: "americano-brazzers-pro",
+    title: "Americano Brazzers PRO",
+    date: "17 июня",
+    dateOrder: "2026-06-17",
+    club: "Padel Pro Club",
+    format: "Americano",
+    teams: "12 игроков",
+    rounds: "11 раундов",
+    matches: "33 матча",
+    winner: "Kh Ivan",
+    status: "Боевой турнир",
+    image: "/assets/handshake.png",
+    featured: true,
+  },
+].sort((a, b) => b.dateOrder.localeCompare(a.dateOrder));
 
 const fallbackForecastTournaments = [
   {
@@ -387,6 +385,28 @@ function describeScoringMethod(method) {
   }
 
   return `Точное место ${method.exactPlace} · ошибка на 1 позицию ${method.onePositionError} · ошибка на 2 позиции ${method.twoPositionError} · топ-3 точно +${method.top3ExactBonus} · топ-3 в любом порядке +${method.top3AnyOrderBonus} · последнее место +${method.lastPlaceBonus}`;
+}
+
+function getScoringMethodDetails(method) {
+  if (!method) {
+    return [];
+  }
+
+  return [
+    ["Точное место", `${method.exactPlace} баллов`],
+    ["Ошибка на 1 позицию", `${method.onePositionError} балла`],
+    ["Ошибка на 2 позиции", `${method.twoPositionError} балл`],
+    ["Топ-3 точный", `+${method.top3ExactBonus}`],
+    ["Топ-3 в любом порядке", `+${method.top3AnyOrderBonus}`],
+    ["Последнее место", `+${method.lastPlaceBonus}`],
+  ];
+}
+
+function getTournamentScoringMethod(tournament, scoringMethods) {
+  return tournament.scoringMethod
+    ?? scoringMethods.find((method) => method.id === tournament.scoringMethodId)
+    ?? scoringMethods[0]
+    ?? fallbackScoringMethods[0];
 }
 
 function getStandingsAfterRound(round) {
@@ -1234,7 +1254,7 @@ function makeTournamentFormState(scoringMethods, tournament = null) {
       date: tournament.date ?? "",
       format: tournament.format ?? "Americano",
       pointsToWin: tournament.pointsToWin ? String(tournament.pointsToWin) : "11",
-      scoringMethodId: tournament.scoringMethodId ?? scoringMethods[0]?.id ?? "",
+      scoringMethodId: tournament.scoringMethodId || tournament.scoringMethod?.id || scoringMethods[0]?.id || "",
       time: tournament.time ?? "",
       title: tournament.title ?? "",
     } : {}),
@@ -1380,7 +1400,7 @@ function AdminTournamentForm({
         <label>
           <span>Условия турнира</span>
           <textarea
-            required
+            required={!initialTournament}
             value={form.conditions}
             onChange={(event) => updateForm("conditions", event.target.value)}
             placeholder="Коротко: формат, пары/смены партнеров, как считается итог, ограничения по заменам."
@@ -1862,6 +1882,7 @@ function ForecastTournamentDetail({
   const filledSlots = forecastSlots.filter(Boolean).length;
   const isForecastComplete = tournament.roster.length > 0 && filledSlots === Math.min(16, tournament.roster.length);
   const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
+  const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
 
   const getPlayerKey = (player) => player.id ?? player.name;
   const selectedPlayer = sortedRoster.find((player) => getPlayerKey(player) === selectedPlayerId);
@@ -1957,7 +1978,7 @@ function ForecastTournamentDetail({
           </div>
           <div className="metric-strip">
             <div><strong>{tournament.roster.length || "—"}</strong><span>участников</span></div>
-            <div><strong>1</strong><span>балл за позицию</span></div>
+            <div><strong>{tournamentScoringMethod?.exactPlace ?? "—"}</strong><span>за точное место</span></div>
             <div><strong>До старта</strong><span>редактирование</span></div>
             <div><strong>{tournament.format}</strong><span>формат</span></div>
           </div>
@@ -1966,15 +1987,26 @@ function ForecastTournamentDetail({
         <section className="surface prediction-tournament-card">
           <div className="section-title">
             <span>Условия прогноза</span>
-            <h2>{tournament.scoring || "1 балл за точное место"}</h2>
+            <h2>{tournamentScoringMethod?.name ?? tournament.scoring ?? "Методика прогноза"}</h2>
           </div>
           <p>
             {tournament.predictionCloseAt
               ? `Прием прогнозов открыт до ${formatVladivostokDateTime(tournament.predictionCloseAt)}.`
               : "Прогноз можно будет сохранить и менять до закрытия приема."}
           </p>
-          {tournament.scoringMethod && (
-            <p className="prediction-scoring-summary">{describeScoringMethod(tournament.scoringMethod)}</p>
+          {tournamentScoringMethod && (
+            <div className="prediction-scoring-details">
+              <span>{tournamentScoringMethod.formats}</span>
+              <p>{tournamentScoringMethod.description || "Методика подсчета очков для этого турнира."}</p>
+              <div>
+                {getScoringMethodDetails(tournamentScoringMethod).map(([label, value]) => (
+                  <b key={label}>
+                    <small>{label}</small>
+                    {value}
+                  </b>
+                ))}
+              </div>
+            </div>
           )}
           {canManageTournament && (
             <div className="prediction-admin-actions">
@@ -2104,9 +2136,7 @@ function ForecastTournamentDetail({
 }
 
 function HomeScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament }) {
-  const [category, setCategory] = useState("pro");
-  const tournaments = tournamentRegistry[category];
-  const activeLabel = category.toUpperCase();
+  const tournaments = tournamentRegistry;
 
   return (
     <main className="home-shell">
@@ -2127,15 +2157,12 @@ function HomeScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions, on
           <h1>Добро пожаловать в Padel Brazzers</h1>
           <p>
             Архив турниров, таблицы после каждого раунда, результаты всех кортов и
-            аналитика по главным матчам. Выбирайте PRO или LITE и открывайте нужный
-            турнир.
+            аналитика по главным матчам. Все турниры идут единым реестром: новые
+            даты сверху.
           </p>
           <div className="home-actions">
             <a href="#registry">Смотреть турниры</a>
             <button type="button" onClick={onOpenPredictions}>Сделать прогноз</button>
-            <button type="button" onClick={() => setCategory(category === "pro" ? "lite" : "pro")}>
-              Переключить на {category === "pro" ? "LITE" : "PRO"}
-            </button>
           </div>
         </div>
         <div className="home-hero-stats" aria-label="Статистика сообщества">
@@ -2150,24 +2177,16 @@ function HomeScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions, on
           <div className="registry-head">
             <div>
               <span>Реестр турниров</span>
-              <h2>Прошедшие турниры {activeLabel}</h2>
-            </div>
-            <div className="registry-toggle" aria-label="Категория турниров">
-              <button className={category === "pro" ? "active" : ""} type="button" onClick={() => setCategory("pro")}>
-                PRO
-              </button>
-              <button className={category === "lite" ? "active" : ""} type="button" onClick={() => setCategory("lite")}>
-                LITE
-              </button>
+              <h2>Прошедшие турниры по дате</h2>
             </div>
           </div>
 
           <div className="tournament-list">
             {tournaments.length === 0 && (
               <div className="empty-registry">
-                <span>{activeLabel}</span>
+                <span>Архив</span>
                 <strong>Турниров пока нет</strong>
-                <p>Здесь появятся боевые турниры этой категории, когда мы загрузим реальные данные.</p>
+                <p>Здесь появятся боевые турниры, когда мы загрузим реальные данные.</p>
               </div>
             )}
             {tournaments.map((tournament) => (

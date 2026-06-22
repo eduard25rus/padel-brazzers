@@ -184,27 +184,33 @@ function authPayload(store, user = null, token) {
 }
 
 function buildForecastTournamentFromBody(body, store, existingTournament = null) {
-  const title = String(body.title ?? "").trim();
-  const date = String(body.date ?? "").trim();
-  const time = String(body.time ?? "").trim();
-  const club = String(body.club ?? "Padel Pro Club").trim();
-  const format = String(body.format ?? "").trim();
-  const conditions = String(body.conditions ?? "").trim();
-  const pointsToWin = format === "Americano" ? Number(body.pointsToWin) : null;
+  const isEdit = Boolean(existingTournament);
+  const title = String(body.title ?? existingTournament?.title ?? "").trim();
+  const date = String(body.date ?? existingTournament?.date ?? "").trim();
+  const time = String(body.time ?? existingTournament?.time ?? "").trim();
+  const club = String(body.club ?? existingTournament?.club ?? "Padel Pro Club").trim();
+  const format = String(body.format ?? existingTournament?.format ?? "").trim();
+  const conditions = String(body.conditions ?? existingTournament?.conditions ?? "").trim();
+  const rawPointsToWin = body.pointsToWin ?? existingTournament?.pointsToWin;
+  const pointsToWin = format === "Americano" ? Number(rawPointsToWin) : null;
   const predictionCloseAt = date && time ? `${date}T${time}` : "";
-  const scoringMethodId = String(body.scoringMethodId ?? "").trim();
-  const scoringMethod = store.scoringMethods.find((method) => method.id === scoringMethodId);
-  const roster = Array.isArray(body.roster)
-    ? body.roster
+  const scoringMethodId = String(body.scoringMethodId ?? existingTournament?.scoringMethodId ?? existingTournament?.scoringMethod?.id ?? "").trim();
+  const scoringMethod = store.scoringMethods.find((method) => method.id === scoringMethodId)
+    ?? store.scoringMethods.find((method) => method.id === existingTournament?.scoringMethodId)
+    ?? store.scoringMethods[0]
+    ?? defaultScoringMethod;
+  const sourceRoster = Array.isArray(body.roster) ? body.roster : existingTournament?.roster;
+  const roster = Array.isArray(sourceRoster)
+    ? sourceRoster
         .map((player) => ({
           id: String(player.id ?? "").trim() || randomUUID(),
           name: String(player.name ?? "").trim(),
           rating: Number(player.rating),
         }))
         .filter((player) => player.name && Number.isFinite(player.rating))
-    : [];
+      : [];
 
-  if (!title || !date || !time || !allowedClubs.has(club) || !format || !conditions || !scoringMethod || roster.length < 2) {
+  if (!title || !date || !time || !allowedClubs.has(club) || !format || !scoringMethod || roster.length < 2 || (!conditions && !isEdit)) {
     return {
       error: "Заполни название, дату, время, выбери клуб, формат, методику, условия и минимум двух игроков с рейтингами.",
     };
