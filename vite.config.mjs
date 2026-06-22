@@ -10,5 +10,8 @@ export default defineConfig({
       clientFiles: ["./src/main.jsx"],
     },
   },
+  preview: {
+    allowedHosts: ["padel-brazzers-production.up.railway.app"],
+  },
   plugins: [react()],
 });
