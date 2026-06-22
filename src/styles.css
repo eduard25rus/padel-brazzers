@@ -131,7 +131,8 @@ main {
   position: relative;
 }
 
-.topbar nav a:first-child::after {
+.topbar nav a.active::after,
+.topbar nav button.active::after {
   background: var(--green);
   border-radius: 999px;
   bottom: 0;
@@ -549,6 +550,14 @@ main {
   transform: translateY(-1px);
 }
 
+.prediction-card-head button:disabled {
+  background: #dfe7dd;
+  box-shadow: none;
+  color: #738173;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .predictions-shell {
   max-width: 1420px;
 }
@@ -632,6 +641,20 @@ main {
   gap: 14px;
   grid-template-columns: minmax(320px, 0.7fr) minmax(0, 1.3fr);
   margin-top: 14px;
+}
+
+.forecast-registry-layout {
+  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.72fr);
+}
+
+.prediction-detail-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(380px, 0.72fr);
+}
+
+.prediction-detail-hero {
+  min-height: 420px;
 }
 
 .prediction-login-card,
@@ -753,6 +776,27 @@ main {
 
 .prediction-roster-player strong {
   font-size: 13px;
+  line-height: 1.2;
+}
+
+.prediction-empty-list {
+  align-content: center;
+  background: rgba(255, 254, 250, 0.58);
+  border: 1px dashed rgba(29, 93, 42, 0.24);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-height: 170px;
+  padding: 22px;
+}
+
+.prediction-empty-list.tall {
+  min-height: 340px;
+}
+
+.prediction-empty-list strong {
+  color: #1b241d;
+  font-size: 20px;
   line-height: 1.2;
 }
 
@@ -1830,7 +1874,9 @@ p {
   .americano-round-body,
   .prediction-dashboard,
   .prediction-workspace,
-  .prediction-results {
+  .prediction-results,
+  .prediction-detail-grid,
+  .forecast-registry-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1862,7 +1908,8 @@ p {
   .round-body,
   .americano-page-grid,
   .americano-round-body,
-  .description-panel {
+  .description-panel,
+  .prediction-detail-grid {
     grid-template-columns: 1fr;
   }
 

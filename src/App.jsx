@@ -273,169 +273,20 @@ const tournamentRegistry = {
   ],
 };
 
-const predictionUsers = [
-  { login: "eduard", password: "1234", name: "Шевченко Эдуард", rating: 2.97 },
-  { login: "ilya", password: "1234", name: "Редько Илья", rating: 3.18 },
-  { login: "kh", password: "1234", name: "Kh Ivan", rating: 3.55 },
-  { login: "daria", password: "1234", name: "Ширинская Дарья", rating: 2.95 },
+const forecastTournaments = [
+  {
+    id: "forecast-shell",
+    title: "Будущий турнир",
+    date: "Дата после публикации",
+    time: "Время будет задано",
+    club: "Padel Pro Club",
+    format: "Формат из управляющей части",
+    players: "Состав ожидается",
+    status: "Прием прогнозов",
+    image: "/assets/hero-court.png",
+    roster: [],
+  },
 ];
-
-const upcomingPredictionTournament = {
-  id: "americano-pro-forecast-june-29",
-  title: "Americano Brazzers PRO",
-  date: "29 июня",
-  time: "20:00–22:00",
-  club: "Padel Pro Club",
-  format: "Americano",
-  status: "Прогноз открыт",
-  roster: [
-    { name: "Kh Ivan", rating: 3.55 },
-    { name: "Редько Илья", rating: 3.18 },
-    { name: "Рустам Мамедов", rating: 3.24 },
-    { name: "G Alexey", rating: 3.12 },
-    { name: "Тарасов Артем", rating: 3.22 },
-    { name: "Шевченко Эдуард", rating: 2.97 },
-    { name: "Ширинская Дарья", rating: 2.95 },
-    { name: "Селантьев Данил", rating: 2.92 },
-    { name: "Каменный Никита", rating: 2.73 },
-    { name: "Борис Чигиринцев", rating: 2.65 },
-    { name: "Бессонов Егор", rating: 2.22 },
-    { name: "Трут Дмитрий", rating: 3.28 },
-    { name: "Гудини Дмитрий", rating: 2.28 },
-    { name: "Khrapatyi Denis", rating: 1.93 },
-    { name: "Калюжный Максим", rating: 2.28 },
-    { name: "Очкуров Илья", rating: 1.79 },
-  ],
-};
-
-const completedPredictionRound = {
-  id: "mexicano-lite-forecast-june-21",
-  title: "Mexicano Brazzers LITE",
-  date: "21 июня",
-  status: "Турнир завершен",
-  results: mexicanoPlayers.map((player) => player.name),
-  predictions: [
-    {
-      author: "Шевченко Эдуард",
-      ranking: [
-        "Искалдович Константин",
-        "Khrapatyi Denis",
-        "Гудини Дмитрий",
-        "Калюжный Максим",
-        "Очкуров Илья",
-        "@L.A.Bruin Алексей",
-        "Кулик Дмитрий",
-        "Золотов Илья",
-        "Князев Влад",
-        "Khizhnyak Mikhail",
-        "Захаров Иван",
-        "Levchenko Roman",
-      ],
-    },
-    {
-      author: "Редько Илья",
-      ranking: [
-        "Гудини Дмитрий",
-        "Искалдович Константин",
-        "Калюжный Максим",
-        "Khrapatyi Denis",
-        "Очкуров Илья",
-        "Кулик Дмитрий",
-        "@L.A.Bruin Алексей",
-        "Khizhnyak Mikhail",
-        "Золотов Илья",
-        "Князев Влад",
-        "Levchenko Roman",
-        "Захаров Иван",
-      ],
-    },
-    {
-      author: "Kh Ivan",
-      ranking: [
-        "Искалдович Константин",
-        "Гудини Дмитрий",
-        "Khrapatyi Denis",
-        "Очкуров Илья",
-        "Калюжный Максим",
-        "@L.A.Bruin Алексей",
-        "Золотов Илья",
-        "Кулик Дмитрий",
-        "Khizhnyak Mikhail",
-        "Князев Влад",
-        "Захаров Иван",
-        "Levchenko Roman",
-      ],
-    },
-    {
-      author: "Ширинская Дарья",
-      ranking: [
-        "Искалдович Константин",
-        "Гудини Дмитрий",
-        "Калюжный Максим",
-        "Khrapatyi Denis",
-        "Кулик Дмитрий",
-        "Очкуров Илья",
-        "@L.A.Bruin Алексей",
-        "Золотов Илья",
-        "Khizhnyak Mikhail",
-        "Levchenko Roman",
-        "Князев Влад",
-        "Захаров Иван",
-      ],
-    },
-  ],
-};
-
-function readJsonStorage(key, fallback) {
-  try {
-    const value = window.localStorage.getItem(key);
-    return value ? JSON.parse(value) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJsonStorage(key, value) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Local storage can be blocked in private modes; the in-memory state still works.
-  }
-}
-
-function predictionStorageKey(account) {
-  return `pb-prediction-${upcomingPredictionTournament.id}-${account.login}`;
-}
-
-function getSavedPrediction(account) {
-  if (!account) {
-    return null;
-  }
-
-  const saved = readJsonStorage(predictionStorageKey(account), null);
-  if (!saved?.ranking?.length) {
-    return null;
-  }
-
-  return saved;
-}
-
-function getDefaultPredictionOrder() {
-  return upcomingPredictionTournament.roster.map((player) => player.name);
-}
-
-function scorePrediction(ranking, results) {
-  return ranking.reduce((score, player, index) => score + (results[index] === player ? 1 : 0), 0);
-}
-
-function getCompletedPredictionLeaderboard() {
-  return completedPredictionRound.predictions
-    .map((prediction) => ({
-      ...prediction,
-      score: scorePrediction(prediction.ranking, completedPredictionRound.results),
-    }))
-    .sort((a, b) => b.score - a.score || a.author.localeCompare(b.author));
-}
 
 function getStandingsAfterRound(round) {
   const table = new Map(
@@ -1081,387 +932,201 @@ function MexicanoDescriptionPanel({ onClose }) {
   );
 }
 
-function PredictionBadge({ value }) {
-  return <span className="prediction-rating">{Number(value).toFixed(2)}</span>;
-}
-
-function PredictionLoginCard({ account, error, form, onChange, onLogin, onLogout }) {
-  if (account) {
-    return (
-      <section className="surface prediction-login-card">
-        <div className="section-title">
-          <span>Личный кабинет</span>
-          <h2>{account.name}</h2>
-        </div>
-        <div className="account-summary">
-          <PredictionBadge value={account.rating} />
-          <div>
-            <strong>{account.login}</strong>
-            <p>Можно менять порядок игроков до закрытия приема прогнозов.</p>
-          </div>
-        </div>
-        <button className="secondary-action" type="button" onClick={onLogout}>Выйти</button>
-      </section>
-    );
-  }
-
-  return (
-    <section className="surface prediction-login-card">
-      <div className="section-title">
-        <span>Вход участника</span>
-        <h2>Логин и пароль</h2>
-      </div>
-      <form className="prediction-login-form" onSubmit={onLogin}>
-        <label>
-          <span>Логин</span>
-          <input
-            autoComplete="username"
-            name="login"
-            onChange={onChange}
-            placeholder="eduard"
-            type="text"
-            value={form.login}
-          />
-        </label>
-        <label>
-          <span>Пароль</span>
-          <input
-            autoComplete="current-password"
-            name="password"
-            onChange={onChange}
-            placeholder="1234"
-            type="password"
-            value={form.password}
-          />
-        </label>
-        {error && <p className="prediction-error">{error}</p>}
-        <button type="submit">Войти</button>
-      </form>
-    </section>
-  );
-}
-
-function PredictionRosterCard() {
-  return (
-    <section className="surface prediction-roster-card" id="roster">
-      <div className="section-title">
-        <span>Состав турнира</span>
-        <h2>{upcomingPredictionTournament.roster.length} участников в заявке</h2>
-      </div>
-      <div className="prediction-roster-grid">
-        {upcomingPredictionTournament.roster.map((player) => (
-          <article className="prediction-roster-player" key={player.name}>
-            <PredictionBadge value={player.rating} />
-            <strong>{player.name}</strong>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function PredictionRankingCard({
-  account,
-  order,
-  draggedIndex,
-  savedAt,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  onMove,
-  onSave,
-}) {
-  if (!account) {
-    return (
-      <section className="surface prediction-ranking-card locked" id="ranking">
-        <div className="section-title">
-          <span>Мой прогноз</span>
-          <h2>Войдите, чтобы собрать порядок мест</h2>
-        </div>
-        <p>После входа здесь появится список игроков, который можно перетаскивать вверх и вниз.</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="surface prediction-ranking-card" id="ranking">
-      <div className="prediction-card-head">
-        <div className="section-title">
-          <span>Мой прогноз</span>
-          <h2>Распределите игроков по местам</h2>
-        </div>
-        <button type="button" onClick={onSave}>Сохранить прогноз</button>
-      </div>
-      <div className="prediction-order-list">
-        {order.map((playerName, index) => {
-          const player = upcomingPredictionTournament.roster.find((item) => item.name === playerName);
-
-          return (
-            <article
-              className={`prediction-order-row ${draggedIndex === index ? "dragging" : ""}`}
-              draggable
-              key={playerName}
-              onDragEnd={onDragEnd}
-              onDragOver={onDragOver}
-              onDragStart={(event) => onDragStart(event, index)}
-              onDrop={(event) => onDrop(event, index)}
-            >
-              <b>{index + 1}</b>
-              <span className="drag-handle" aria-hidden="true">☰</span>
-              <PredictionBadge value={player?.rating ?? 0} />
-              <strong>{playerName}</strong>
-              <div className="prediction-row-actions">
-                <button aria-label={`Поднять ${playerName}`} disabled={index === 0} type="button" onClick={() => onMove(index, index - 1)}>
-                  ↑
-                </button>
-                <button aria-label={`Опустить ${playerName}`} disabled={index === order.length - 1} type="button" onClick={() => onMove(index, index + 1)}>
-                  ↓
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      <footer>
-        {savedAt ? `Сохранено: ${savedAt}` : "Прогноз еще не сохранен"}
-      </footer>
-    </section>
-  );
-}
-
-function PredictionResultsCard() {
-  const leaderboard = getCompletedPredictionLeaderboard();
-  const winners = leaderboard.filter((item) => item.score === leaderboard[0]?.score);
-
-  return (
-    <section className="prediction-results" id="results">
-      <section className="surface prediction-final-table">
-        <div className="section-title">
-          <span>{completedPredictionRound.status}</span>
-          <h2>{completedPredictionRound.title} · {completedPredictionRound.date}</h2>
-        </div>
-        <div className="prediction-final-head">
-          <span>#</span>
-          <span>Игрок</span>
-          <span>Факт</span>
-        </div>
-        {completedPredictionRound.results.map((player, index) => (
-          <article className="prediction-final-row" key={player}>
-            <b>{index + 1}</b>
-            <strong>{player}</strong>
-            <span>{mexicanoPlayers.find((item) => item.name === player)?.points ?? "—"}</span>
-          </article>
-        ))}
-      </section>
-
-      <section className="surface prediction-leaderboard">
-        <div className="section-title">
-          <span>Раунд прогнозов</span>
-          <h2>Победитель: {winners.map((item) => item.author).join(", ")}</h2>
-        </div>
-        <div className="forecast-list">
-          {leaderboard.map((prediction, index) => (
-            <article className="forecast-card" key={prediction.author}>
-              <div className="forecast-card-top">
-                <b>{index + 1}</b>
-                <div>
-                  <strong>{prediction.author}</strong>
-                  <span>{prediction.score} точных мест</span>
-                </div>
-              </div>
-              <ol>
-                {prediction.ranking.map((player, place) => (
-                  <li className={completedPredictionRound.results[place] === player ? "hit" : ""} key={`${prediction.author}-${player}`}>
-                    <span>{place + 1}</span>
-                    <strong>{player}</strong>
-                  </li>
-                ))}
-              </ol>
-            </article>
-          ))}
-        </div>
-      </section>
-    </section>
-  );
-}
-
-function PredictionsScreen({ onBack }) {
-  const savedAccount = readJsonStorage("pb-prediction-account", null);
-  const [account, setAccount] = useState(savedAccount);
-  const [loginForm, setLoginForm] = useState({ login: "", password: "" });
-  const [loginError, setLoginError] = useState("");
-  const [draggedIndex, setDraggedIndex] = useState(null);
-  const initialSavedPrediction = getSavedPrediction(savedAccount);
-  const [predictionOrder, setPredictionOrder] = useState(initialSavedPrediction?.ranking ?? getDefaultPredictionOrder());
-  const [savedAt, setSavedAt] = useState(initialSavedPrediction?.savedAt ?? "");
-
-  const movePrediction = (from, to) => {
-    if (to < 0 || to >= predictionOrder.length || from === to) {
-      return;
-    }
-
-    setPredictionOrder((current) => {
-      const next = [...current];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
-
-  const handleLoginChange = (event) => {
-    const { name, value } = event.target;
-    setLoginForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleLogin = (event) => {
+function MainNav({ active = "home", onOpenHome, onOpenPredictions, label = "Club", action = null }) {
+  const goHome = (event) => {
     event.preventDefault();
-    const nextAccount = predictionUsers.find(
-      (user) => user.login === loginForm.login.trim() && user.password === loginForm.password,
-    );
-
-    if (!nextAccount) {
-      setLoginError("Проверьте логин и пароль.");
-      return;
-    }
-
-    const publicAccount = { login: nextAccount.login, name: nextAccount.name, rating: nextAccount.rating };
-    const savedPrediction = getSavedPrediction(publicAccount);
-    setAccount(publicAccount);
-    setLoginError("");
-    setLoginForm({ login: "", password: "" });
-    setPredictionOrder(savedPrediction?.ranking ?? getDefaultPredictionOrder());
-    setSavedAt(savedPrediction?.savedAt ?? "");
-    writeJsonStorage("pb-prediction-account", publicAccount);
+    onOpenHome?.();
   };
 
-  const handleLogout = () => {
-    setAccount(null);
-    setSavedAt("");
-    setPredictionOrder(getDefaultPredictionOrder());
-    writeJsonStorage("pb-prediction-account", null);
-  };
+  return (
+    <header className="topbar">
+      <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={goHome}>
+        <span className="brand-mark">PB</span>
+        <strong>Padel Brazzers</strong>
+        <span>{label}</span>
+      </a>
+      <nav>
+        <a className={active === "tournaments" ? "active" : ""} href="#registry" onClick={active === "predictions" ? goHome : undefined}>
+          Турниры
+        </a>
+        <a className={active === "leaders" ? "active" : ""} href="#leaders">Лидеры</a>
+        <button className={active === "predictions" ? "active" : ""} type="button" onClick={onOpenPredictions}>
+          Прогнозы
+        </button>
+        <a href="#community">Сообщество</a>
+      </nav>
+      {action ?? (
+        <div className="profile-chip home-chip">
+          <span>PB</span>
+          <b>PRO</b>
+        </div>
+      )}
+    </header>
+  );
+}
 
-  const handleDragStart = (event, index) => {
-    setDraggedIndex(index);
-    event.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (event) => {
-    event.preventDefault();
-  };
-
-  const handleDrop = (event, index) => {
-    event.preventDefault();
-    if (draggedIndex !== null) {
-      movePrediction(draggedIndex, index);
-    }
-    setDraggedIndex(null);
-  };
-
-  const handleSave = () => {
-    if (!account) {
-      return;
-    }
-
-    const stamp = new Intl.DateTimeFormat("ru-RU", {
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      month: "long",
-    }).format(new Date());
-    const payload = {
-      author: account.name,
-      ranking: predictionOrder,
-      savedAt: stamp,
-    };
-
-    writeJsonStorage(predictionStorageKey(account), payload);
-    setSavedAt(stamp);
-  };
-
+function ForecastRegistryScreen({ onOpenHome, onOpenPredictions, onOpenTournament }) {
   return (
     <main className="predictions-shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
-          <span className="brand-mark">PB</span>
-          <strong>Padel Brazzers</strong>
-          <span>Forecast</span>
-        </a>
-        <nav>
-          <a href="#top">Турнир</a>
-          <a href="#roster">Состав</a>
-          <a href="#ranking">Мой порядок</a>
-          <a href="#results">Итоги</a>
-        </nav>
-        <div className="profile-chip">
-          <button className="back-link" type="button" onClick={onBack}>На главную</button>
-          <span>{account ? "✓" : "PB"}</span>
-        </div>
-      </header>
+      <MainNav
+        active="predictions"
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPredictions={onOpenPredictions}
+        action={(
+          <div className="profile-chip home-chip">
+            <span>PB</span>
+            <b>Forecast</b>
+          </div>
+        )}
+      />
 
       <section className="prediction-hero surface" id="top">
         <img src="/assets/hero-court.png" alt="Падел корт перед турниром" />
         <div className="prediction-hero-copy">
-          <span className="eyebrow">{upcomingPredictionTournament.status}</span>
-          <h1>Прогнозы на результат турнира</h1>
-          <div className="meta-row">
-            <span>{upcomingPredictionTournament.date}</span>
-            <span>{upcomingPredictionTournament.time}</span>
-            <span>{upcomingPredictionTournament.club}</span>
-          </div>
+          <span className="eyebrow">Реестр прогнозов</span>
+          <h1>Будущие турниры для прогнозов</h1>
           <p>
-            {upcomingPredictionTournament.title}: участники собирают свой порядок финиша до старта,
-            а после внесения результатов система считает точные совпадения по местам.
+            Здесь будут турниры, которые опубликованы заранее и открыты для ставок
+            на итоговые места. Нажатие на турнир открывает карточку с составом и
+            расстановкой участников.
           </p>
         </div>
         <div className="prediction-hero-stats">
-          <div><strong>{upcomingPredictionTournament.roster.length}</strong><span>участников</span></div>
+          <div><strong>{forecastTournaments.length}</strong><span>турнир в реестре</span></div>
           <div><strong>1</strong><span>балл за точное место</span></div>
-          <div><strong>{completedPredictionRound.predictions.length}</strong><span>прогноза в прошлом раунде</span></div>
+          <div><strong>До старта</strong><span>прием прогнозов</span></div>
         </div>
       </section>
 
-      <section className="prediction-dashboard">
-        <PredictionLoginCard
-          account={account}
-          error={loginError}
-          form={loginForm}
-          onChange={handleLoginChange}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-        />
+      <section className="home-layout forecast-registry-layout" id="registry">
+        <section className="surface registry-card">
+          <div className="registry-head">
+            <div>
+              <span>Реестр прогнозов</span>
+              <h2>Турниры, которые еще впереди</h2>
+            </div>
+          </div>
+
+          <div className="tournament-list">
+            {forecastTournaments.map((tournament) => (
+              <button
+                className="tournament-row featured"
+                type="button"
+                onClick={() => onOpenTournament(tournament.id)}
+                key={tournament.id}
+              >
+                <img src={tournament.image} alt="" />
+                <div className="tournament-copy">
+                  <span>{tournament.date} · {tournament.club}</span>
+                  <strong>{tournament.title}</strong>
+                  <p>{tournament.format} · {tournament.players}</p>
+                </div>
+                <div className="tournament-result">
+                  <span>{tournament.status}</span>
+                  <strong>Прогнозы</strong>
+                  <small>Открыть</small>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <aside className="home-side">
+          <section className="surface side-panel prediction-teaser-panel" id="community">
+            <div className="section-title">
+              <span>Как это работает</span>
+              <h2>Сначала публикуем турнир, потом принимаем прогнозы</h2>
+            </div>
+            <p>
+              После добавления турнира в управляющей части здесь появятся дата,
+              формат, состав и статус приема прогнозов.
+            </p>
+          </section>
+        </aside>
+      </section>
+    </main>
+  );
+}
+
+function ForecastTournamentDetail({ tournament, onOpenHome, onOpenPredictions, onBack }) {
+  return (
+    <main className="predictions-shell">
+      <MainNav
+        active="predictions"
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPredictions={onOpenPredictions}
+        action={(
+          <div className="profile-chip">
+            <button className="back-link" type="button" onClick={onBack}>Все прогнозы</button>
+            <span>PB</span>
+          </div>
+        )}
+      />
+
+      <section className="prediction-detail-grid" id="top">
+        <section className="surface hero-card prediction-detail-hero">
+          <img src={tournament.image} alt="" />
+          <div className="hero-content">
+            <span className="eyebrow">{tournament.status}</span>
+            <h1>{tournament.title}</h1>
+            <div className="meta-row">
+              <span>{tournament.date}</span>
+              <span>{tournament.time}</span>
+              <span>{tournament.club}</span>
+            </div>
+            <p>
+              Карточка будущего турнира для прогнозов. После публикации состава
+              участник сможет открыть этот экран и расставить игроков по местам.
+            </p>
+          </div>
+          <div className="metric-strip">
+            <div><strong>{tournament.roster.length || "—"}</strong><span>участников</span></div>
+            <div><strong>1</strong><span>балл за позицию</span></div>
+            <div><strong>До старта</strong><span>редактирование</span></div>
+            <div><strong>{tournament.format}</strong><span>формат</span></div>
+          </div>
+        </section>
+
         <section className="surface prediction-tournament-card">
           <div className="section-title">
-            <span>Будущий турнир</span>
-            <h2>{upcomingPredictionTournament.title}</h2>
+            <span>Кабинет участника</span>
+            <h2>Вход появится после подключения авторизации</h2>
           </div>
-          <div className="prediction-tournament-meta">
-            <strong>{upcomingPredictionTournament.date}</strong>
-            <span>{upcomingPredictionTournament.format}</span>
-            <span>{upcomingPredictionTournament.club}</span>
-          </div>
-          <p>Прием прогнозов открыт для авторизованных участников.</p>
+          <p>
+            Здесь будет состояние участника: вошел в аккаунт, прогноз сохранен,
+            можно изменить до закрытия приема.
+          </p>
         </section>
       </section>
 
       <section className="prediction-workspace">
-        <PredictionRosterCard />
-        <PredictionRankingCard
-          account={account}
-          draggedIndex={draggedIndex}
-          onDragEnd={() => setDraggedIndex(null)}
-          onDragOver={handleDragOver}
-          onDragStart={handleDragStart}
-          onDrop={handleDrop}
-          onMove={movePrediction}
-          onSave={handleSave}
-          order={predictionOrder}
-          savedAt={savedAt}
-        />
-      </section>
+        <section className="surface prediction-roster-card" id="roster">
+          <div className="section-title">
+            <span>Состав турнира</span>
+            <h2>Игроки появятся из управляющей части</h2>
+          </div>
+          <div className="prediction-empty-list">
+            <strong>Состав пока не опубликован</strong>
+            <p>Когда организатор добавит участников, здесь появятся плашки игроков.</p>
+          </div>
+        </section>
 
-      <PredictionResultsCard />
+        <section className="surface prediction-ranking-card" id="ranking">
+          <div className="prediction-card-head">
+            <div className="section-title">
+              <span>Мой прогноз</span>
+              <h2>Порядок мест</h2>
+            </div>
+            <button disabled type="button">Сохранить прогноз</button>
+          </div>
+          <div className="prediction-empty-list tall">
+            <strong>Расстановка откроется после публикации состава</strong>
+            <p>Здесь будет drag-and-drop список участников: 1-е место сверху, последнее место снизу.</p>
+          </div>
+        </section>
+      </section>
     </main>
   );
 }
@@ -1480,7 +1145,7 @@ function HomeScreen({ onOpenTournament, onOpenPredictions }) {
           <span>Club</span>
         </a>
         <nav>
-          <a href="#registry">Турниры</a>
+          <a className="active" href="#registry">Турниры</a>
           <a href="#leaders">Лидеры</a>
           <button type="button" onClick={onOpenPredictions}>Прогнозы</button>
           <a href="#community">Сообщество</a>
@@ -1900,8 +1565,27 @@ function TournamentDetail({ onBack }) {
 export function App() {
   const [screen, setScreen] = useState({ name: "home" });
 
+  if (screen.name === "forecast-detail") {
+    const tournament = forecastTournaments.find((item) => item.id === screen.tournamentId) ?? forecastTournaments[0];
+
+    return (
+      <ForecastTournamentDetail
+        onBack={() => setScreen({ name: "predictions" })}
+        onOpenHome={() => setScreen({ name: "home" })}
+        onOpenPredictions={() => setScreen({ name: "predictions" })}
+        tournament={tournament}
+      />
+    );
+  }
+
   if (screen.name === "predictions") {
-    return <PredictionsScreen onBack={() => setScreen({ name: "home" })} />;
+    return (
+      <ForecastRegistryScreen
+        onOpenHome={() => setScreen({ name: "home" })}
+        onOpenPredictions={() => setScreen({ name: "predictions" })}
+        onOpenTournament={(tournamentId) => setScreen({ name: "forecast-detail", tournamentId })}
+      />
+    );
   }
 
   if (screen.name === "detail") {
