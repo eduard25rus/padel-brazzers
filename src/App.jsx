@@ -1870,26 +1870,30 @@ function ForecastTournamentDetail({
   scoringMethods,
   tournament,
 }) {
+  const getPlayerKey = (player) => player.id ?? player.name;
   const sortedRoster = useMemo(
     () => [...tournament.roster].sort((a, b) => Number(b.rating) - Number(a.rating) || a.name.localeCompare(b.name)),
     [tournament.roster],
   );
   const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: 16 }, () => null));
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [forecastSaveMessage, setForecastSaveMessage] = useState("");
   const [adminEditing, setAdminEditing] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
   const filledSlots = forecastSlots.filter(Boolean).length;
-  const isForecastComplete = tournament.roster.length > 0 && filledSlots === Math.min(16, tournament.roster.length);
+  const forecastPlayerIds = new Set(forecastSlots.filter(Boolean).map((slot) => String(getPlayerKey(slot))));
+  const expectedPlayerIds = sortedRoster.slice(0, 16).map((player) => String(getPlayerKey(player)));
+  const isForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => forecastPlayerIds.has(playerId));
   const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
 
-  const getPlayerKey = (player) => player.id ?? player.name;
   const selectedPlayer = sortedRoster.find((player) => getPlayerKey(player) === selectedPlayerId);
 
   useEffect(() => {
     setForecastSlots(Array.from({ length: 16 }, () => null));
     setSelectedPlayerId(null);
+    setForecastSaveMessage("");
     setAdminEditing(false);
     setAdminMessage("");
   }, [tournament.id]);
@@ -1906,16 +1910,40 @@ function ForecastTournamentDetail({
       return next;
     });
     setSelectedPlayerId(null);
+    setForecastSaveMessage("");
   };
 
   const clearSlot = (slotIndex) => {
     setForecastSlots((current) => current.map((slot, index) => (index === slotIndex ? null : slot)));
+    setForecastSaveMessage("");
   };
 
   const handleSlotDrop = (event, slotIndex) => {
     event.preventDefault();
+    const sourceSlotValue = event.dataTransfer.getData("application/x-padel-slot");
+    const sourceSlotIndex = Number(sourceSlotValue);
+    if (sourceSlotValue !== "" && Number.isInteger(sourceSlotIndex) && sourceSlotIndex >= 0 && sourceSlotIndex < forecastSlots.length) {
+      if (sourceSlotIndex !== slotIndex) {
+        setForecastSlots((current) => {
+          const next = [...current];
+          [next[sourceSlotIndex], next[slotIndex]] = [next[slotIndex], next[sourceSlotIndex]];
+          return next;
+        });
+        setForecastSaveMessage("");
+      }
+      return;
+    }
+
     const playerId = event.dataTransfer.getData("text/plain");
     placePlayer(slotIndex, playerId);
+  };
+
+  const saveForecast = () => {
+    if (!isForecastComplete) {
+      return;
+    }
+
+    setForecastSaveMessage("Прогноз сохранен на этом устройстве. Скоро подключим общий рейтинг прогнозов.");
   };
 
   const submitTournamentUpdate = async (payload) => {
@@ -2082,8 +2110,9 @@ function ForecastTournamentDetail({
               <span>Мой прогноз</span>
               <h2>16 мест турнира</h2>
             </div>
-            <button disabled={!isForecastComplete} type="button">Сохранить прогноз</button>
+            <button disabled={!isForecastComplete} type="button" onClick={saveForecast}>Сохранить прогноз</button>
           </div>
+          {forecastSaveMessage && <strong className="prediction-save-message">{forecastSaveMessage}</strong>}
           {tournament.roster.length === 0 ? (
             <div className="prediction-empty-list tall">
               <strong>Расстановка откроется после публикации состава</strong>
@@ -2094,12 +2123,13 @@ function ForecastTournamentDetail({
               <div className="prediction-placement-hint">
                 {selectedPlayer
                   ? `Выбран: ${selectedPlayer.name}. Нажми на место справа.`
-                  : "Перетащи игрока в место справа или выбери игрока кликом, затем нажми на слот."}
+                  : `Расставлено ${filledSlots} из ${expectedPlayerIds.length}. Перетаскивай игроков в места справа, а занятые места можно менять между собой.`}
               </div>
               <div className="prediction-slot-grid">
                 {forecastSlots.map((slot, index) => (
                   <button
                     className={`prediction-slot ${slot ? "filled" : ""}`}
+                    draggable={Boolean(slot)}
                     key={`slot-${index}`}
                     type="button"
                     onClick={() => {
@@ -2113,6 +2143,15 @@ function ForecastTournamentDetail({
                       }
                     }}
                     onDragOver={(event) => event.preventDefault()}
+                    onDragStart={(event) => {
+                      if (!slot) {
+                        return;
+                      }
+
+                      event.dataTransfer.setData("text/plain", String(getPlayerKey(slot)));
+                      event.dataTransfer.setData("application/x-padel-slot", String(index));
+                      event.dataTransfer.effectAllowed = "move";
+                    }}
                     onDrop={(event) => handleSlotDrop(event, index)}
                   >
                     <span>{index + 1}</span>

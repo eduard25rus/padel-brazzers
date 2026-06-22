@@ -1649,6 +1649,18 @@ main {
   padding: 10px 12px;
 }
 
+.prediction-save-message {
+  background: rgba(29, 93, 42, 0.08);
+  border: 1px solid rgba(29, 93, 42, 0.14);
+  border-radius: 8px;
+  color: var(--green);
+  display: block;
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
 .prediction-slot-grid {
   display: grid;
   gap: 8px;
@@ -1685,6 +1697,11 @@ main {
 .prediction-slot.filled {
   background: rgba(255, 254, 250, 0.92);
   border-style: solid;
+  cursor: grab;
+}
+
+.prediction-slot.filled:active {
+  cursor: grabbing;
 }
 
 .prediction-slot > span {
