@@ -1338,9 +1338,81 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
   );
 }
 
+function AdminMembersPanel({ users }) {
+  return (
+    <section className="surface admin-members-panel">
+      <div className="section-title">
+        <span>Клуб</span>
+        <h2>Все зарегистрированные участники</h2>
+      </div>
+
+      {users.length === 0 ? (
+        <p>Пока нет зарегистрированных аккаунтов.</p>
+      ) : (
+        <div className="member-list">
+          {users.map((user) => (
+            <article className="member-row" key={user.id}>
+              <span>{getInitials(user)}</span>
+              <div>
+                <strong>{getUserDisplayName(user)}</strong>
+                <small>{user.lundaNick} · {user.email} · {user.phone}</small>
+              </div>
+              <b className={`member-status ${user.status}`}>{user.status === "active" ? "Активен" : "Заявка"}</b>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AdminSectionShell({ children, eyebrow, onBack, title }) {
+  return (
+    <section className="admin-section-shell">
+      <div className="admin-section-head">
+        <button className="back-link" type="button" onClick={onBack}>К меню кабинета</button>
+        <div>
+          <span>{eyebrow}</span>
+          <h2>{title}</h2>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function AdminCabinetScreen({ auth, forecastTournaments, onCreateTournament, onOpenHome, onOpenPredictions }) {
+  const [activeSection, setActiveSection] = useState(null);
   const pendingUsers = auth.users.filter((user) => user.status === "pending");
-  const activeMembers = auth.users.filter((user) => user.status === "active" && user.role !== "admin");
+  const activeMembers = auth.users.filter((user) => user.status === "active");
+
+  const renderActiveSection = () => {
+    if (activeSection === "approvals") {
+      return (
+        <AdminSectionShell eyebrow="Акцепт заявок" onBack={() => setActiveSection(null)} title="Проверка новых регистраций">
+          <AdminApprovalPanel users={auth.users} onApproveUser={auth.onApproveUser} />
+        </AdminSectionShell>
+      );
+    }
+
+    if (activeSection === "tournament") {
+      return (
+        <AdminSectionShell eyebrow="Прогнозы" onBack={() => setActiveSection(null)} title="Добавить турнир для прогнозов">
+          <AdminTournamentForm forecastTournaments={forecastTournaments} onCreateTournament={onCreateTournament} />
+        </AdminSectionShell>
+      );
+    }
+
+    if (activeSection === "members") {
+      return (
+        <AdminSectionShell eyebrow="Члены клуба" onBack={() => setActiveSection(null)} title="Все зарегистрированные участники">
+          <AdminMembersPanel users={auth.users} />
+        </AdminSectionShell>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <main className="admin-cabinet-shell">
@@ -1356,10 +1428,10 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateTournament, onO
       <section className="admin-cabinet-hero surface" id="top">
         <div>
           <span className="eyebrow">Личный кабинет админа</span>
-          <h1>Акцепт заявок участников</h1>
+          <h1>Управление клубом</h1>
           <p>
-            Все новые регистрации попадают сюда. Пока заявка не принята, участник
-            может войти в аккаунт, но не сможет открыть прогнозы и ставить места.
+            Выбирай нужный раздел: принять новые регистрации, добавить турнир для
+            прогнозов или посмотреть полный список членов клуба.
           </p>
         </div>
         <div className="admin-cabinet-stats">
@@ -1369,35 +1441,27 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateTournament, onO
         </div>
       </section>
 
-      <AdminTournamentForm forecastTournaments={forecastTournaments} onCreateTournament={onCreateTournament} />
+      {activeSection ? renderActiveSection() : (
+        <section className="admin-menu-grid">
+          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("approvals")}>
+            <span>Акцепт заявок</span>
+            <strong>{pendingUsers.length ? `${pendingUsers.length} ожидают проверки` : "Новых заявок нет"}</strong>
+            <p>Открыть заявки, проверить данные участника и принять регистрацию.</p>
+          </button>
 
-      <section className="admin-cabinet-grid">
-        <AdminApprovalPanel users={auth.users} onApproveUser={auth.onApproveUser} />
+          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("tournament")}>
+            <span>Прогнозы</span>
+            <strong>Добавить турнир</strong>
+            <p>Дата, формат, условия, состав игроков и рейтинги для нового прогноза.</p>
+          </button>
 
-        <section className="surface side-panel admin-members-panel">
-          <div className="section-title">
-            <span>Уже приняты</span>
-            <h2>Активные участники</h2>
-          </div>
-
-          {activeMembers.length === 0 ? (
-            <p>Пока нет принятых участников.</p>
-          ) : (
-            <div className="member-list">
-              {activeMembers.map((user) => (
-                <article className="member-row" key={user.id}>
-                  <span>{getInitials(user)}</span>
-                  <div>
-                    <strong>{getUserDisplayName(user)}</strong>
-                    <small>{user.lundaNick} · {user.email}</small>
-                  </div>
-                  <b>Активен</b>
-                </article>
-              ))}
-            </div>
-          )}
+          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("members")}>
+            <span>Члены клуба</span>
+            <strong>{activeMembers.length} активных из {auth.users.length}</strong>
+            <p>Полный список зарегистрированных аккаунтов со статусами и контактами.</p>
+          </button>
         </section>
-      </section>
+      )}
     </main>
   );
 }

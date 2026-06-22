@@ -1002,8 +1002,70 @@ main {
   margin-top: 0;
 }
 
-.admin-tournament-panel {
+.admin-menu-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 14px;
+}
+
+.admin-menu-card {
+  cursor: pointer;
+  min-height: 220px;
+  padding: 24px;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.admin-menu-card:hover {
+  border-color: rgba(29, 93, 42, 0.28);
+  transform: translateY(-2px);
+}
+
+.admin-menu-card span,
+.admin-section-head span {
+  color: var(--green);
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-menu-card strong {
+  color: #17221a;
+  display: block;
+  font-size: 28px;
+  line-height: 1.05;
+  margin-top: 12px;
+}
+
+.admin-menu-card p {
+  margin: 18px 0 0;
+}
+
+.admin-section-shell {
+  margin-top: 14px;
+}
+
+.admin-section-head {
+  align-items: flex-end;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.admin-section-head h2 {
+  font-size: clamp(30px, 3.8vw, 54px);
+  line-height: 1;
+  margin-top: 8px;
+}
+
+.admin-tournament-panel {
   padding: 22px;
 }
 
@@ -1265,6 +1327,10 @@ main {
 .member-row b {
   color: var(--green);
   font-size: 12px;
+}
+
+.member-status.pending {
+  color: var(--loss);
 }
 
 .secondary-action {
@@ -2422,6 +2488,7 @@ p {
   .prediction-access-gate,
   .admin-cabinet-hero,
   .admin-cabinet-grid,
+  .admin-menu-grid,
   .forecast-registry-layout {
     grid-template-columns: 1fr;
   }
@@ -2738,6 +2805,7 @@ p {
   }
 
   .admin-player-head,
+  .admin-section-head,
   .admin-tournament-form footer {
     align-items: flex-start;
     flex-direction: column;
