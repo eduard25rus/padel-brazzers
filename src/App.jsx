@@ -273,7 +273,7 @@ const tournamentRegistry = {
   ],
 };
 
-const forecastTournaments = [
+const fallbackForecastTournaments = [
   {
     id: "forecast-shell",
     title: "Будущий турнир",
@@ -1176,7 +1176,169 @@ function AdminApprovalPanel({ users, onApproveUser }) {
   );
 }
 
-function AdminCabinetScreen({ auth, onOpenHome, onOpenPredictions }) {
+function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
+  const [form, setForm] = useState({
+    club: "Padel Pro Club",
+    conditions: "",
+    date: "",
+    format: "Americano",
+    predictionCloseAt: "",
+    scoring: "1 балл за точное место",
+    time: "",
+    title: "",
+  });
+  const [players, setPlayers] = useState([
+    { name: "", rating: "" },
+    { name: "", rating: "" },
+    { name: "", rating: "" },
+    { name: "", rating: "" },
+  ]);
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setMessage("");
+  };
+
+  const updatePlayer = (index, field, value) => {
+    setPlayers((current) => current.map((player, playerIndex) => (
+      playerIndex === index ? { ...player, [field]: value } : player
+    )));
+    setMessage("");
+  };
+
+  const addPlayer = () => {
+    setPlayers((current) => [...current, { name: "", rating: "" }]);
+  };
+
+  const removePlayer = (index) => {
+    setPlayers((current) => current.filter((_, playerIndex) => playerIndex !== index));
+  };
+
+  const submitTournament = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+
+    const roster = players
+      .map((player) => ({ name: player.name.trim(), rating: Number(player.rating) }))
+      .filter((player) => player.name && Number.isFinite(player.rating));
+
+    const result = await onCreateTournament({ ...form, roster });
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+
+    setForm({
+      club: "Padel Pro Club",
+      conditions: "",
+      date: "",
+      format: "Americano",
+      predictionCloseAt: "",
+      scoring: "1 балл за точное место",
+      time: "",
+      title: "",
+    });
+    setPlayers([
+      { name: "", rating: "" },
+      { name: "", rating: "" },
+      { name: "", rating: "" },
+      { name: "", rating: "" },
+    ]);
+    setMessage("Турнир опубликован в прогнозах.");
+  };
+
+  return (
+    <section className="surface admin-tournament-panel">
+      <div className="section-title">
+        <span>Прогнозы</span>
+        <h2>Новый турнир для участников</h2>
+      </div>
+
+      <form className="admin-tournament-form" onSubmit={submitTournament}>
+        <div className="admin-form-grid">
+          <label>
+            <span>Название</span>
+            <input required value={form.title} onChange={(event) => updateForm("title", event.target.value)} placeholder="Например, Friday Mexicano" />
+          </label>
+          <label>
+            <span>Формат</span>
+            <select value={form.format} onChange={(event) => updateForm("format", event.target.value)}>
+              <option>Americano</option>
+              <option>Mexicano</option>
+              <option>Round Robin</option>
+              <option>King of the Court</option>
+            </select>
+          </label>
+          <label>
+            <span>Дата</span>
+            <input required type="date" value={form.date} onChange={(event) => updateForm("date", event.target.value)} />
+          </label>
+          <label>
+            <span>Время</span>
+            <input required type="time" value={form.time} onChange={(event) => updateForm("time", event.target.value)} />
+          </label>
+          <label>
+            <span>Клуб</span>
+            <input required value={form.club} onChange={(event) => updateForm("club", event.target.value)} />
+          </label>
+          <label>
+            <span>Прием прогнозов до</span>
+            <input type="datetime-local" value={form.predictionCloseAt} onChange={(event) => updateForm("predictionCloseAt", event.target.value)} />
+          </label>
+        </div>
+
+        <label>
+          <span>Условия турнира</span>
+          <textarea
+            required
+            value={form.conditions}
+            onChange={(event) => updateForm("conditions", event.target.value)}
+            placeholder="Коротко: формат, пары/смены партнеров, как считается итог, ограничения по заменам."
+          />
+        </label>
+
+        <label>
+          <span>Подсчет прогнозов</span>
+          <input value={form.scoring} onChange={(event) => updateForm("scoring", event.target.value)} />
+        </label>
+
+        <div className="admin-player-editor">
+          <div className="admin-player-head">
+            <div>
+              <span>Состав и рейтинги</span>
+              <strong>Минимум 2 игрока</strong>
+            </div>
+            <button type="button" onClick={addPlayer}>Добавить игрока</button>
+          </div>
+
+          <div className="admin-player-list">
+            {players.map((player, index) => (
+              <div className="admin-player-row" key={`player-${index}`}>
+                <b>{index + 1}</b>
+                <input value={player.name} onChange={(event) => updatePlayer(index, "name", event.target.value)} placeholder="Имя игрока" />
+                <input inputMode="decimal" value={player.rating} onChange={(event) => updatePlayer(index, "rating", event.target.value)} placeholder="Рейтинг" />
+                <button disabled={players.length <= 2} type="button" onClick={() => removePlayer(index)}>Убрать</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {message && <strong className={message.includes("опубликован") ? "admin-form-success" : "prediction-error"}>{message}</strong>}
+
+        <footer>
+          <span>{forecastTournaments.length} турниров в реестре прогнозов</span>
+          <button disabled={submitting} type="submit">{submitting ? "Публикуем..." : "Опубликовать турнир"}</button>
+        </footer>
+      </form>
+    </section>
+  );
+}
+
+function AdminCabinetScreen({ auth, forecastTournaments, onCreateTournament, onOpenHome, onOpenPredictions }) {
   const pendingUsers = auth.users.filter((user) => user.status === "pending");
   const activeMembers = auth.users.filter((user) => user.status === "active" && user.role !== "admin");
 
@@ -1203,9 +1365,11 @@ function AdminCabinetScreen({ auth, onOpenHome, onOpenPredictions }) {
         <div className="admin-cabinet-stats">
           <div><strong>{pendingUsers.length}</strong><span>ожидают принятия</span></div>
           <div><strong>{activeMembers.length}</strong><span>принятых участников</span></div>
-          <div><strong>{auth.users.length}</strong><span>аккаунтов всего</span></div>
+          <div><strong>{forecastTournaments.length}</strong><span>турниров для прогнозов</span></div>
         </div>
       </section>
+
+      <AdminTournamentForm forecastTournaments={forecastTournaments} onCreateTournament={onCreateTournament} />
 
       <section className="admin-cabinet-grid">
         <AdminApprovalPanel users={auth.users} onApproveUser={auth.onApproveUser} />
@@ -1306,7 +1470,7 @@ function LockedPredictionsScreen({ auth, onOpenHome, onOpenPredictions }) {
   );
 }
 
-function ForecastRegistryScreen({ auth, onOpenHome, onOpenPredictions, onOpenTournament }) {
+function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenPredictions, onOpenTournament }) {
   return (
     <main className="predictions-shell">
       <MainNav
@@ -1330,7 +1494,7 @@ function ForecastRegistryScreen({ auth, onOpenHome, onOpenPredictions, onOpenTou
           </p>
         </div>
         <div className="prediction-hero-stats">
-          <div><strong>{forecastTournaments.length}</strong><span>турнир в реестре</span></div>
+          <div><strong>{forecastTournaments.length}</strong><span>турниров в реестре</span></div>
           <div><strong>1</strong><span>балл за точное место</span></div>
           <div><strong>До старта</strong><span>прием прогнозов</span></div>
         </div>
@@ -1346,6 +1510,13 @@ function ForecastRegistryScreen({ auth, onOpenHome, onOpenPredictions, onOpenTou
           </div>
 
           <div className="tournament-list">
+            {forecastTournaments.length === 0 && (
+              <div className="empty-registry">
+                <span>Forecast</span>
+                <strong>Турниров для прогнозов пока нет</strong>
+                <p>Когда админ добавит турнир в кабинете, он появится здесь.</p>
+              </div>
+            )}
             {forecastTournaments.map((tournament) => (
               <button
                 className="tournament-row featured"
@@ -1415,8 +1586,7 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
               <span>{tournament.club}</span>
             </div>
             <p>
-              Карточка будущего турнира для прогнозов. После публикации состава
-              участник сможет открыть этот экран и расставить игроков по местам.
+              {tournament.conditions || "Карточка будущего турнира для прогнозов. Участник сможет расставить игроков по местам до закрытия приема."}
             </p>
           </div>
           <div className="metric-strip">
@@ -1429,12 +1599,13 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
 
         <section className="surface prediction-tournament-card">
           <div className="section-title">
-            <span>Кабинет участника</span>
-            <h2>{getUserDisplayName(auth.currentUser)}</h2>
+            <span>Условия прогноза</span>
+            <h2>{tournament.scoring || "1 балл за точное место"}</h2>
           </div>
           <p>
-            Вход выполнен. Прогноз можно будет сохранить и менять до закрытия
-            приема после публикации состава турнира.
+            {tournament.predictionCloseAt
+              ? `Прием прогнозов открыт до ${tournament.predictionCloseAt}.`
+              : "Прогноз можно будет сохранить и менять до закрытия приема."}
           </p>
         </section>
       </section>
@@ -1443,12 +1614,24 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
         <section className="surface prediction-roster-card" id="roster">
           <div className="section-title">
             <span>Состав турнира</span>
-            <h2>Игроки появятся из управляющей части</h2>
+            <h2>{tournament.roster.length ? `${tournament.roster.length} игроков` : "Игроки появятся из управляющей части"}</h2>
           </div>
-          <div className="prediction-empty-list">
-            <strong>Состав пока не опубликован</strong>
-            <p>Когда организатор добавит участников, здесь появятся плашки игроков.</p>
-          </div>
+          {tournament.roster.length === 0 ? (
+            <div className="prediction-empty-list">
+              <strong>Состав пока не опубликован</strong>
+              <p>Когда организатор добавит участников, здесь появятся плашки игроков.</p>
+            </div>
+          ) : (
+            <div className="prediction-roster-grid">
+              {tournament.roster.map((player, index) => (
+                <article className="prediction-roster-player" key={player.id ?? player.name}>
+                  <span>{index + 1}</span>
+                  <strong>{player.name}</strong>
+                  <b className="prediction-rating">{Number(player.rating).toFixed(2)}</b>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="surface prediction-ranking-card" id="ranking">
@@ -1460,8 +1643,8 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
             <button disabled type="button">Сохранить прогноз</button>
           </div>
           <div className="prediction-empty-list tall">
-            <strong>Расстановка откроется после публикации состава</strong>
-            <p>Здесь будет drag-and-drop список участников: 1-е место сверху, последнее место снизу.</p>
+            <strong>{tournament.roster.length ? "Расстановка готовится" : "Расстановка откроется после публикации состава"}</strong>
+            <p>Здесь будет список участников для прогноза: 1-е место сверху, последнее место снизу.</p>
           </div>
         </section>
       </section>
@@ -1902,6 +2085,7 @@ export function App() {
   const [screen, setScreen] = useState({ name: "home" });
   const [authState, setAuthState] = useState(emptyAuthState);
   const [authMode, setAuthMode] = useState(null);
+  const [forecastTournaments, setForecastTournaments] = useState([]);
   const currentUser = authState.currentUser;
   const canOpenPredictions = currentUser?.status === "active";
   const canOpenAdmin = currentUser?.role === "admin" && currentUser?.status === "active";
@@ -1909,16 +2093,21 @@ export function App() {
   useEffect(() => {
     const loadServerAuthState = async () => {
       try {
-        const payload = await apiRequest("/api/auth/state");
+        const [payload, forecastPayload] = await Promise.all([
+          apiRequest("/api/auth/state"),
+          apiRequest("/api/forecast-tournaments"),
+        ]);
         setAuthState({
           currentUser: payload.user ?? null,
           hasUsers: payload.hasUsers,
           loading: false,
           users: payload.users ?? [],
         });
+        setForecastTournaments(forecastPayload.tournaments ?? []);
       } catch {
         storeAuthToken("");
         setAuthState({ ...emptyAuthState, loading: false });
+        setForecastTournaments(fallbackForecastTournaments);
       }
     };
 
@@ -1941,6 +2130,19 @@ export function App() {
   const refreshAuthState = async () => {
     const payload = await apiRequest("/api/auth/state");
     applyAuthPayload(payload);
+  };
+
+  const createForecastTournament = async (payload) => {
+    try {
+      const result = await apiRequest("/api/admin/forecast-tournaments", {
+        body: JSON.stringify(payload),
+        method: "POST",
+      });
+      setForecastTournaments(result.tournaments ?? []);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
   };
 
   const openPredictions = () => {
@@ -2049,6 +2251,8 @@ export function App() {
       <>
         <AdminCabinetScreen
           auth={auth}
+          forecastTournaments={forecastTournaments}
+          onCreateTournament={createForecastTournament}
           onOpenHome={() => setScreen({ name: "home" })}
           onOpenPredictions={openPredictions}
         />
@@ -2058,7 +2262,7 @@ export function App() {
   }
 
   if (screen.name === "forecast-detail") {
-    const tournament = forecastTournaments.find((item) => item.id === screen.tournamentId) ?? forecastTournaments[0];
+    const tournament = forecastTournaments.find((item) => item.id === screen.tournamentId) ?? forecastTournaments[0] ?? fallbackForecastTournaments[0];
 
     if (!canOpenPredictions) {
       return (
@@ -2105,6 +2309,7 @@ export function App() {
       <>
         <ForecastRegistryScreen
           auth={auth}
+          forecastTournaments={forecastTournaments}
           onOpenHome={() => setScreen({ name: "home" })}
           onOpenPredictions={openPredictions}
           onOpenTournament={(tournamentId) => setScreen({ name: "forecast-detail", tournamentId })}

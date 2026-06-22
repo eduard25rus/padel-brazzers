@@ -23,7 +23,7 @@ const mimeTypes = {
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
-    writeFileSync(storePath, JSON.stringify({ sessions: [], users: [] }, null, 2));
+    writeFileSync(storePath, JSON.stringify({ forecastTournaments: [], sessions: [], users: [] }, null, 2));
   }
 }
 
@@ -33,11 +33,12 @@ function readStore() {
   try {
     const parsed = JSON.parse(readFileSync(storePath, "utf8"));
     return {
+      forecastTournaments: Array.isArray(parsed.forecastTournaments) ? parsed.forecastTournaments : [],
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
   } catch {
-    return { sessions: [], users: [] };
+    return { forecastTournaments: [], sessions: [], users: [] };
   }
 }
 
@@ -58,6 +59,27 @@ function sanitizeUser(user) {
 
   const { passwordHash, passwordSalt, ...safeUser } = user;
   return safeUser;
+}
+
+function sanitizeTournament(tournament) {
+  const roster = Array.isArray(tournament.roster) ? tournament.roster : [];
+
+  return {
+    club: tournament.club ?? "Padel Pro Club",
+    conditions: tournament.conditions ?? "",
+    createdAt: tournament.createdAt,
+    date: tournament.date ?? "",
+    format: tournament.format ?? "",
+    id: tournament.id,
+    image: tournament.image ?? "/assets/hero-court.png",
+    players: tournament.players ?? `${roster.length} игроков`,
+    predictionCloseAt: tournament.predictionCloseAt ?? "",
+    roster,
+    scoring: tournament.scoring ?? "1 балл за точное место",
+    status: tournament.status ?? "Прием прогнозов",
+    time: tournament.time ?? "",
+    title: tournament.title ?? "Будущий турнир",
+  };
 }
 
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
@@ -138,6 +160,11 @@ async function handleApi(request, response, url) {
   if (request.method === "GET" && url.pathname === "/api/auth/state") {
     const user = getAuthedUser(store, request);
     jsonResponse(response, 200, authPayload(store, user));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/forecast-tournaments") {
+    jsonResponse(response, 200, { tournaments: store.forecastTournaments.map(sanitizeTournament) });
     return;
   }
 
@@ -235,6 +262,65 @@ async function handleApi(request, response, url) {
     targetUser.approvedAt = new Date().toISOString();
     writeStore(store);
     jsonResponse(response, 200, authPayload(store, admin));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/admin/forecast-tournaments") {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const title = String(body.title ?? "").trim();
+    const date = String(body.date ?? "").trim();
+    const time = String(body.time ?? "").trim();
+    const club = String(body.club ?? "Padel Pro Club").trim();
+    const format = String(body.format ?? "").trim();
+    const conditions = String(body.conditions ?? "").trim();
+    const predictionCloseAt = String(body.predictionCloseAt ?? "").trim();
+    const scoring = String(body.scoring ?? "1 балл за точное место").trim();
+    const roster = Array.isArray(body.roster)
+      ? body.roster
+          .map((player) => ({
+            id: randomUUID(),
+            name: String(player.name ?? "").trim(),
+            rating: Number(player.rating),
+          }))
+          .filter((player) => player.name && Number.isFinite(player.rating))
+      : [];
+
+    if (!title || !date || !time || !club || !format || !conditions || roster.length < 2) {
+      jsonResponse(response, 400, {
+        message: "Заполни название, дату, время, клуб, формат, условия и минимум двух игроков с рейтингами.",
+      });
+      return;
+    }
+
+    const tournament = {
+      club,
+      conditions,
+      createdAt: new Date().toISOString(),
+      date,
+      format,
+      id: `forecast-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      image: "/assets/hero-court.png",
+      players: `${roster.length} игроков`,
+      predictionCloseAt,
+      roster,
+      scoring,
+      status: "Прием прогнозов",
+      time,
+      title,
+    };
+
+    store.forecastTournaments.unshift(tournament);
+    writeStore(store);
+    jsonResponse(response, 201, {
+      tournament: sanitizeTournament(tournament),
+      tournaments: store.forecastTournaments.map(sanitizeTournament),
+    });
     return;
   }
 
