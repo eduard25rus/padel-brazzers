@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const distDir = join(rootDir, "dist");
-const dataDir = process.env.DATA_DIR ?? join(rootDir, "data");
+const dataDir = process.env.DATA_DIR ?? process.env.RAILWAY_VOLUME_MOUNT_PATH ?? join(rootDir, "data");
 const storePath = join(dataDir, "auth-store.json");
 const port = Number(process.env.PORT ?? 4173);
 

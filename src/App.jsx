@@ -1184,6 +1184,7 @@ function AdminCabinetScreen({ auth, onOpenHome, onOpenPredictions }) {
     <main className="admin-cabinet-shell">
       <MainNav
         active="admin"
+        auth={auth}
         label="Admin"
         onOpenHome={onOpenHome}
         onOpenPredictions={onOpenPredictions}
@@ -1237,7 +1238,21 @@ function AdminCabinetScreen({ auth, onOpenHome, onOpenPredictions }) {
   );
 }
 
-function MainNav({ active = "home", onOpenHome, onOpenPredictions, label = "Club", action = null }) {
+function AdminNavButton({ auth }) {
+  const canOpenAdmin = auth?.currentUser?.role === "admin" && auth?.currentUser?.status === "active";
+
+  if (!canOpenAdmin) {
+    return null;
+  }
+
+  return (
+    <button className="admin-nav-button" type="button" onClick={auth.onOpenAdmin}>
+      Кабинет
+    </button>
+  );
+}
+
+function MainNav({ active = "home", auth = null, onOpenHome, onOpenPredictions, label = "Club", action = null }) {
   const goHome = (event) => {
     event.preventDefault();
     onOpenHome?.();
@@ -1258,6 +1273,7 @@ function MainNav({ active = "home", onOpenHome, onOpenPredictions, label = "Club
         <button className={active === "predictions" ? "active" : ""} type="button" onClick={onOpenPredictions}>
           Прогнозы
         </button>
+        <AdminNavButton auth={auth} />
         <a href="#community">Сообщество</a>
       </nav>
       {action ?? (
@@ -1275,6 +1291,7 @@ function LockedPredictionsScreen({ auth, onOpenHome, onOpenPredictions }) {
     <main className="predictions-shell">
       <MainNav
         active="predictions"
+        auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
         onOpenPredictions={onOpenPredictions}
@@ -1294,6 +1311,7 @@ function ForecastRegistryScreen({ auth, onOpenHome, onOpenPredictions, onOpenTou
     <main className="predictions-shell">
       <MainNav
         active="predictions"
+        auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
         onOpenPredictions={onOpenPredictions}
@@ -1373,6 +1391,7 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
     <main className="predictions-shell">
       <MainNav
         active="predictions"
+        auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
         onOpenPredictions={onOpenPredictions}
@@ -1467,6 +1486,7 @@ function HomeScreen({ auth, onOpenTournament, onOpenPredictions }) {
           <a className="active" href="#registry">Турниры</a>
           <a href="#leaders">Лидеры</a>
           <button type="button" onClick={onOpenPredictions}>Прогнозы</button>
+          <AdminNavButton auth={auth} />
           <a href="#community">Сообщество</a>
         </nav>
         <AuthControls {...auth} />
