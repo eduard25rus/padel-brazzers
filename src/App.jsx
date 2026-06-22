@@ -288,6 +288,22 @@ const fallbackForecastTournaments = [
   },
 ];
 
+const fallbackScoringMethods = [
+  {
+    createdAt: new Date(0).toISOString(),
+    description: "Базовый подсчет для индивидуальных турниров: Americano, Mexicano, Escalera.",
+    exactPlace: 5,
+    formats: "Americano, Mexicano, Escalera",
+    id: "individual-basic",
+    lastPlaceBonus: 5,
+    name: "Базовая индивидуальная методика",
+    onePositionError: 3,
+    top3AnyOrderBonus: 8,
+    top3ExactBonus: 15,
+    twoPositionError: 1,
+  },
+];
+
 const authTokenStorageKey = "padel-brazzers-auth-token";
 const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, users: [] };
 
@@ -363,6 +379,14 @@ function formatVladivostokDateTime(value) {
 
   const [date, time] = value.split("T");
   return `${formatVladivostokDate(date)} ${time} VLAT`;
+}
+
+function describeScoringMethod(method) {
+  if (!method) {
+    return "Методика не выбрана";
+  }
+
+  return `Точное место ${method.exactPlace} · ошибка на 1 позицию ${method.onePositionError} · ошибка на 2 позиции ${method.twoPositionError} · топ-3 точно +${method.top3ExactBonus} · топ-3 в любом порядке +${method.top3AnyOrderBonus} · последнее место +${method.lastPlaceBonus}`;
 }
 
 function getStandingsAfterRound(round) {
@@ -1194,14 +1218,14 @@ function AdminApprovalPanel({ users, onApproveUser }) {
   );
 }
 
-function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
+function AdminTournamentForm({ forecastTournaments, onCreateTournament, scoringMethods }) {
   const [form, setForm] = useState({
     club: "Padel Pro Club",
     conditions: "",
     date: "",
     format: "Americano",
     pointsToWin: "11",
-    scoring: "1 балл за точное место",
+    scoringMethodId: scoringMethods[0]?.id ?? "",
     time: "",
     title: "",
   });
@@ -1213,6 +1237,7 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
   ]);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const selectedScoringMethod = scoringMethods.find((method) => method.id === form.scoringMethodId) ?? scoringMethods[0];
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1256,7 +1281,7 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
       date: "",
       format: "Americano",
       pointsToWin: "11",
-      scoring: "1 балл за точное место",
+      scoringMethodId: scoringMethods[0]?.id ?? "",
       time: "",
       title: "",
     });
@@ -1315,6 +1340,16 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
         </div>
 
         <label>
+          <span>Методика подсчета</span>
+          <select required value={form.scoringMethodId} onChange={(event) => updateForm("scoringMethodId", event.target.value)}>
+            {scoringMethods.map((method) => (
+              <option key={method.id} value={method.id}>{method.name}</option>
+            ))}
+          </select>
+          <small className="admin-method-preview">{describeScoringMethod(selectedScoringMethod)}</small>
+        </label>
+
+        <label>
           <span>Условия турнира</span>
           <textarea
             required
@@ -1322,11 +1357,6 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
             onChange={(event) => updateForm("conditions", event.target.value)}
             placeholder="Коротко: формат, пары/смены партнеров, как считается итог, ограничения по заменам."
           />
-        </label>
-
-        <label>
-          <span>Подсчет прогнозов</span>
-          <input value={form.scoring} onChange={(event) => updateForm("scoring", event.target.value)} />
         </label>
 
         <div className="admin-player-editor">
@@ -1389,6 +1419,128 @@ function AdminMembersPanel({ users }) {
   );
 }
 
+function AdminScoringMethodsPanel({ onCreateScoringMethod, scoringMethods }) {
+  const [form, setForm] = useState({
+    description: "",
+    exactPlace: "5",
+    formats: "Americano, Mexicano, Escalera",
+    lastPlaceBonus: "5",
+    name: "",
+    onePositionError: "3",
+    top3AnyOrderBonus: "8",
+    top3ExactBonus: "15",
+    twoPositionError: "1",
+  });
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setMessage("");
+  };
+
+  const submitMethod = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    const result = await onCreateScoringMethod(form);
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+
+    setForm({
+      description: "",
+      exactPlace: "5",
+      formats: "Americano, Mexicano, Escalera",
+      lastPlaceBonus: "5",
+      name: "",
+      onePositionError: "3",
+      top3AnyOrderBonus: "8",
+      top3ExactBonus: "15",
+      twoPositionError: "1",
+    });
+    setMessage("Методика сохранена.");
+  };
+
+  return (
+    <section className="surface admin-scoring-panel">
+      <div className="section-title">
+        <span>Настройки прогнозов</span>
+        <h2>Методики подсчета</h2>
+      </div>
+
+      <div className="scoring-method-list">
+        {scoringMethods.map((method) => (
+          <article className="scoring-method-card" key={method.id}>
+            <span>{method.formats}</span>
+            <strong>{method.name}</strong>
+            <p>{method.description || describeScoringMethod(method)}</p>
+            <div>
+              <b>Точное: {method.exactPlace}</b>
+              <b>±1: {method.onePositionError}</b>
+              <b>±2: {method.twoPositionError}</b>
+              <b>Топ-3 точно: +{method.top3ExactBonus}</b>
+              <b>Топ-3 любой: +{method.top3AnyOrderBonus}</b>
+              <b>Последний: +{method.lastPlaceBonus}</b>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <form className="admin-tournament-form scoring-method-form" onSubmit={submitMethod}>
+        <div className="admin-form-grid">
+          <label>
+            <span>Название</span>
+            <input required value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="Например, PRO playoffs" />
+          </label>
+          <label>
+            <span>Типы турниров</span>
+            <input required value={form.formats} onChange={(event) => updateForm("formats", event.target.value)} />
+          </label>
+          <label>
+            <span>Точное место</span>
+            <input required inputMode="numeric" min="0" type="number" value={form.exactPlace} onChange={(event) => updateForm("exactPlace", event.target.value)} />
+          </label>
+          <label>
+            <span>Ошибка на 1</span>
+            <input required inputMode="numeric" min="0" type="number" value={form.onePositionError} onChange={(event) => updateForm("onePositionError", event.target.value)} />
+          </label>
+          <label>
+            <span>Ошибка на 2</span>
+            <input required inputMode="numeric" min="0" type="number" value={form.twoPositionError} onChange={(event) => updateForm("twoPositionError", event.target.value)} />
+          </label>
+          <label>
+            <span>Топ-3 точный</span>
+            <input required inputMode="numeric" min="0" type="number" value={form.top3ExactBonus} onChange={(event) => updateForm("top3ExactBonus", event.target.value)} />
+          </label>
+          <label>
+            <span>Топ-3 любой</span>
+            <input required inputMode="numeric" min="0" type="number" value={form.top3AnyOrderBonus} onChange={(event) => updateForm("top3AnyOrderBonus", event.target.value)} />
+          </label>
+          <label>
+            <span>Последнее место</span>
+            <input required inputMode="numeric" min="0" type="number" value={form.lastPlaceBonus} onChange={(event) => updateForm("lastPlaceBonus", event.target.value)} />
+          </label>
+        </div>
+
+        <label>
+          <span>Описание</span>
+          <textarea value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder="Для каких турниров и почему такая логика." />
+        </label>
+
+        {message && <strong className={message.includes("сохранена") ? "admin-form-success" : "prediction-error"}>{message}</strong>}
+
+        <footer>
+          <span>{scoringMethods.length} методик сохранено</span>
+          <button disabled={submitting} type="submit">{submitting ? "Сохраняем..." : "Сохранить методику"}</button>
+        </footer>
+      </form>
+    </section>
+  );
+}
+
 function AdminSectionShell({ children, eyebrow, onBack, title }) {
   return (
     <section className="admin-section-shell">
@@ -1404,7 +1556,7 @@ function AdminSectionShell({ children, eyebrow, onBack, title }) {
   );
 }
 
-function AdminCabinetScreen({ auth, forecastTournaments, onCreateTournament, onOpenHome, onOpenPredictions }) {
+function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPredictions, scoringMethods }) {
   const [activeSection, setActiveSection] = useState(null);
   const pendingUsers = auth.users.filter((user) => user.status === "pending");
   const activeMembers = auth.users.filter((user) => user.status === "active");
@@ -1421,7 +1573,15 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateTournament, onO
     if (activeSection === "tournament") {
       return (
         <AdminSectionShell eyebrow="Прогнозы" onBack={() => setActiveSection(null)} title="Добавить турнир для прогнозов">
-          <AdminTournamentForm forecastTournaments={forecastTournaments} onCreateTournament={onCreateTournament} />
+          <AdminTournamentForm forecastTournaments={forecastTournaments} onCreateTournament={onCreateTournament} scoringMethods={scoringMethods} />
+        </AdminSectionShell>
+      );
+    }
+
+    if (activeSection === "scoring") {
+      return (
+        <AdminSectionShell eyebrow="Методики подсчета" onBack={() => setActiveSection(null)} title="Настройки очков для прогнозов">
+          <AdminScoringMethodsPanel onCreateScoringMethod={onCreateScoringMethod} scoringMethods={scoringMethods} />
         </AdminSectionShell>
       );
     }
@@ -1476,6 +1636,12 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateTournament, onO
             <span>Прогнозы</span>
             <strong>Добавить турнир</strong>
             <p>Дата, формат, условия, состав игроков и рейтинги для нового прогноза.</p>
+          </button>
+
+          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("scoring")}>
+            <span>Методики</span>
+            <strong>{scoringMethods.length} сохранено</strong>
+            <p>Настрой правила начисления очков и выбирай их при создании турнира.</p>
           </button>
 
           <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("members")}>
@@ -1733,6 +1899,9 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
               ? `Прием прогнозов открыт до ${formatVladivostokDateTime(tournament.predictionCloseAt)}.`
               : "Прогноз можно будет сохранить и менять до закрытия приема."}
           </p>
+          {tournament.scoringMethod && (
+            <p className="prediction-scoring-summary">{describeScoringMethod(tournament.scoringMethod)}</p>
+          )}
         </section>
       </section>
 
@@ -2269,6 +2438,7 @@ export function App() {
   const [authState, setAuthState] = useState(emptyAuthState);
   const [authMode, setAuthMode] = useState(null);
   const [forecastTournaments, setForecastTournaments] = useState([]);
+  const [scoringMethods, setScoringMethods] = useState(fallbackScoringMethods);
   const currentUser = authState.currentUser;
   const canOpenPredictions = currentUser?.status === "active";
   const canOpenAdmin = currentUser?.role === "admin" && currentUser?.status === "active";
@@ -2276,9 +2446,10 @@ export function App() {
   useEffect(() => {
     const loadServerAuthState = async () => {
       try {
-        const [payload, forecastPayload] = await Promise.all([
+        const [payload, forecastPayload, scoringPayload] = await Promise.all([
           apiRequest("/api/auth/state"),
           apiRequest("/api/forecast-tournaments"),
+          apiRequest("/api/scoring-methods"),
         ]);
         setAuthState({
           currentUser: payload.user ?? null,
@@ -2287,10 +2458,12 @@ export function App() {
           users: payload.users ?? [],
         });
         setForecastTournaments(forecastPayload.tournaments ?? []);
+        setScoringMethods(scoringPayload.methods?.length ? scoringPayload.methods : fallbackScoringMethods);
       } catch {
         storeAuthToken("");
         setAuthState({ ...emptyAuthState, loading: false });
         setForecastTournaments(fallbackForecastTournaments);
+        setScoringMethods(fallbackScoringMethods);
       }
     };
 
@@ -2322,6 +2495,19 @@ export function App() {
         method: "POST",
       });
       setForecastTournaments(result.tournaments ?? []);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const createScoringMethod = async (payload) => {
+    try {
+      const result = await apiRequest("/api/admin/scoring-methods", {
+        body: JSON.stringify(payload),
+        method: "POST",
+      });
+      setScoringMethods(result.methods?.length ? result.methods : fallbackScoringMethods);
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -2435,9 +2621,11 @@ export function App() {
         <AdminCabinetScreen
           auth={auth}
           forecastTournaments={forecastTournaments}
+          onCreateScoringMethod={createScoringMethod}
           onCreateTournament={createForecastTournament}
           onOpenHome={() => setScreen({ name: "home" })}
           onOpenPredictions={openPredictions}
+          scoringMethods={scoringMethods}
         />
         {authModal}
       </>

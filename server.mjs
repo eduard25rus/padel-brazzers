@@ -22,10 +22,24 @@ const mimeTypes = {
 
 const allowedClubs = new Set(["Padel Pro Club", 'Падел-клуб "Небо"']);
 
+const defaultScoringMethod = {
+  createdAt: new Date(0).toISOString(),
+  description: "Базовый подсчет для индивидуальных турниров: Americano, Mexicano, Escalera.",
+  formats: "Americano, Mexicano, Escalera",
+  id: "individual-basic",
+  lastPlaceBonus: 5,
+  name: "Базовая индивидуальная методика",
+  onePositionError: 3,
+  exactPlace: 5,
+  top3AnyOrderBonus: 8,
+  top3ExactBonus: 15,
+  twoPositionError: 1,
+};
+
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
-    writeFileSync(storePath, JSON.stringify({ forecastTournaments: [], sessions: [], users: [] }, null, 2));
+    writeFileSync(storePath, JSON.stringify({ forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] }, null, 2));
   }
 }
 
@@ -34,13 +48,18 @@ function readStore() {
 
   try {
     const parsed = JSON.parse(readFileSync(storePath, "utf8"));
+    const scoringMethods = Array.isArray(parsed.scoringMethods) && parsed.scoringMethods.length > 0
+      ? parsed.scoringMethods
+      : [defaultScoringMethod];
+
     return {
       forecastTournaments: Array.isArray(parsed.forecastTournaments) ? parsed.forecastTournaments : [],
+      scoringMethods,
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
   } catch {
-    return { forecastTournaments: [], sessions: [], users: [] };
+    return { forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] };
   }
 }
 
@@ -79,10 +98,28 @@ function sanitizeTournament(tournament) {
     predictionCloseAt: tournament.predictionCloseAt ?? "",
     roster,
     scoring: tournament.scoring ?? "1 балл за точное место",
+    scoringMethod: tournament.scoringMethod ?? null,
+    scoringMethodId: tournament.scoringMethodId ?? "",
     status: tournament.status ?? "Прием прогнозов",
     time: tournament.time ?? "",
     timezone: tournament.timezone ?? "Asia/Vladivostok",
     title: tournament.title ?? "Будущий турнир",
+  };
+}
+
+function sanitizeScoringMethod(method) {
+  return {
+    createdAt: method.createdAt,
+    description: method.description ?? "",
+    exactPlace: Number(method.exactPlace),
+    formats: method.formats ?? "",
+    id: method.id,
+    lastPlaceBonus: Number(method.lastPlaceBonus),
+    name: method.name,
+    onePositionError: Number(method.onePositionError),
+    top3AnyOrderBonus: Number(method.top3AnyOrderBonus),
+    top3ExactBonus: Number(method.top3ExactBonus),
+    twoPositionError: Number(method.twoPositionError),
   };
 }
 
@@ -169,6 +206,11 @@ async function handleApi(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/forecast-tournaments") {
     jsonResponse(response, 200, { tournaments: store.forecastTournaments.map(sanitizeTournament) });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/scoring-methods") {
+    jsonResponse(response, 200, { methods: store.scoringMethods.map(sanitizeScoringMethod) });
     return;
   }
 
@@ -285,7 +327,8 @@ async function handleApi(request, response, url) {
     const conditions = String(body.conditions ?? "").trim();
     const pointsToWin = format === "Americano" ? Number(body.pointsToWin) : null;
     const predictionCloseAt = date && time ? `${date}T${time}` : "";
-    const scoring = String(body.scoring ?? "1 балл за точное место").trim();
+    const scoringMethodId = String(body.scoringMethodId ?? "").trim();
+    const scoringMethod = store.scoringMethods.find((method) => method.id === scoringMethodId);
     const roster = Array.isArray(body.roster)
       ? body.roster
           .map((player) => ({
@@ -296,9 +339,9 @@ async function handleApi(request, response, url) {
           .filter((player) => player.name && Number.isFinite(player.rating))
       : [];
 
-    if (!title || !date || !time || !allowedClubs.has(club) || !format || !conditions || roster.length < 2) {
+    if (!title || !date || !time || !allowedClubs.has(club) || !format || !conditions || !scoringMethod || roster.length < 2) {
       jsonResponse(response, 400, {
-        message: "Заполни название, дату, время, выбери клуб, формат, условия и минимум двух игроков с рейтингами.",
+        message: "Заполни название, дату, время, выбери клуб, формат, методику, условия и минимум двух игроков с рейтингами.",
       });
       return;
     }
@@ -320,7 +363,9 @@ async function handleApi(request, response, url) {
       pointsToWin,
       predictionCloseAt,
       roster,
-      scoring,
+      scoring: scoringMethod.name,
+      scoringMethod: sanitizeScoringMethod(scoringMethod),
+      scoringMethodId: scoringMethod.id,
       status: "Прием прогнозов",
       time,
       timezone: "Asia/Vladivostok",
@@ -332,6 +377,51 @@ async function handleApi(request, response, url) {
     jsonResponse(response, 201, {
       tournament: sanitizeTournament(tournament),
       tournaments: store.forecastTournaments.map(sanitizeTournament),
+    });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/admin/scoring-methods") {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const method = {
+      createdAt: new Date().toISOString(),
+      description: String(body.description ?? "").trim(),
+      exactPlace: Number(body.exactPlace),
+      formats: String(body.formats ?? "").trim(),
+      id: `scoring-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      lastPlaceBonus: Number(body.lastPlaceBonus),
+      name: String(body.name ?? "").trim(),
+      onePositionError: Number(body.onePositionError),
+      top3AnyOrderBonus: Number(body.top3AnyOrderBonus),
+      top3ExactBonus: Number(body.top3ExactBonus),
+      twoPositionError: Number(body.twoPositionError),
+    };
+
+    const numbers = [
+      method.exactPlace,
+      method.onePositionError,
+      method.twoPositionError,
+      method.top3ExactBonus,
+      method.top3AnyOrderBonus,
+      method.lastPlaceBonus,
+    ];
+
+    if (!method.name || !method.formats || numbers.some((value) => !Number.isFinite(value) || value < 0)) {
+      jsonResponse(response, 400, { message: "Заполни название, форматы и все числовые поля методики." });
+      return;
+    }
+
+    store.scoringMethods.push(method);
+    writeStore(store);
+    jsonResponse(response, 201, {
+      method: sanitizeScoringMethod(method),
+      methods: store.scoringMethods.map(sanitizeScoringMethod),
     });
     return;
   }

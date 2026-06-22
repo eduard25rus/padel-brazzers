@@ -1005,7 +1005,7 @@ main {
 .admin-menu-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 14px;
 }
 
@@ -1038,7 +1038,7 @@ main {
 .admin-menu-card strong {
   color: #17221a;
   display: block;
-  font-size: 28px;
+  font-size: 25px;
   line-height: 1.05;
   margin-top: 12px;
 }
@@ -1066,6 +1066,10 @@ main {
 }
 
 .admin-tournament-panel {
+  padding: 22px;
+}
+
+.admin-scoring-panel {
   padding: 22px;
 }
 
@@ -1222,6 +1226,61 @@ main {
   color: var(--green);
   font-size: 13px;
   font-weight: 900;
+}
+
+.admin-method-preview {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.scoring-method-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.scoring-method-card {
+  background: rgba(255, 254, 250, 0.66);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.scoring-method-card span {
+  color: var(--green);
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scoring-method-card strong {
+  display: block;
+  font-size: 19px;
+  margin-top: 6px;
+}
+
+.scoring-method-card p {
+  margin: 8px 0 0;
+}
+
+.scoring-method-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.scoring-method-card b {
+  background: rgba(29, 93, 42, 0.08);
+  border: 1px solid rgba(29, 93, 42, 0.13);
+  border-radius: 8px;
+  color: var(--green);
+  font-size: 12px;
+  padding: 7px 9px;
 }
 
 .approval-list {
@@ -1431,6 +1490,13 @@ main {
   margin-top: 12px;
 }
 
+.prediction-scoring-summary {
+  color: #526054;
+  font-size: 13px;
+  font-weight: 750;
+  margin-top: 12px;
+}
+
 .prediction-empty-list strong {
   color: #1b241d;
   font-size: 20px;
@@ -1484,7 +1550,9 @@ main {
 .prediction-slot-grid {
   display: grid;
   gap: 8px;
+  grid-auto-flow: column;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(58px, auto));
 }
 
 .prediction-slot {
@@ -2952,7 +3020,9 @@ p {
   }
 
   .prediction-slot-grid {
+    grid-auto-flow: row;
     grid-template-columns: 1fr;
+    grid-template-rows: none;
   }
 
   .prediction-order-row {
