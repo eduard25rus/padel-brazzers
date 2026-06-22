@@ -104,6 +104,7 @@ function sanitizeTournament(tournament) {
     time: tournament.time ?? "",
     timezone: tournament.timezone ?? "Asia/Vladivostok",
     title: tournament.title ?? "Будущий турнир",
+    updatedAt: tournament.updatedAt ?? null,
   };
 }
 
@@ -179,6 +180,62 @@ function authPayload(store, user = null, token) {
     hasUsers: store.users.length > 0,
     user: sanitizeUser(user),
     users: isActiveAdmin(user) ? store.users.map(sanitizeUser) : [],
+  };
+}
+
+function buildForecastTournamentFromBody(body, store, existingTournament = null) {
+  const title = String(body.title ?? "").trim();
+  const date = String(body.date ?? "").trim();
+  const time = String(body.time ?? "").trim();
+  const club = String(body.club ?? "Padel Pro Club").trim();
+  const format = String(body.format ?? "").trim();
+  const conditions = String(body.conditions ?? "").trim();
+  const pointsToWin = format === "Americano" ? Number(body.pointsToWin) : null;
+  const predictionCloseAt = date && time ? `${date}T${time}` : "";
+  const scoringMethodId = String(body.scoringMethodId ?? "").trim();
+  const scoringMethod = store.scoringMethods.find((method) => method.id === scoringMethodId);
+  const roster = Array.isArray(body.roster)
+    ? body.roster
+        .map((player) => ({
+          id: String(player.id ?? "").trim() || randomUUID(),
+          name: String(player.name ?? "").trim(),
+          rating: Number(player.rating),
+        }))
+        .filter((player) => player.name && Number.isFinite(player.rating))
+    : [];
+
+  if (!title || !date || !time || !allowedClubs.has(club) || !format || !conditions || !scoringMethod || roster.length < 2) {
+    return {
+      error: "Заполни название, дату, время, выбери клуб, формат, методику, условия и минимум двух игроков с рейтингами.",
+    };
+  }
+
+  if (format === "Americano" && (!Number.isInteger(pointsToWin) || pointsToWin < 1)) {
+    return { error: "Для Americano укажи, до скольки очков идет розыгрыш." };
+  }
+
+  return {
+    tournament: {
+      club,
+      conditions,
+      createdAt: existingTournament?.createdAt ?? new Date().toISOString(),
+      date,
+      format,
+      id: existingTournament?.id ?? `forecast-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      image: existingTournament?.image ?? "/assets/hero-court.png",
+      players: `${roster.length} игроков`,
+      pointsToWin,
+      predictionCloseAt,
+      roster,
+      scoring: scoringMethod.name,
+      scoringMethod: sanitizeScoringMethod(scoringMethod),
+      scoringMethodId: scoringMethod.id,
+      status: existingTournament?.status ?? "Прием прогнозов",
+      time,
+      timezone: "Asia/Vladivostok",
+      title,
+      updatedAt: existingTournament ? new Date().toISOString() : null,
+    },
   };
 }
 
@@ -319,63 +376,58 @@ async function handleApi(request, response, url) {
     }
 
     const body = await readJson(request);
-    const title = String(body.title ?? "").trim();
-    const date = String(body.date ?? "").trim();
-    const time = String(body.time ?? "").trim();
-    const club = String(body.club ?? "Padel Pro Club").trim();
-    const format = String(body.format ?? "").trim();
-    const conditions = String(body.conditions ?? "").trim();
-    const pointsToWin = format === "Americano" ? Number(body.pointsToWin) : null;
-    const predictionCloseAt = date && time ? `${date}T${time}` : "";
-    const scoringMethodId = String(body.scoringMethodId ?? "").trim();
-    const scoringMethod = store.scoringMethods.find((method) => method.id === scoringMethodId);
-    const roster = Array.isArray(body.roster)
-      ? body.roster
-          .map((player) => ({
-            id: randomUUID(),
-            name: String(player.name ?? "").trim(),
-            rating: Number(player.rating),
-          }))
-          .filter((player) => player.name && Number.isFinite(player.rating))
-      : [];
-
-    if (!title || !date || !time || !allowedClubs.has(club) || !format || !conditions || !scoringMethod || roster.length < 2) {
-      jsonResponse(response, 400, {
-        message: "Заполни название, дату, время, выбери клуб, формат, методику, условия и минимум двух игроков с рейтингами.",
-      });
+    const result = buildForecastTournamentFromBody(body, store);
+    if (result.error) {
+      jsonResponse(response, 400, { message: result.error });
       return;
     }
 
-    if (format === "Americano" && (!Number.isInteger(pointsToWin) || pointsToWin < 1)) {
-      jsonResponse(response, 400, { message: "Для Americano укажи, до скольки очков идет розыгрыш." });
-      return;
-    }
-
-    const tournament = {
-      club,
-      conditions,
-      createdAt: new Date().toISOString(),
-      date,
-      format,
-      id: `forecast-${Date.now()}-${randomUUID().slice(0, 8)}`,
-      image: "/assets/hero-court.png",
-      players: `${roster.length} игроков`,
-      pointsToWin,
-      predictionCloseAt,
-      roster,
-      scoring: scoringMethod.name,
-      scoringMethod: sanitizeScoringMethod(scoringMethod),
-      scoringMethodId: scoringMethod.id,
-      status: "Прием прогнозов",
-      time,
-      timezone: "Asia/Vladivostok",
-      title,
-    };
+    const { tournament } = result;
 
     store.forecastTournaments.unshift(tournament);
     writeStore(store);
     jsonResponse(response, 201, {
       tournament: sanitizeTournament(tournament),
+      tournaments: store.forecastTournaments.map(sanitizeTournament),
+    });
+    return;
+  }
+
+  const forecastTournamentMatch = url.pathname.match(/^\/api\/admin\/forecast-tournaments\/([^/]+)$/);
+  if ((request.method === "PUT" || request.method === "DELETE") && forecastTournamentMatch) {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const tournamentIndex = store.forecastTournaments.findIndex((tournament) => tournament.id === forecastTournamentMatch[1]);
+    if (tournamentIndex === -1) {
+      jsonResponse(response, 404, { message: "Турнир не найден." });
+      return;
+    }
+
+    if (request.method === "DELETE") {
+      const [deletedTournament] = store.forecastTournaments.splice(tournamentIndex, 1);
+      writeStore(store);
+      jsonResponse(response, 200, {
+        deletedTournament: sanitizeTournament(deletedTournament),
+        tournaments: store.forecastTournaments.map(sanitizeTournament),
+      });
+      return;
+    }
+
+    const body = await readJson(request);
+    const result = buildForecastTournamentFromBody(body, store, store.forecastTournaments[tournamentIndex]);
+    if (result.error) {
+      jsonResponse(response, 400, { message: result.error });
+      return;
+    }
+
+    store.forecastTournaments[tournamentIndex] = result.tournament;
+    writeStore(store);
+    jsonResponse(response, 200, {
+      tournament: sanitizeTournament(result.tournament),
       tournaments: store.forecastTournaments.map(sanitizeTournament),
     });
     return;

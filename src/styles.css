@@ -277,6 +277,44 @@ main {
   transform: translateY(-1px);
 }
 
+.placeholder-section {
+  display: grid;
+  gap: 16px;
+  margin: 42px auto 0;
+  max-width: 820px;
+  min-height: 360px;
+  padding: clamp(28px, 5vw, 56px);
+}
+
+.placeholder-section h1 {
+  max-width: 760px;
+}
+
+.placeholder-section p {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.55;
+  max-width: 680px;
+}
+
+.placeholder-section > div {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.placeholder-section > div button:last-child {
+  background: var(--green);
+  border-radius: 8px;
+  color: #fffefa;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 10px 12px;
+}
+
 .auth-modal-backdrop {
   align-items: center;
   background: rgba(14, 26, 17, 0.46);
@@ -1495,6 +1533,47 @@ main {
   font-size: 13px;
   font-weight: 750;
   margin-top: 12px;
+}
+
+.prediction-admin-actions {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.prediction-admin-actions button {
+  background: var(--green);
+  border-radius: 8px;
+  color: #fffefa;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 10px 12px;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.prediction-admin-actions button:hover {
+  transform: translateY(-1px);
+}
+
+.prediction-admin-actions button.danger {
+  background: #8d2c25;
+}
+
+.prediction-admin-actions button:disabled {
+  background: #d8dfd7;
+  color: #748075;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.forecast-edit-panel {
+  margin-top: 14px;
 }
 
 .prediction-empty-list strong {

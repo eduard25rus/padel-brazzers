@@ -1218,8 +1218,8 @@ function AdminApprovalPanel({ users, onApproveUser }) {
   );
 }
 
-function AdminTournamentForm({ forecastTournaments, onCreateTournament, scoringMethods }) {
-  const [form, setForm] = useState({
+function makeTournamentFormState(scoringMethods, tournament = null) {
+  return {
     club: "Padel Pro Club",
     conditions: "",
     date: "",
@@ -1228,16 +1228,56 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament, scoringM
     scoringMethodId: scoringMethods[0]?.id ?? "",
     time: "",
     title: "",
-  });
-  const [players, setPlayers] = useState([
+    ...(tournament ? {
+      club: tournament.club ?? "Padel Pro Club",
+      conditions: tournament.conditions ?? "",
+      date: tournament.date ?? "",
+      format: tournament.format ?? "Americano",
+      pointsToWin: tournament.pointsToWin ? String(tournament.pointsToWin) : "11",
+      scoringMethodId: tournament.scoringMethodId ?? scoringMethods[0]?.id ?? "",
+      time: tournament.time ?? "",
+      title: tournament.title ?? "",
+    } : {}),
+  };
+}
+
+function makeTournamentPlayers(tournament = null) {
+  if (tournament?.roster?.length) {
+    return tournament.roster.map((player) => ({
+      id: player.id,
+      name: player.name ?? "",
+      rating: player.rating !== undefined ? String(player.rating) : "",
+    }));
+  }
+
+  return [
     { name: "", rating: "" },
     { name: "", rating: "" },
     { name: "", rating: "" },
     { name: "", rating: "" },
-  ]);
+  ];
+}
+
+function AdminTournamentForm({
+  forecastTournaments,
+  initialTournament = null,
+  onSubmitTournament,
+  scoringMethods,
+  submitLabel = "Опубликовать турнир",
+  submittingLabel = "Публикуем...",
+  successMessage = "Турнир опубликован в прогнозах.",
+}) {
+  const [form, setForm] = useState(() => makeTournamentFormState(scoringMethods, initialTournament));
+  const [players, setPlayers] = useState(() => makeTournamentPlayers(initialTournament));
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const selectedScoringMethod = scoringMethods.find((method) => method.id === form.scoringMethodId) ?? scoringMethods[0];
+
+  useEffect(() => {
+    setForm(makeTournamentFormState(scoringMethods, initialTournament));
+    setPlayers(makeTournamentPlayers(initialTournament));
+    setMessage("");
+  }, [initialTournament?.id, scoringMethods]);
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1264,10 +1304,10 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament, scoringM
     setSubmitting(true);
 
     const roster = players
-      .map((player) => ({ name: player.name.trim(), rating: Number(player.rating) }))
+      .map((player) => ({ id: player.id, name: player.name.trim(), rating: Number(player.rating) }))
       .filter((player) => player.name && Number.isFinite(player.rating));
 
-    const result = await onCreateTournament({ ...form, roster });
+    const result = await onSubmitTournament({ ...form, roster });
     setSubmitting(false);
 
     if (!result.ok) {
@@ -1275,23 +1315,11 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament, scoringM
       return;
     }
 
-    setForm({
-      club: "Padel Pro Club",
-      conditions: "",
-      date: "",
-      format: "Americano",
-      pointsToWin: "11",
-      scoringMethodId: scoringMethods[0]?.id ?? "",
-      time: "",
-      title: "",
-    });
-    setPlayers([
-      { name: "", rating: "" },
-      { name: "", rating: "" },
-      { name: "", rating: "" },
-      { name: "", rating: "" },
-    ]);
-    setMessage("Турнир опубликован в прогнозах.");
+    if (!initialTournament) {
+      setForm(makeTournamentFormState(scoringMethods));
+      setPlayers(makeTournamentPlayers());
+    }
+    setMessage(successMessage);
   };
 
   return (
@@ -1380,11 +1408,11 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament, scoringM
           </div>
         </div>
 
-        {message && <strong className={message.includes("опубликован") ? "admin-form-success" : "prediction-error"}>{message}</strong>}
+        {message && <strong className={message.includes("опубликован") || message.includes("обновлен") ? "admin-form-success" : "prediction-error"}>{message}</strong>}
 
         <footer>
           <span>{forecastTournaments.length} турниров в реестре прогнозов</span>
-          <button disabled={submitting} type="submit">{submitting ? "Публикуем..." : "Опубликовать турнир"}</button>
+          <button disabled={submitting} type="submit">{submitting ? submittingLabel : submitLabel}</button>
         </footer>
       </form>
     </section>
@@ -1556,7 +1584,7 @@ function AdminSectionShell({ children, eyebrow, onBack, title }) {
   );
 }
 
-function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPredictions, scoringMethods }) {
+function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, scoringMethods }) {
   const [activeSection, setActiveSection] = useState(null);
   const pendingUsers = auth.users.filter((user) => user.status === "pending");
   const activeMembers = auth.users.filter((user) => user.status === "active");
@@ -1573,7 +1601,11 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
     if (activeSection === "tournament") {
       return (
         <AdminSectionShell eyebrow="Прогнозы" onBack={() => setActiveSection(null)} title="Добавить турнир для прогнозов">
-          <AdminTournamentForm forecastTournaments={forecastTournaments} onCreateTournament={onCreateTournament} scoringMethods={scoringMethods} />
+          <AdminTournamentForm
+            forecastTournaments={forecastTournaments}
+            onSubmitTournament={onCreateTournament}
+            scoringMethods={scoringMethods}
+          />
         </AdminSectionShell>
       );
     }
@@ -1604,6 +1636,7 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
         auth={auth}
         label="Admin"
         onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
         action={<AuthControls {...auth} />}
       />
@@ -1655,24 +1688,14 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
   );
 }
 
-function AdminNavButton({ auth }) {
-  const canOpenAdmin = auth?.currentUser?.role === "admin" && auth?.currentUser?.status === "active";
-
-  if (!canOpenAdmin) {
-    return null;
-  }
-
-  return (
-    <button className="admin-nav-button" type="button" onClick={auth.onOpenAdmin}>
-      Кабинет
-    </button>
-  );
-}
-
-function MainNav({ active = "home", auth = null, onOpenHome, onOpenPredictions, label = "Club", action = null }) {
+function MainNav({ active = "home", auth = null, onOpenHome, onOpenPlaceholder, onOpenPredictions, label = "Club", action = null }) {
   const goHome = (event) => {
     event.preventDefault();
     onOpenHome?.();
+  };
+
+  const openPlaceholder = (sectionKey, sectionTitle) => {
+    onOpenPlaceholder?.(sectionKey, sectionTitle);
   };
 
   return (
@@ -1683,15 +1706,18 @@ function MainNav({ active = "home", auth = null, onOpenHome, onOpenPredictions, 
         <span>{label}</span>
       </a>
       <nav>
-        <a className={active === "tournaments" ? "active" : ""} href="#registry" onClick={active === "predictions" ? goHome : undefined}>
+        <button className={active === "tournaments" || active === "home" ? "active" : ""} type="button" onClick={onOpenHome}>
           Турниры
-        </a>
-        <a className={active === "leaders" ? "active" : ""} href="#leaders">Лидеры</a>
+        </button>
+        <button className={active === "leaders" ? "active" : ""} type="button" onClick={() => openPlaceholder("leaders", "Лидеры")}>
+          Лидеры
+        </button>
         <button className={active === "predictions" ? "active" : ""} type="button" onClick={onOpenPredictions}>
           Прогнозы
         </button>
-        <AdminNavButton auth={auth} />
-        <a href="#community">Сообщество</a>
+        <button className={active === "community" ? "active" : ""} type="button" onClick={() => openPlaceholder("community", "Сообщество")}>
+          Сообщество
+        </button>
       </nav>
       {action ?? (
         <div className="profile-chip home-chip">
@@ -1703,7 +1729,7 @@ function MainNav({ active = "home", auth = null, onOpenHome, onOpenPredictions, 
   );
 }
 
-function LockedPredictionsScreen({ auth, onOpenHome, onOpenPredictions }) {
+function LockedPredictionsScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions }) {
   return (
     <main className="predictions-shell">
       <MainNav
@@ -1711,6 +1737,7 @@ function LockedPredictionsScreen({ auth, onOpenHome, onOpenPredictions }) {
         auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
         action={<AuthControls {...auth} />}
       />
@@ -1723,7 +1750,7 @@ function LockedPredictionsScreen({ auth, onOpenHome, onOpenPredictions }) {
   );
 }
 
-function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenPredictions, onOpenTournament }) {
+function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament }) {
   return (
     <main className="predictions-shell">
       <MainNav
@@ -1731,6 +1758,7 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
         auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
         action={<AuthControls {...auth} />}
       />
@@ -1810,18 +1838,40 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
   );
 }
 
-function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredictions, onBack }) {
+function ForecastTournamentDetail({
+  auth,
+  forecastTournaments,
+  onBack,
+  onDeleteTournament,
+  onOpenHome,
+  onOpenPlaceholder,
+  onOpenPredictions,
+  onUpdateTournament,
+  scoringMethods,
+  tournament,
+}) {
   const sortedRoster = useMemo(
     () => [...tournament.roster].sort((a, b) => Number(b.rating) - Number(a.rating) || a.name.localeCompare(b.name)),
     [tournament.roster],
   );
   const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: 16 }, () => null));
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [adminEditing, setAdminEditing] = useState(false);
+  const [adminMessage, setAdminMessage] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const filledSlots = forecastSlots.filter(Boolean).length;
   const isForecastComplete = tournament.roster.length > 0 && filledSlots === Math.min(16, tournament.roster.length);
+  const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
 
   const getPlayerKey = (player) => player.id ?? player.name;
   const selectedPlayer = sortedRoster.find((player) => getPlayerKey(player) === selectedPlayerId);
+
+  useEffect(() => {
+    setForecastSlots(Array.from({ length: 16 }, () => null));
+    setSelectedPlayerId(null);
+    setAdminEditing(false);
+    setAdminMessage("");
+  }, [tournament.id]);
 
   const placePlayer = (slotIndex, playerId) => {
     const player = sortedRoster.find((item) => getPlayerKey(item) === playerId);
@@ -1847,6 +1897,29 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
     placePlayer(slotIndex, playerId);
   };
 
+  const submitTournamentUpdate = async (payload) => {
+    const result = await onUpdateTournament(tournament.id, payload);
+    if (result.ok) {
+      setAdminEditing(false);
+    }
+
+    return result;
+  };
+
+  const deleteTournament = async () => {
+    const confirmed = window.confirm("Удалить этот турнир из прогнозов?");
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleting(true);
+    const result = await onDeleteTournament(tournament.id);
+    setDeleting(false);
+    if (!result.ok) {
+      setAdminMessage(result.message);
+    }
+  };
+
   return (
     <main className="predictions-shell">
       <MainNav
@@ -1854,6 +1927,7 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
         auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
         action={(
           <div className="prediction-top-actions">
@@ -1902,8 +1976,33 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
           {tournament.scoringMethod && (
             <p className="prediction-scoring-summary">{describeScoringMethod(tournament.scoringMethod)}</p>
           )}
+          {canManageTournament && (
+            <div className="prediction-admin-actions">
+              <button type="button" onClick={() => { setAdminEditing((value) => !value); setAdminMessage(""); }}>
+                {adminEditing ? "Закрыть редактор" : "Редактировать"}
+              </button>
+              <button className="danger" disabled={deleting} type="button" onClick={deleteTournament}>
+                {deleting ? "Удаляем..." : "Удалить"}
+              </button>
+            </div>
+          )}
+          {adminMessage && <strong className="prediction-error">{adminMessage}</strong>}
         </section>
       </section>
+
+      {canManageTournament && adminEditing && (
+        <section className="forecast-edit-panel" id="edit-tournament">
+          <AdminTournamentForm
+            forecastTournaments={forecastTournaments}
+            initialTournament={tournament}
+            onSubmitTournament={submitTournamentUpdate}
+            scoringMethods={scoringMethods}
+            submitLabel="Сохранить изменения"
+            submittingLabel="Сохраняем..."
+            successMessage="Турнир обновлен."
+          />
+        </section>
+      )}
 
       <section className="prediction-workspace">
         <section className="surface prediction-roster-card" id="roster">
@@ -2004,28 +2103,22 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
   );
 }
 
-function HomeScreen({ auth, onOpenTournament, onOpenPredictions }) {
+function HomeScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament }) {
   const [category, setCategory] = useState("pro");
   const tournaments = tournamentRegistry[category];
   const activeLabel = category.toUpperCase();
 
   return (
     <main className="home-shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Padel Brazzers">
-          <span className="brand-mark">PB</span>
-          <strong>Padel Brazzers</strong>
-          <span>Club</span>
-        </a>
-        <nav>
-          <a className="active" href="#registry">Турниры</a>
-          <a href="#leaders">Лидеры</a>
-          <button type="button" onClick={onOpenPredictions}>Прогнозы</button>
-          <AdminNavButton auth={auth} />
-          <a href="#community">Сообщество</a>
-        </nav>
-        <AuthControls {...auth} />
-      </header>
+      <MainNav
+        active="tournaments"
+        auth={auth}
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
+      />
 
       <section className="home-hero surface" id="top">
         <img src="/assets/hero-court.png" alt="Падел корт Padel Brazzers" />
@@ -2139,29 +2232,25 @@ function HomeScreen({ auth, onOpenTournament, onOpenPredictions }) {
   );
 }
 
-function AmericanoDetail({ onBack }) {
+function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
 
   return (
     <main>
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
-          <span className="brand-mark">PB</span>
-          <strong>Padel Brazzers</strong>
-          <span>PRO</span>
-        </a>
-        <nav>
-          <a href="#top">Турнир</a>
-          <a href="#standings">Личный зачет</a>
-          <a href="#rounds">Раунды</a>
-          <a href="#stories">Разбор</a>
-        </nav>
-        <div className="profile-chip">
-          <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
-          <span>1</span>
-          <PlayerBadge player="Kh Ivan" small />
-        </div>
-      </header>
+      <MainNav
+        active="tournaments"
+        auth={auth}
+        label="PRO"
+        onOpenHome={onBack}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={(
+          <div className="prediction-top-actions">
+            <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
+            <AuthControls {...auth} />
+          </div>
+        )}
+      />
 
       <section className="page-grid americano-page-grid" id="top">
         <section className="surface hero-card americano-hero-card">
@@ -2237,29 +2326,25 @@ function AmericanoDetail({ onBack }) {
   );
 }
 
-function MexicanoDetail({ onBack }) {
+function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
 
   return (
     <main>
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
-          <span className="brand-mark">PB</span>
-          <strong>Padel Brazzers</strong>
-          <span>LITE</span>
-        </a>
-        <nav>
-          <a href="#top">Турнир</a>
-          <a href="#standings">Личный зачет</a>
-          <a href="#rounds">Раунды</a>
-          <a href="#stories">Важное</a>
-        </nav>
-        <div className="profile-chip">
-          <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
-          <span>1</span>
-          <PlayerBadge player="Искалдович Константин" playerPool={mexicanoPlayers} small />
-        </div>
-      </header>
+      <MainNav
+        active="tournaments"
+        auth={auth}
+        label="LITE"
+        onOpenHome={onBack}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={(
+          <div className="prediction-top-actions">
+            <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
+            <AuthControls {...auth} />
+          </div>
+        )}
+      />
 
       <section className="page-grid americano-page-grid" id="top">
         <section className="surface hero-card americano-hero-card">
@@ -2335,29 +2420,25 @@ function MexicanoDetail({ onBack }) {
   );
 }
 
-function TournamentDetail({ onBack }) {
+function TournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
 
   return (
     <main>
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
-          <span className="brand-mark">PB</span>
-          <strong>Padel Brazzers</strong>
-          <span>PRO</span>
-        </a>
-        <nav>
-          <a href="#top">Турниры</a>
-          <a href="#standings">Рейтинг</a>
-          <a href="#rounds">Игроки</a>
-          <a href="#stories">О нас</a>
-        </nav>
-        <div className="profile-chip">
-          <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
-          <span>2</span>
-          <TeamBadge team="Шевченко / Борис" small />
-        </div>
-      </header>
+      <MainNav
+        active="tournaments"
+        auth={auth}
+        label="PRO"
+        onOpenHome={onBack}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={(
+          <div className="prediction-top-actions">
+            <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
+            <AuthControls {...auth} />
+          </div>
+        )}
+      />
 
       <section className="page-grid" id="top">
         <section className="surface hero-card">
@@ -2433,6 +2514,35 @@ function TournamentDetail({ onBack }) {
   );
 }
 
+function PlaceholderScreen({ active, auth, onOpenHome, onOpenPlaceholder, onOpenPredictions, title }) {
+  return (
+    <main className="predictions-shell">
+      <MainNav
+        active={active}
+        auth={auth}
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
+      />
+
+      <section className="surface placeholder-section" id="top">
+        <span className="eyebrow">Padel Brazzers</span>
+        <h1>Раздел «{title}» еще не создан</h1>
+        <p>
+          Меню уже кликабельное на всех страницах. Когда появится полноценный
+          раздел, откроем здесь его содержимое.
+        </p>
+        <div>
+          <button className="back-link" type="button" onClick={onOpenHome}>К турнирам</button>
+          <button type="button" onClick={onOpenPredictions}>Прогнозы</button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export function App() {
   const [screen, setScreen] = useState({ name: "home" });
   const [authState, setAuthState] = useState(emptyAuthState);
@@ -2501,6 +2611,32 @@ export function App() {
     }
   };
 
+  const updateForecastTournament = async (tournamentId, payload) => {
+    try {
+      const result = await apiRequest(`/api/admin/forecast-tournaments/${tournamentId}`, {
+        body: JSON.stringify(payload),
+        method: "PUT",
+      });
+      setForecastTournaments(result.tournaments ?? []);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const deleteForecastTournament = async (tournamentId) => {
+    try {
+      const result = await apiRequest(`/api/admin/forecast-tournaments/${tournamentId}`, {
+        method: "DELETE",
+      });
+      setForecastTournaments(result.tournaments ?? []);
+      setScreen({ name: "predictions" });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
   const createScoringMethod = async (payload) => {
     try {
       const result = await apiRequest("/api/admin/scoring-methods", {
@@ -2519,6 +2655,10 @@ export function App() {
     if (!currentUser) {
       setAuthMode("login");
     }
+  };
+
+  const openPlaceholder = (sectionKey, sectionTitle) => {
+    setScreen({ name: "placeholder", sectionKey, sectionTitle });
   };
 
   const openAdminCabinet = () => {
@@ -2609,6 +2749,7 @@ export function App() {
           <LockedPredictionsScreen
             auth={auth}
             onOpenHome={() => setScreen({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
           />
           {authModal}
@@ -2624,6 +2765,7 @@ export function App() {
           onCreateScoringMethod={createScoringMethod}
           onCreateTournament={createForecastTournament}
           onOpenHome={() => setScreen({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           scoringMethods={scoringMethods}
         />
@@ -2641,6 +2783,7 @@ export function App() {
           <LockedPredictionsScreen
             auth={auth}
             onOpenHome={() => setScreen({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
           />
           {authModal}
@@ -2652,9 +2795,14 @@ export function App() {
       <>
         <ForecastTournamentDetail
           auth={auth}
+          forecastTournaments={forecastTournaments}
           onBack={() => setScreen({ name: "predictions" })}
+          onDeleteTournament={deleteForecastTournament}
           onOpenHome={() => setScreen({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
+          onUpdateTournament={updateForecastTournament}
+          scoringMethods={scoringMethods}
           tournament={tournament}
         />
         {authModal}
@@ -2669,6 +2817,7 @@ export function App() {
           <LockedPredictionsScreen
             auth={auth}
             onOpenHome={() => setScreen({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
           />
           {authModal}
@@ -2682,6 +2831,7 @@ export function App() {
           auth={auth}
           forecastTournaments={forecastTournaments}
           onOpenHome={() => setScreen({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           onOpenTournament={(tournamentId) => setScreen({ name: "forecast-detail", tournamentId })}
         />
@@ -2692,16 +2842,54 @@ export function App() {
 
   if (screen.name === "detail") {
     if (screen.tournamentId === "mexicano-brazzers-lite") {
-      return <MexicanoDetail onBack={() => setScreen({ name: "home" })} />;
+      return (
+        <>
+          <MexicanoDetail
+            auth={auth}
+            onBack={() => setScreen({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
+            onOpenPredictions={openPredictions}
+          />
+          {authModal}
+        </>
+      );
     }
 
-    return <AmericanoDetail onBack={() => setScreen({ name: "home" })} />;
+    return (
+      <>
+        <AmericanoDetail
+          auth={auth}
+          onBack={() => setScreen({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
+          onOpenPredictions={openPredictions}
+        />
+        {authModal}
+      </>
+    );
+  }
+
+  if (screen.name === "placeholder") {
+    return (
+      <>
+        <PlaceholderScreen
+          active={screen.sectionKey}
+          auth={auth}
+          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
+          onOpenPredictions={openPredictions}
+          title={screen.sectionTitle}
+        />
+        {authModal}
+      </>
+    );
   }
 
   return (
     <>
       <HomeScreen
         auth={auth}
+        onOpenHome={() => setScreen({ name: "home" })}
+        onOpenPlaceholder={openPlaceholder}
         onOpenPredictions={openPredictions}
         onOpenTournament={(tournamentId) => {
           setScreen({ name: "detail", tournamentId });
