@@ -1182,7 +1182,7 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
     conditions: "",
     date: "",
     format: "Americano",
-    predictionCloseAt: "",
+    pointsToWin: "11",
     scoring: "1 балл за точное место",
     time: "",
     title: "",
@@ -1237,7 +1237,7 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
       conditions: "",
       date: "",
       format: "Americano",
-      predictionCloseAt: "",
+      pointsToWin: "11",
       scoring: "1 балл за точное место",
       time: "",
       title: "",
@@ -1283,12 +1283,17 @@ function AdminTournamentForm({ forecastTournaments, onCreateTournament }) {
           </label>
           <label>
             <span>Клуб</span>
-            <input required value={form.club} onChange={(event) => updateForm("club", event.target.value)} />
+            <select value={form.club} onChange={(event) => updateForm("club", event.target.value)}>
+              <option>Padel Pro Club</option>
+              <option>Падел-клуб "Небо"</option>
+            </select>
           </label>
-          <label>
-            <span>Прием прогнозов до</span>
-            <input type="datetime-local" value={form.predictionCloseAt} onChange={(event) => updateForm("predictionCloseAt", event.target.value)} />
-          </label>
+          {form.format === "Americano" && (
+            <label>
+              <span>Розыгрыш до</span>
+              <input required inputMode="numeric" min="1" type="number" value={form.pointsToWin} onChange={(event) => updateForm("pointsToWin", event.target.value)} />
+            </label>
+          )}
         </div>
 
         <label>
@@ -1652,6 +1657,9 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
             <p>
               {tournament.conditions || "Карточка будущего турнира для прогнозов. Участник сможет расставить игроков по местам до закрытия приема."}
             </p>
+            {tournament.format === "Americano" && tournament.pointsToWin && (
+              <p className="prediction-format-note">Americano до {tournament.pointsToWin} очков в розыгрыше.</p>
+            )}
           </div>
           <div className="metric-strip">
             <div><strong>{tournament.roster.length || "—"}</strong><span>участников</span></div>

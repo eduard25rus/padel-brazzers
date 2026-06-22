@@ -20,6 +20,8 @@ const mimeTypes = {
   ".webp": "image/webp",
 };
 
+const allowedClubs = new Set(["Padel Pro Club", 'Падел-клуб "Небо"']);
+
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
@@ -73,6 +75,7 @@ function sanitizeTournament(tournament) {
     id: tournament.id,
     image: tournament.image ?? "/assets/hero-court.png",
     players: tournament.players ?? `${roster.length} игроков`,
+    pointsToWin: tournament.pointsToWin ?? "",
     predictionCloseAt: tournament.predictionCloseAt ?? "",
     roster,
     scoring: tournament.scoring ?? "1 балл за точное место",
@@ -279,7 +282,8 @@ async function handleApi(request, response, url) {
     const club = String(body.club ?? "Padel Pro Club").trim();
     const format = String(body.format ?? "").trim();
     const conditions = String(body.conditions ?? "").trim();
-    const predictionCloseAt = String(body.predictionCloseAt ?? "").trim();
+    const pointsToWin = format === "Americano" ? Number(body.pointsToWin) : null;
+    const predictionCloseAt = date && time ? `${date}T${time}` : "";
     const scoring = String(body.scoring ?? "1 балл за точное место").trim();
     const roster = Array.isArray(body.roster)
       ? body.roster
@@ -291,10 +295,15 @@ async function handleApi(request, response, url) {
           .filter((player) => player.name && Number.isFinite(player.rating))
       : [];
 
-    if (!title || !date || !time || !club || !format || !conditions || roster.length < 2) {
+    if (!title || !date || !time || !allowedClubs.has(club) || !format || !conditions || roster.length < 2) {
       jsonResponse(response, 400, {
-        message: "Заполни название, дату, время, клуб, формат, условия и минимум двух игроков с рейтингами.",
+        message: "Заполни название, дату, время, выбери клуб, формат, условия и минимум двух игроков с рейтингами.",
       });
+      return;
+    }
+
+    if (format === "Americano" && (!Number.isInteger(pointsToWin) || pointsToWin < 1)) {
+      jsonResponse(response, 400, { message: "Для Americano укажи, до скольки очков идет розыгрыш." });
       return;
     }
 
@@ -307,6 +316,7 @@ async function handleApi(request, response, url) {
       id: `forecast-${Date.now()}-${randomUUID().slice(0, 8)}`,
       image: "/assets/hero-court.png",
       players: `${roster.length} игроков`,
+      pointsToWin,
       predictionCloseAt,
       roster,
       scoring,

@@ -1403,6 +1403,12 @@ main {
   min-height: 340px;
 }
 
+.prediction-format-note {
+  color: var(--green);
+  font-weight: 850;
+  margin-top: 12px;
+}
+
 .prediction-empty-list strong {
   color: #1b241d;
   font-size: 20px;
