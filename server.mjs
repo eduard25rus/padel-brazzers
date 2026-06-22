@@ -81,6 +81,7 @@ function sanitizeTournament(tournament) {
     scoring: tournament.scoring ?? "1 балл за точное место",
     status: tournament.status ?? "Прием прогнозов",
     time: tournament.time ?? "",
+    timezone: tournament.timezone ?? "Asia/Vladivostok",
     title: tournament.title ?? "Будущий турнир",
   };
 }
@@ -322,6 +323,7 @@ async function handleApi(request, response, url) {
       scoring,
       status: "Прием прогнозов",
       time,
+      timezone: "Asia/Vladivostok",
       title,
     };
 

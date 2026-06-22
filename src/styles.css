@@ -1377,13 +1377,35 @@ main {
   background: rgba(255, 254, 250, 0.58);
   border: 1px solid var(--line);
   border-radius: 8px;
+  color: var(--text);
+  cursor: grab;
   display: flex;
   gap: 10px;
+  font: inherit;
   min-height: 50px;
   padding: 8px;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+  width: 100%;
+}
+
+.prediction-roster-player:hover,
+.prediction-roster-player.selected {
+  background: var(--green-soft);
+  border-color: rgba(29, 93, 42, 0.28);
+  transform: translateY(-1px);
+}
+
+.prediction-roster-player.placed {
+  opacity: 0.55;
 }
 
 .prediction-roster-player strong {
+  flex: 1;
   font-size: 13px;
   line-height: 1.2;
 }
@@ -1446,6 +1468,90 @@ main {
 
 .prediction-card-head .section-title {
   margin-bottom: 0;
+}
+
+.prediction-placement-hint {
+  background: rgba(29, 93, 42, 0.08);
+  border: 1px solid rgba(29, 93, 42, 0.14);
+  border-radius: 8px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 850;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+.prediction-slot-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.prediction-slot {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.62);
+  border: 1px dashed rgba(29, 93, 42, 0.24);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: 58px;
+  padding: 8px;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.prediction-slot:hover {
+  background: var(--green-soft);
+  border-color: rgba(29, 93, 42, 0.3);
+  transform: translateY(-1px);
+}
+
+.prediction-slot.filled {
+  background: rgba(255, 254, 250, 0.92);
+  border-style: solid;
+}
+
+.prediction-slot > span {
+  align-items: center;
+  background: var(--green);
+  border-radius: 50%;
+  color: #fffefa;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.prediction-slot strong,
+.prediction-slot b,
+.prediction-slot em {
+  display: block;
+}
+
+.prediction-slot strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.prediction-slot b {
+  color: var(--green);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.prediction-slot em {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 750;
 }
 
 .prediction-order-list {
@@ -2842,6 +2948,10 @@ p {
   }
 
   .prediction-roster-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prediction-slot-grid {
     grid-template-columns: 1fr;
   }
 

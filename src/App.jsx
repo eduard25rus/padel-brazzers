@@ -347,6 +347,24 @@ function getUserDisplayName(user) {
   return `${user.firstName} ${user.lastName}`.trim() || user.lundaNick;
 }
 
+function formatVladivostokDate(date) {
+  if (!date || !date.includes("-")) {
+    return date;
+  }
+
+  const [year, month, day] = date.split("-");
+  return `${day}.${month}.${year}`;
+}
+
+function formatVladivostokDateTime(value) {
+  if (!value || !value.includes("T")) {
+    return value;
+  }
+
+  const [date, time] = value.split("T");
+  return `${formatVladivostokDate(date)} ${time} VLAT`;
+}
+
 function getStandingsAfterRound(round) {
   const table = new Map(
     standings.map((team, index) => [
@@ -1595,7 +1613,7 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
               >
                 <img src={tournament.image} alt="" />
                 <div className="tournament-copy">
-                  <span>{tournament.date} · {tournament.club}</span>
+                  <span>{formatVladivostokDate(tournament.date)} · {tournament.time} VLAT · {tournament.club}</span>
                   <strong>{tournament.title}</strong>
                   <p>{tournament.format} · {tournament.players}</p>
                 </div>
@@ -1627,6 +1645,42 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
 }
 
 function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredictions, onBack }) {
+  const sortedRoster = useMemo(
+    () => [...tournament.roster].sort((a, b) => Number(b.rating) - Number(a.rating) || a.name.localeCompare(b.name)),
+    [tournament.roster],
+  );
+  const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: 16 }, () => null));
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const filledSlots = forecastSlots.filter(Boolean).length;
+  const isForecastComplete = tournament.roster.length > 0 && filledSlots === Math.min(16, tournament.roster.length);
+
+  const getPlayerKey = (player) => player.id ?? player.name;
+  const selectedPlayer = sortedRoster.find((player) => getPlayerKey(player) === selectedPlayerId);
+
+  const placePlayer = (slotIndex, playerId) => {
+    const player = sortedRoster.find((item) => getPlayerKey(item) === playerId);
+    if (!player) {
+      return;
+    }
+
+    setForecastSlots((current) => {
+      const next = current.map((slot) => (slot && getPlayerKey(slot) === playerId ? null : slot));
+      next[slotIndex] = player;
+      return next;
+    });
+    setSelectedPlayerId(null);
+  };
+
+  const clearSlot = (slotIndex) => {
+    setForecastSlots((current) => current.map((slot, index) => (index === slotIndex ? null : slot)));
+  };
+
+  const handleSlotDrop = (event, slotIndex) => {
+    event.preventDefault();
+    const playerId = event.dataTransfer.getData("text/plain");
+    placePlayer(slotIndex, playerId);
+  };
+
   return (
     <main className="predictions-shell">
       <MainNav
@@ -1650,8 +1704,8 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
             <span className="eyebrow">{tournament.status}</span>
             <h1>{tournament.title}</h1>
             <div className="meta-row">
-              <span>{tournament.date}</span>
-              <span>{tournament.time}</span>
+              <span>{formatVladivostokDate(tournament.date)}</span>
+              <span>{tournament.time} VLAT</span>
               <span>{tournament.club}</span>
             </div>
             <p>
@@ -1676,7 +1730,7 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
           </div>
           <p>
             {tournament.predictionCloseAt
-              ? `Прием прогнозов открыт до ${tournament.predictionCloseAt}.`
+              ? `Прием прогнозов открыт до ${formatVladivostokDateTime(tournament.predictionCloseAt)}.`
               : "Прогноз можно будет сохранить и менять до закрытия приема."}
           </p>
         </section>
@@ -1686,7 +1740,7 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
         <section className="surface prediction-roster-card" id="roster">
           <div className="section-title">
             <span>Состав турнира</span>
-            <h2>{tournament.roster.length ? `${tournament.roster.length} игроков` : "Игроки появятся из управляющей части"}</h2>
+            <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Игроки появятся из управляющей части"}</h2>
           </div>
           {tournament.roster.length === 0 ? (
             <div className="prediction-empty-list">
@@ -1695,13 +1749,29 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
             </div>
           ) : (
             <div className="prediction-roster-grid">
-              {tournament.roster.map((player, index) => (
-                <article className="prediction-roster-player" key={player.id ?? player.name}>
+              {sortedRoster.map((player, index) => {
+                const playerId = getPlayerKey(player);
+                const isSelected = selectedPlayerId === playerId;
+                const isPlaced = forecastSlots.some((slot) => slot && getPlayerKey(slot) === playerId);
+
+                return (
+                <button
+                  className={`prediction-roster-player ${isSelected ? "selected" : ""} ${isPlaced ? "placed" : ""}`}
+                  draggable
+                  key={playerId}
+                  type="button"
+                  onClick={() => setSelectedPlayerId(isSelected ? null : playerId)}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData("text/plain", playerId);
+                    event.dataTransfer.effectAllowed = "move";
+                  }}
+                >
                   <span>{index + 1}</span>
                   <strong>{player.name}</strong>
                   <b className="prediction-rating">{Number(player.rating).toFixed(2)}</b>
-                </article>
-              ))}
+                </button>
+              );
+              })}
             </div>
           )}
         </section>
@@ -1710,14 +1780,55 @@ function ForecastTournamentDetail({ auth, tournament, onOpenHome, onOpenPredicti
           <div className="prediction-card-head">
             <div className="section-title">
               <span>Мой прогноз</span>
-              <h2>Порядок мест</h2>
+              <h2>16 мест турнира</h2>
             </div>
-            <button disabled type="button">Сохранить прогноз</button>
+            <button disabled={!isForecastComplete} type="button">Сохранить прогноз</button>
           </div>
-          <div className="prediction-empty-list tall">
-            <strong>{tournament.roster.length ? "Расстановка готовится" : "Расстановка откроется после публикации состава"}</strong>
-            <p>Здесь будет список участников для прогноза: 1-е место сверху, последнее место снизу.</p>
-          </div>
+          {tournament.roster.length === 0 ? (
+            <div className="prediction-empty-list tall">
+              <strong>Расстановка откроется после публикации состава</strong>
+              <p>Здесь будет 16 мест турнира для прогноза.</p>
+            </div>
+          ) : (
+            <>
+              <div className="prediction-placement-hint">
+                {selectedPlayer
+                  ? `Выбран: ${selectedPlayer.name}. Нажми на место справа.`
+                  : "Перетащи игрока в место справа или выбери игрока кликом, затем нажми на слот."}
+              </div>
+              <div className="prediction-slot-grid">
+                {forecastSlots.map((slot, index) => (
+                  <button
+                    className={`prediction-slot ${slot ? "filled" : ""}`}
+                    key={`slot-${index}`}
+                    type="button"
+                    onClick={() => {
+                      if (selectedPlayerId) {
+                        placePlayer(index, selectedPlayerId);
+                        return;
+                      }
+
+                      if (slot) {
+                        clearSlot(index);
+                      }
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => handleSlotDrop(event, index)}
+                  >
+                    <span>{index + 1}</span>
+                    {slot ? (
+                      <div>
+                        <strong>{slot.name}</strong>
+                        <b>{Number(slot.rating).toFixed(2)}</b>
+                      </div>
+                    ) : (
+                      <em>Место свободно</em>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </section>
       </section>
     </main>
