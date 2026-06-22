@@ -1,0 +1,1923 @@
+import { useMemo, useState } from "react";
+
+const standings = [
+  { place: 1, team: "Редько / Kh", short: "RK", rating: 6.6, record: "6 - 0 - 1", points: "34 - 14", delta: 20 },
+  { place: 2, team: "Аршакян / Ткачев", short: "AT", rating: 4.5, record: "6 - 0 - 1", points: "33 - 16", delta: 17 },
+  { place: 3, team: "Shapovalova / Sh", short: "SS", rating: 5.8, record: "4 - 0 - 3", points: "24 - 22", delta: 2 },
+  { place: 4, team: "Гудини / Shvedov", short: "GS", rating: 5.2, record: "4 - 0 - 3", points: "23 - 21", delta: 2 },
+  { place: 5, team: "Пронович / Gleb", short: "PG", rating: 4.9, record: "3 - 0 - 4", points: "24 - 22", delta: 2 },
+  { place: 6, team: "Soloveva / Каменный", short: "SK", rating: 5.4, record: "2 - 0 - 5", points: "15 - 25", delta: -10 },
+  { place: 7, team: "Шевченко / Борис", short: "SB", rating: 5.7, record: "2 - 0 - 5", points: "16 - 28", delta: -12 },
+  { place: 8, team: "Мхитарян / Muradyan", short: "MA", rating: 5.0, record: "1 - 0 - 6", points: "12 - 33", delta: -21 },
+];
+
+const matches = [
+  { round: 1, court: 1, a: "Редько / Kh", b: "Пронович / Gleb", scoreA: 5, scoreB: 3 },
+  { round: 1, court: 2, a: "Шевченко / Борис", b: "Soloveva / Каменный", scoreA: 3, scoreB: 4 },
+  { round: 1, court: 3, a: "Shapovalova / Sh", b: "Аршакян / Ткачев", scoreA: 2, scoreB: 6 },
+  { round: 1, court: 4, a: "Мхитарян / Muradyan", b: "Гудини / Shvedov", scoreA: 2, scoreB: 5 },
+  { round: 2, court: 1, a: "Shapovalova / Sh", b: "Редько / Kh", scoreA: 2, scoreB: 6 },
+  { round: 2, court: 2, a: "Soloveva / Каменный", b: "Мхитарян / Muradyan", scoreA: 4, scoreB: 1 },
+  { round: 2, court: 3, a: "Гудини / Shvedov", b: "Аршакян / Ткачев", scoreA: 2, scoreB: 5 },
+  { round: 2, court: 4, a: "Шевченко / Борис", b: "Пронович / Gleb", scoreA: 4, scoreB: 2 },
+  { round: 3, court: 1, a: "Мхитарян / Muradyan", b: "Аршакян / Ткачев", scoreA: 2, scoreB: 6 },
+  { round: 3, court: 2, a: "Шевченко / Борис", b: "Shapovalova / Sh", scoreA: 4, scoreB: 3 },
+  { round: 3, court: 3, a: "Гудини / Shvedov", b: "Редько / Kh", scoreA: 4, scoreB: 3 },
+  { round: 3, court: 4, a: "Soloveva / Каменный", b: "Пронович / Gleb", scoreA: 1, scoreB: 5 },
+  { round: 4, court: 1, a: "Гудини / Shvedov", b: "Шевченко / Борис", scoreA: 3, scoreB: 2 },
+  { round: 4, court: 2, a: "Аршакян / Ткачев", b: "Редько / Kh", scoreA: 3, scoreB: 4 },
+  { round: 4, court: 3, a: "Пронович / Gleb", b: "Мхитарян / Muradyan", scoreA: 5, scoreB: 1 },
+  { round: 4, court: 4, a: "Soloveva / Каменный", b: "Shapovalova / Sh", scoreA: 1, scoreB: 4 },
+  { round: 5, court: 1, a: "Пронович / Gleb", b: "Shapovalova / Sh", scoreA: 2, scoreB: 4 },
+  { round: 5, court: 2, a: "Soloveva / Каменный", b: "Гудини / Shvedov", scoreA: 2, scoreB: 4 },
+  { round: 5, court: 3, a: "Мхитарян / Muradyan", b: "Редько / Kh", scoreA: 1, scoreB: 5 },
+  { round: 5, court: 4, a: "Аршакян / Ткачев", b: "Шевченко / Борис", scoreA: 6, scoreB: 1 },
+  { round: 6, court: 1, a: "Аршакян / Ткачев", b: "Soloveva / Каменный", scoreA: 3, scoreB: 2 },
+  { round: 6, court: 2, a: "Пронович / Gleb", b: "Гудини / Shvedov", scoreA: 4, scoreB: 3 },
+  { round: 6, court: 3, a: "Редько / Kh", b: "Шевченко / Борис", scoreA: 6, scoreB: 0 },
+  { round: 6, court: 4, a: "Shapovalova / Sh", b: "Мхитарян / Muradyan", scoreA: 6, scoreB: 1 },
+  { round: 7, court: 1, a: "Редько / Kh", b: "Soloveva / Каменный", scoreA: 5, scoreB: 1 },
+  { round: 7, court: 2, a: "Мхитарян / Muradyan", b: "Шевченко / Борис", scoreA: 4, scoreB: 2 },
+  { round: 7, court: 3, a: "Shapovalova / Sh", b: "Гудини / Shvedov", scoreA: 3, scoreB: 2 },
+  { round: 7, court: 4, a: "Пронович / Gleb", b: "Аршакян / Ткачев", scoreA: 3, scoreB: 4 },
+];
+
+const storyCards = [
+  {
+    image: "/assets/trophy.png",
+    label: "Матч за золото",
+    title: "Редько / Kh — Аршакян / Ткачев 4–3",
+    copy: "Обе пары закончили турнир 6–1, и личная встреча решила, кто станет чемпионом.",
+  },
+  {
+    image: "/assets/handshake.png",
+    label: "Главный апсет",
+    title: "Гудини / Shvedov — Редько / Kh 4–3",
+    copy: "Будущие победители проиграли всего один матч, но именно он стал главным сюжетом вечера.",
+  },
+  {
+    image: "/assets/forehand.png",
+    label: "Холодная концовка",
+    title: "Шевченко / Борис: 0–4 на финише",
+    copy: "После бодрого старта пара не выдержала вторую половину турнира и упала на 7-е место.",
+  },
+];
+
+const gallery = [
+  { src: "/assets/forehand.png", alt: "Игрок выполняет удар на корте" },
+  { src: "/assets/handshake.png", alt: "Игроки после матча" },
+  { src: "/assets/trophy.png", alt: "Кубок турнира и мячи" },
+  { src: "/assets/hero-court.png", alt: "Матч на падел корте" },
+];
+
+const americanoPlayers = [
+  { place: 1, name: "Kh Ivan", record: "8–3", points: "120–89", delta: 31, change: "+0.039", rating: 3.55 },
+  { place: 2, name: "Редько Илья", record: "8–3", points: "111–98", delta: 13, change: "+0.082", rating: 3.18 },
+  { place: 3, name: "Рустам Мамедов", record: "7–4", points: "111–98", delta: 13, change: "+0.048", rating: 3.24 },
+  { place: 4, name: "G Alexey", record: "6–5", points: "112–97", delta: 15, change: "+0.022", rating: 3.12 },
+  { place: 5, name: "Бессонов Егор", record: "6–5", points: "108–101", delta: 7, change: "+0.129", rating: 2.22 },
+  { place: 6, name: "Тарасов Артем", record: "6–5", points: "97–112", delta: -15, change: "-0.002", rating: 3.22 },
+  { place: 7, name: "Шевченко Эдуард", record: "5–6", points: "101–108", delta: -7, change: "-0.008", rating: 2.97 },
+  { place: 8, name: "Борис Чигиринцев", record: "5–6", points: "98–111", delta: -13, change: "+0.027", rating: 2.65 },
+  { place: 9, name: "Селантьев Данил", record: "4–7", points: "106–103", delta: 3, change: "-0.034", rating: 2.92 },
+  { place: 10, name: "Трут Дмитрий", record: "4–7", points: "100–109", delta: -9, change: "-0.065", rating: 3.28 },
+  { place: 11, name: "Каменный Никита", record: "4–7", points: "96–113", delta: -17, change: "-0.043", rating: 2.73 },
+  { place: 12, name: "Ширинская Дарья", record: "3–8", points: "94–115", delta: -21, change: "-0.100", rating: 2.95 },
+];
+
+const americanoMatches = [
+  { round: 1, court: 1, a: ["Шевченко Эдуард", "Ширинская Дарья"], b: ["Редько Илья", "Бессонов Егор"], scoreA: 8, scoreB: 11 },
+  { round: 1, court: 2, a: ["Kh Ivan", "G Alexey"], b: ["Борис Чигиринцев", "Тарасов Артем"], scoreA: 16, scoreB: 3 },
+  { round: 1, court: 3, a: ["Рустам Мамедов", "Трут Дмитрий"], b: ["Селантьев Данил", "Каменный Никита"], scoreA: 11, scoreB: 8 },
+  { round: 2, court: 1, a: ["Шевченко Эдуард", "Рустам Мамедов"], b: ["Каменный Никита", "G Alexey"], scoreA: 8, scoreB: 11 },
+  { round: 2, court: 2, a: ["Борис Чигиринцев", "Трут Дмитрий"], b: ["Бессонов Егор", "Ширинская Дарья"], scoreA: 13, scoreB: 6 },
+  { round: 2, court: 3, a: ["Редько Илья", "Селантьев Данил"], b: ["Kh Ivan", "Тарасов Артем"], scoreA: 9, scoreB: 10 },
+  { round: 3, court: 1, a: ["Бессонов Егор", "Шевченко Эдуард"], b: ["Тарасов Артем", "Селантьев Данил"], scoreA: 12, scoreB: 7 },
+  { round: 3, court: 2, a: ["Kh Ivan", "Каменный Никита"], b: ["Борис Чигиринцев", "Ширинская Дарья"], scoreA: 10, scoreB: 9 },
+  { round: 3, court: 3, a: ["Рустам Мамедов", "Редько Илья"], b: ["G Alexey", "Трут Дмитрий"], scoreA: 11, scoreB: 8 },
+  { round: 4, court: 1, a: ["Рустам Мамедов", "Kh Ivan"], b: ["Трут Дмитрий", "Шевченко Эдуард"], scoreA: 12, scoreB: 7 },
+  { round: 4, court: 2, a: ["Борис Чигиринцев", "G Alexey"], b: ["Бессонов Егор", "Селантьев Данил"], scoreA: 11, scoreB: 8 },
+  { round: 4, court: 3, a: ["Тарасов Артем", "Редько Илья"], b: ["Ширинская Дарья", "Каменный Никита"], scoreA: 11, scoreB: 8 },
+  { round: 5, court: 1, a: ["Рустам Мамедов", "Борис Чигиринцев"], b: ["Шевченко Эдуард", "Редько Илья"], scoreA: 7, scoreB: 12 },
+  { round: 5, court: 2, a: ["Ширинская Дарья", "Kh Ivan"], b: ["Селантьев Данил", "G Alexey"], scoreA: 10, scoreB: 9 },
+  { round: 5, court: 3, a: ["Бессонов Егор", "Трут Дмитрий"], b: ["Тарасов Артем", "Каменный Никита"], scoreA: 9, scoreB: 10 },
+  { round: 6, court: 1, a: ["Селантьев Данил", "Борис Чигиринцев"], b: ["Каменный Никита", "Трут Дмитрий"], scoreA: 10, scoreB: 9 },
+  { round: 6, court: 2, a: ["Тарасов Артем", "Шевченко Эдуард"], b: ["Ширинская Дарья", "G Alexey"], scoreA: 10, scoreB: 9 },
+  { round: 6, court: 3, a: ["Рустам Мамедов", "Бессонов Егор"], b: ["Редько Илья", "Kh Ivan"], scoreA: 10, scoreB: 9 },
+  { round: 7, court: 1, a: ["Ширинская Дарья", "Редько Илья"], b: ["Селантьев Данил", "Трут Дмитрий"], scoreA: 10, scoreB: 9 },
+  { round: 7, court: 2, a: ["Рустам Мамедов", "Тарасов Артем"], b: ["Kh Ivan", "Борис Чигиринцев"], scoreA: 13, scoreB: 6 },
+  { round: 7, court: 3, a: ["Каменный Никита", "Бессонов Егор"], b: ["G Alexey", "Шевченко Эдуард"], scoreA: 9, scoreB: 10 },
+  { round: 8, court: 1, a: ["Селантьев Данил", "Kh Ivan"], b: ["Каменный Никита", "Шевченко Эдуард"], scoreA: 13, scoreB: 6 },
+  { round: 8, court: 2, a: ["G Alexey", "Тарасов Артем"], b: ["Трут Дмитрий", "Редько Илья"], scoreA: 9, scoreB: 10 },
+  { round: 8, court: 3, a: ["Рустам Мамедов", "Ширинская Дарья"], b: ["Борис Чигиринцев", "Бессонов Егор"], scoreA: 8, scoreB: 11 },
+  { round: 9, court: 1, a: ["Каменный Никита", "Борис Чигиринцев"], b: ["G Alexey", "Редько Илья"], scoreA: 8, scoreB: 11 },
+  { round: 9, court: 2, a: ["Рустам Мамедов", "Селантьев Данил"], b: ["Бессонов Егор", "Тарасов Артем"], scoreA: 13, scoreB: 6 },
+  { round: 9, court: 3, a: ["Ширинская Дарья", "Трут Дмитрий"], b: ["Шевченко Эдуард", "Kh Ivan"], scoreA: 6, scoreB: 13 },
+  { round: 10, court: 1, a: ["G Alexey", "Бессонов Егор"], b: ["Трут Дмитрий", "Kh Ivan"], scoreA: 12, scoreB: 7 },
+  { round: 10, court: 2, a: ["Рустам Мамедов", "Каменный Никита"], b: ["Тарасов Артем", "Ширинская Дарья"], scoreA: 12, scoreB: 7 },
+  { round: 10, court: 3, a: ["Шевченко Эдуард", "Селантьев Данил"], b: ["Редько Илья", "Борис Чигиринцев"], scoreA: 7, scoreB: 12 },
+  { round: 11, court: 1, a: ["Редько Илья", "Каменный Никита"], b: ["Kh Ivan", "Бессонов Егор"], scoreA: 5, scoreB: 14 },
+  { round: 11, court: 2, a: ["Рустам Мамедов", "G Alexey"], b: ["Ширинская Дарья", "Селантьев Данил"], scoreA: 6, scoreB: 13 },
+  { round: 11, court: 3, a: ["Трут Дмитрий", "Тарасов Артем"], b: ["Шевченко Эдуард", "Борис Чигиринцев"], scoreA: 11, scoreB: 8 },
+];
+
+const americanoStories = [
+  {
+    image: "/assets/trophy.png",
+    label: "MVP турнира",
+    title: "Kh Ivan: 8–3 и лучшая разница +31",
+    copy: "Лучший по победам, очкам, защите и общей стабильности. 120 набранных и всего 89 пропущенных.",
+  },
+  {
+    image: "/assets/handshake.png",
+    label: "Матч за первое место",
+    title: "Редько / Каменный — Kh / Бессонов 5–14",
+    copy: "Последний раунд окончательно закрепил первое место за Kh и снял интригу по разнице.",
+  },
+  {
+    image: "/assets/forehand.png",
+    label: "Оверперформер",
+    title: "Бессонов Егор: 5 место и +0.129",
+    copy: "При рейтинге 2.22 он выиграл 6 матчей, закончил в плюсе и сильнее всех прибавил в рейтинге.",
+  },
+  {
+    image: "/assets/hero-court.png",
+    label: "Раунд нервов",
+    title: "6-й раунд: все три матча 10–9",
+    copy: "Самый плотный отрезок турнира: каждый корт закончился разницей всего в одно очко.",
+  },
+  {
+    image: "/assets/handshake.png",
+    label: "Странная статистика",
+    title: "Селантьев: 9 место при разнице +3",
+    copy: "Редкий случай, когда игрок остается в нижней части таблицы, но по качеству очков выглядит выше.",
+  },
+];
+
+const mexicanoPlayers = [
+  { place: 1, name: "Искалдович Константин", record: "9–2", points: "105–82", delta: 23, change: "+0.379", rating: 1.5 },
+  { place: 2, name: "Гудини Дмитрий", record: "7–4", points: "101–86", delta: 15, change: "+0.056", rating: 2.28 },
+  { place: 3, name: "Khrapatyi Denis", record: "7–4", points: "98–89", delta: 9, change: "+0.122", rating: 1.93 },
+  { place: 4, name: "Калюжный Максим", record: "8–3", points: "97–90", delta: 7, change: "+0.098", rating: 2.28 },
+  { place: 5, name: "Очкуров Илья", record: "6–5", points: "96–91", delta: 5, change: "+0.088", rating: 1.79 },
+  { place: 6, name: "@L.A.Bruin Алексей", record: "5–6", points: "93–94", delta: -1, change: "-0.074", rating: 2.27 },
+  { place: 7, name: "Кулик Дмитрий", record: "6–5", points: "92–95", delta: -3, change: "+0.003", rating: 1.9 },
+  { place: 8, name: "Золотов Илья", record: "5–6", points: "92–95", delta: -3, change: "+0.055", rating: 1.57 },
+  { place: 9, name: "Khizhnyak Mikhail", record: "3–8", points: "92–95", delta: -3, change: "-0.160", rating: 2.14 },
+  { place: 10, name: "Князев Влад", record: "4–7", points: "89–98", delta: -9, change: "-0.180", rating: 2.26 },
+  { place: 11, name: "Захаров Иван", record: "2–9", points: "86–101", delta: -15, change: "+0.006", rating: 1.0 },
+  { place: 12, name: "Levchenko Roman", record: "4–7", points: "81–106", delta: -25, change: "-0.050", rating: 1.44 },
+];
+
+const mexicanoMatches = [
+  { round: 1, court: 1, a: ["Калюжный Максим", "Князев Влад"], b: ["Гудини Дмитрий", "@L.A.Bruin Алексей"], scoreA: 6, scoreB: 11 },
+  { round: 1, court: 2, a: ["Khizhnyak Mikhail", "Очкуров Илья"], b: ["Khrapatyi Denis", "Кулик Дмитрий"], scoreA: 7, scoreB: 10 },
+  { round: 1, court: 3, a: ["Золотов Илья", "Захаров Иван"], b: ["Искалдович Константин", "Levchenko Roman"], scoreA: 8, scoreB: 9 },
+  { round: 2, court: 1, a: ["Гудини Дмитрий", "Кулик Дмитрий"], b: ["@L.A.Bruin Алексей", "Khrapatyi Denis"], scoreA: 6, scoreB: 11 },
+  { round: 2, court: 2, a: ["Искалдович Константин", "Захаров Иван"], b: ["Levchenko Roman", "Золотов Илья"], scoreA: 11, scoreB: 6 },
+  { round: 2, court: 3, a: ["Khizhnyak Mikhail", "Князев Влад"], b: ["Очкуров Илья", "Калюжный Максим"], scoreA: 8, scoreB: 9 },
+  { round: 3, court: 1, a: ["@L.A.Bruin Алексей", "Захаров Иван"], b: ["Khrapatyi Denis", "Искалдович Константин"], scoreA: 8, scoreB: 9 },
+  { round: 3, court: 2, a: ["Гудини Дмитрий", "Калюжный Максим"], b: ["Кулик Дмитрий", "Очкуров Илья"], scoreA: 11, scoreB: 6 },
+  { round: 3, court: 3, a: ["Levchenko Roman", "Золотов Илья"], b: ["Khizhnyak Mikhail", "Князев Влад"], scoreA: 5, scoreB: 12 },
+  { round: 4, court: 1, a: ["Khrapatyi Denis", "Гудини Дмитрий"], b: ["@L.A.Bruin Алексей", "Искалдович Константин"], scoreA: 8, scoreB: 9 },
+  { round: 4, court: 2, a: ["Khizhnyak Mikhail", "Князев Влад"], b: ["Захаров Иван", "Калюжный Максим"], scoreA: 11, scoreB: 6 },
+  { round: 4, court: 3, a: ["Кулик Дмитрий", "Золотов Илья"], b: ["Очкуров Илья", "Levchenko Roman"], scoreA: 10, scoreB: 7 },
+  { round: 5, court: 1, a: ["@L.A.Bruin Алексей", "Khizhnyak Mikhail"], b: ["Искалдович Константин", "Khrapatyi Denis"], scoreA: 8, scoreB: 9 },
+  { round: 5, court: 2, a: ["Князев Влад", "Калюжный Максим"], b: ["Гудини Дмитрий", "Захаров Иван"], scoreA: 11, scoreB: 6 },
+  { round: 5, court: 3, a: ["Кулик Дмитрий", "Levchenko Roman"], b: ["Золотов Илья", "Очкуров Илья"], scoreA: 7, scoreB: 10 },
+  { round: 6, court: 1, a: ["Князев Влад", "@L.A.Bruin Алексей"], b: ["Искалдович Константин", "Khrapatyi Denis"], scoreA: 5, scoreB: 12 },
+  { round: 6, court: 2, a: ["Khizhnyak Mikhail", "Золотов Илья"], b: ["Калюжный Максим", "Гудини Дмитрий"], scoreA: 7, scoreB: 10 },
+  { round: 6, court: 3, a: ["Кулик Дмитрий", "Levchenko Roman"], b: ["Очкуров Илья", "Захаров Иван"], scoreA: 9, scoreB: 8 },
+  { round: 7, court: 1, a: ["Искалдович Константин", "Князев Влад"], b: ["Khrapatyi Denis", "Калюжный Максим"], scoreA: 7, scoreB: 10 },
+  { round: 7, court: 2, a: ["Khizhnyak Mikhail", "Кулик Дмитрий"], b: ["@L.A.Bruin Алексей", "Гудини Дмитрий"], scoreA: 7, scoreB: 10 },
+  { round: 7, court: 3, a: ["Очкуров Илья", "Levchenko Roman"], b: ["Захаров Иван", "Золотов Илья"], scoreA: 9, scoreB: 8 },
+  { round: 8, court: 1, a: ["Khrapatyi Denis", "@L.A.Bruin Алексей"], b: ["Искалдович Константин", "Калюжный Максим"], scoreA: 8, scoreB: 9 },
+  { round: 8, court: 2, a: ["Гудини Дмитрий", "Очкуров Илья"], b: ["Князев Влад", "Khizhnyak Mikhail"], scoreA: 11, scoreB: 6 },
+  { round: 8, court: 3, a: ["Кулик Дмитрий", "Levchenko Roman"], b: ["Захаров Иван", "Золотов Илья"], scoreA: 6, scoreB: 11 },
+  { round: 9, court: 1, a: ["Khrapatyi Denis", "Калюжный Максим"], b: ["Искалдович Константин", "Гудини Дмитрий"], scoreA: 5, scoreB: 12 },
+  { round: 9, court: 2, a: ["@L.A.Bruin Алексей", "Khizhnyak Mikhail"], b: ["Очкуров Илья", "Князев Влад"], scoreA: 7, scoreB: 10 },
+  { round: 9, court: 3, a: ["Захаров Иван", "Levchenko Roman"], b: ["Золотов Илья", "Кулик Дмитрий"], scoreA: 8, scoreB: 9 },
+  { round: 10, court: 1, a: ["Искалдович Константин", "Калюжный Максим"], b: ["Гудини Дмитрий", "Khrapatyi Denis"], scoreA: 10, scoreB: 7 },
+  { round: 10, court: 2, a: ["Очкуров Илья", "Золотов Илья"], b: ["@L.A.Bruin Алексей", "Князев Влад"], scoreA: 11, scoreB: 6 },
+  { round: 10, court: 3, a: ["Захаров Иван", "Levchenko Roman"], b: ["Khizhnyak Mikhail", "Кулик Дмитрий"], scoreA: 5, scoreB: 12 },
+  { round: 11, court: 1, a: ["Искалдович Константин", "Очкуров Илья"], b: ["Гудини Дмитрий", "Khrapatyi Denis"], scoreA: 8, scoreB: 9 },
+  { round: 11, court: 2, a: ["Калюжный Максим", "@L.A.Bruin Алексей"], b: ["Золотов Илья", "Khizhnyak Mikhail"], scoreA: 10, scoreB: 7 },
+  { round: 11, court: 3, a: ["Кулик Дмитрий", "Levchenko Roman"], b: ["Князев Влад", "Захаров Иван"], scoreA: 10, scoreB: 7 },
+];
+
+const mexicanoStories = [
+  {
+    image: "/assets/trophy.png",
+    label: "Победитель по дельте",
+    title: "Искалдович Константин: +23",
+    copy: "Костя закончил с лучшей разницей очков 105–82 и забрал LITE-турнир по главному правилу Mexicano.",
+  },
+  {
+    image: "/assets/handshake.png",
+    label: "Темная лошадка",
+    title: "Эдуард Шевченко сыграл за победителя",
+    copy: "Важная скрытая роль турнира: Эдуард Шевченко выходил за Костю и помог сохранить чемпионский темп.",
+  },
+  {
+    image: "/assets/forehand.png",
+    label: "Фейл турнира",
+    title: "Никита Каменный не явился",
+    copy: "Главный организационный провал: игрок не пришел без предупреждения и заставил перестраивать турнир на ходу.",
+  },
+  {
+    image: "/assets/hero-court.png",
+    label: "Сильная группа",
+    title: "Гудини и Khrapatyi: плотная борьба",
+    copy: "Оба закончили 7–4, но Дмитрий взял второе место за счет более высокой дельты +15.",
+  },
+  {
+    image: "/assets/trophy.png",
+    label: "Главный контраст",
+    title: "Калюжный: 8 побед, но 4 место",
+    copy: "Максим выиграл больше матчей, чем игроки выше, но формат по дельте оставил его за пределами топ-3.",
+  },
+];
+
+const tournamentRegistry = {
+  pro: [
+    {
+      id: "americano-brazzers-pro",
+      title: "Americano Brazzers PRO",
+      date: "17 июня",
+      club: "Padel Pro Club",
+      format: "Americano",
+      teams: "12 игроков",
+      rounds: "11 раундов",
+      matches: "33 матча",
+      winner: "Kh Ivan",
+      status: "Боевой турнир",
+      image: "/assets/handshake.png",
+      featured: true,
+    },
+  ],
+  lite: [
+    {
+      id: "mexicano-brazzers-lite",
+      title: "Mexicano Brazzers LITE",
+      date: "21 июня",
+      club: "Padel Pro Club",
+      format: "Mexicano",
+      teams: "12 игроков",
+      rounds: "11 раундов",
+      matches: "33 матча",
+      winner: "Искалдович Константин",
+      status: "Боевой турнир",
+      image: "/assets/trophy.png",
+      featured: true,
+    },
+  ],
+};
+
+const predictionUsers = [
+  { login: "eduard", password: "1234", name: "Шевченко Эдуард", rating: 2.97 },
+  { login: "ilya", password: "1234", name: "Редько Илья", rating: 3.18 },
+  { login: "kh", password: "1234", name: "Kh Ivan", rating: 3.55 },
+  { login: "daria", password: "1234", name: "Ширинская Дарья", rating: 2.95 },
+];
+
+const upcomingPredictionTournament = {
+  id: "americano-pro-forecast-june-29",
+  title: "Americano Brazzers PRO",
+  date: "29 июня",
+  time: "20:00–22:00",
+  club: "Padel Pro Club",
+  format: "Americano",
+  status: "Прогноз открыт",
+  roster: [
+    { name: "Kh Ivan", rating: 3.55 },
+    { name: "Редько Илья", rating: 3.18 },
+    { name: "Рустам Мамедов", rating: 3.24 },
+    { name: "G Alexey", rating: 3.12 },
+    { name: "Тарасов Артем", rating: 3.22 },
+    { name: "Шевченко Эдуард", rating: 2.97 },
+    { name: "Ширинская Дарья", rating: 2.95 },
+    { name: "Селантьев Данил", rating: 2.92 },
+    { name: "Каменный Никита", rating: 2.73 },
+    { name: "Борис Чигиринцев", rating: 2.65 },
+    { name: "Бессонов Егор", rating: 2.22 },
+    { name: "Трут Дмитрий", rating: 3.28 },
+    { name: "Гудини Дмитрий", rating: 2.28 },
+    { name: "Khrapatyi Denis", rating: 1.93 },
+    { name: "Калюжный Максим", rating: 2.28 },
+    { name: "Очкуров Илья", rating: 1.79 },
+  ],
+};
+
+const completedPredictionRound = {
+  id: "mexicano-lite-forecast-june-21",
+  title: "Mexicano Brazzers LITE",
+  date: "21 июня",
+  status: "Турнир завершен",
+  results: mexicanoPlayers.map((player) => player.name),
+  predictions: [
+    {
+      author: "Шевченко Эдуард",
+      ranking: [
+        "Искалдович Константин",
+        "Khrapatyi Denis",
+        "Гудини Дмитрий",
+        "Калюжный Максим",
+        "Очкуров Илья",
+        "@L.A.Bruin Алексей",
+        "Кулик Дмитрий",
+        "Золотов Илья",
+        "Князев Влад",
+        "Khizhnyak Mikhail",
+        "Захаров Иван",
+        "Levchenko Roman",
+      ],
+    },
+    {
+      author: "Редько Илья",
+      ranking: [
+        "Гудини Дмитрий",
+        "Искалдович Константин",
+        "Калюжный Максим",
+        "Khrapatyi Denis",
+        "Очкуров Илья",
+        "Кулик Дмитрий",
+        "@L.A.Bruin Алексей",
+        "Khizhnyak Mikhail",
+        "Золотов Илья",
+        "Князев Влад",
+        "Levchenko Roman",
+        "Захаров Иван",
+      ],
+    },
+    {
+      author: "Kh Ivan",
+      ranking: [
+        "Искалдович Константин",
+        "Гудини Дмитрий",
+        "Khrapatyi Denis",
+        "Очкуров Илья",
+        "Калюжный Максим",
+        "@L.A.Bruin Алексей",
+        "Золотов Илья",
+        "Кулик Дмитрий",
+        "Khizhnyak Mikhail",
+        "Князев Влад",
+        "Захаров Иван",
+        "Levchenko Roman",
+      ],
+    },
+    {
+      author: "Ширинская Дарья",
+      ranking: [
+        "Искалдович Константин",
+        "Гудини Дмитрий",
+        "Калюжный Максим",
+        "Khrapatyi Denis",
+        "Кулик Дмитрий",
+        "Очкуров Илья",
+        "@L.A.Bruin Алексей",
+        "Золотов Илья",
+        "Khizhnyak Mikhail",
+        "Levchenko Roman",
+        "Князев Влад",
+        "Захаров Иван",
+      ],
+    },
+  ],
+};
+
+function readJsonStorage(key, fallback) {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Local storage can be blocked in private modes; the in-memory state still works.
+  }
+}
+
+function predictionStorageKey(account) {
+  return `pb-prediction-${upcomingPredictionTournament.id}-${account.login}`;
+}
+
+function getSavedPrediction(account) {
+  if (!account) {
+    return null;
+  }
+
+  const saved = readJsonStorage(predictionStorageKey(account), null);
+  if (!saved?.ranking?.length) {
+    return null;
+  }
+
+  return saved;
+}
+
+function getDefaultPredictionOrder() {
+  return upcomingPredictionTournament.roster.map((player) => player.name);
+}
+
+function scorePrediction(ranking, results) {
+  return ranking.reduce((score, player, index) => score + (results[index] === player ? 1 : 0), 0);
+}
+
+function getCompletedPredictionLeaderboard() {
+  return completedPredictionRound.predictions
+    .map((prediction) => ({
+      ...prediction,
+      score: scorePrediction(prediction.ranking, completedPredictionRound.results),
+    }))
+    .sort((a, b) => b.score - a.score || a.author.localeCompare(b.author));
+}
+
+function getStandingsAfterRound(round) {
+  const table = new Map(
+    standings.map((team, index) => [
+      team.team,
+      {
+        team: team.team,
+        short: team.short,
+        index,
+        wins: 0,
+        losses: 0,
+        for: 0,
+        against: 0,
+      },
+    ]),
+  );
+
+  matches
+    .filter((match) => match.round <= round)
+    .forEach((match) => {
+      const a = table.get(match.a);
+      const b = table.get(match.b);
+
+      a.for += match.scoreA;
+      a.against += match.scoreB;
+      b.for += match.scoreB;
+      b.against += match.scoreA;
+
+      if (match.scoreA > match.scoreB) {
+        a.wins += 1;
+        b.losses += 1;
+      } else {
+        b.wins += 1;
+        a.losses += 1;
+      }
+    });
+
+  return [...table.values()]
+    .map((team) => ({
+      ...team,
+      delta: team.for - team.against,
+      record: `${team.wins} - 0 - ${team.losses}`,
+      points: `${team.for} - ${team.against}`,
+    }))
+    .sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        b.delta - a.delta ||
+        b.for - a.for ||
+        a.index - b.index,
+    );
+}
+
+function TeamBadge({ team, small = false }) {
+  const match = standings.find((item) => item.team === team);
+  return <span className={`team-badge ${small ? "small" : ""}`}>{match?.rating?.toFixed(1) ?? "—"}</span>;
+}
+
+function PlayerBadge({ player, small = false, playerPool = americanoPlayers }) {
+  const match = playerPool.find((item) => item.name === player);
+  return <span className={`team-badge player-rating ${small ? "small" : ""}`}>{match?.rating?.toFixed(1) ?? "—"}</span>;
+}
+
+function getPairRating(players, playerPool = americanoPlayers) {
+  return players.reduce((sum, player) => {
+    const match = playerPool.find((item) => item.name === player);
+    return sum + (match?.rating ?? 0);
+  }, 0);
+}
+
+function PairRatingBadge({ players, playerPool = americanoPlayers }) {
+  return <span className="pair-rating-badge">{getPairRating(players, playerPool).toFixed(1)}</span>;
+}
+
+function getIndividualStandingsAfterRound(playerPool, matchPool, round, sortMode = "wins") {
+  const table = new Map(
+    playerPool.map((player, index) => [
+      player.name,
+      {
+        name: player.name,
+        index,
+        wins: 0,
+        losses: 0,
+        for: 0,
+        against: 0,
+      },
+    ]),
+  );
+
+  matchPool
+    .filter((match) => match.round <= round)
+    .forEach((match) => {
+      const sideAWin = match.scoreA > match.scoreB;
+      const applyScore = (playerName, own, opponent, won) => {
+        const player = table.get(playerName);
+        player.for += own;
+        player.against += opponent;
+        if (won) {
+          player.wins += 1;
+        } else {
+          player.losses += 1;
+        }
+      };
+
+      match.a.forEach((player) => applyScore(player, match.scoreA, match.scoreB, sideAWin));
+      match.b.forEach((player) => applyScore(player, match.scoreB, match.scoreA, !sideAWin));
+    });
+
+  const rows = [...table.values()]
+    .map((player) => ({
+      ...player,
+      delta: player.for - player.against,
+      record: `${player.wins}–${player.losses}`,
+      points: `${player.for}–${player.against}`,
+    }));
+
+  if (sortMode === "delta") {
+    return rows.sort(
+      (a, b) =>
+        b.delta - a.delta ||
+        b.for - a.for ||
+        b.wins - a.wins ||
+        a.index - b.index,
+    );
+  }
+
+  return rows.sort(
+    (a, b) =>
+      b.wins - a.wins ||
+      b.delta - a.delta ||
+      b.for - a.for ||
+      a.index - b.index,
+  );
+}
+
+function getAmericanoStandingsAfterRound(round) {
+  return getIndividualStandingsAfterRound(americanoPlayers, americanoMatches, round);
+}
+
+function LeaderCard({ eyebrow, name, meta, metric, image }) {
+  return (
+    <article className="leader-card">
+      <img src={image} alt="" />
+      <div className="leader-copy">
+        <span>{eyebrow}</span>
+        <strong>{name}</strong>
+        <small>{meta}</small>
+      </div>
+      <div className="leader-metric">
+        <span>{metric.label}</span>
+        <strong>{metric.value}</strong>
+      </div>
+    </article>
+  );
+}
+
+function AmericanoStandingsTable() {
+  return (
+    <section className="surface standings-card americano-final-card" id="standings">
+      <div className="section-title">
+        <span>Личный зачет</span>
+        <h2>12 игроков после 11 раундов</h2>
+      </div>
+      <div className="americano-standings-head">
+        <span>#</span>
+        <span>Игрок</span>
+        <span>Игры</span>
+        <span>Очки</span>
+        <span>+/-</span>
+      </div>
+      <div className="standings-list">
+        {americanoPlayers.map((item) => (
+          <article className="americano-standing-row" key={item.name}>
+            <b>{item.place}</b>
+            <div className="standing-team">
+              <PlayerBadge player={item.name} small />
+              <strong>{item.name}</strong>
+            </div>
+            <span>{item.record}</span>
+            <span>{item.points}</span>
+            <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+          </article>
+        ))}
+      </div>
+      <footer>Победитель определяется по победам · Americano</footer>
+    </section>
+  );
+}
+
+function MexicanoStandingsTable() {
+  return (
+    <section className="surface standings-card americano-final-card" id="standings">
+      <div className="section-title">
+        <span>Личный зачет</span>
+        <h2>12 игроков · победитель по дельте</h2>
+      </div>
+      <div className="americano-standings-head">
+        <span>#</span>
+        <span>Игрок</span>
+        <span>Игры</span>
+        <span>Очки</span>
+        <span>+/-</span>
+      </div>
+      <div className="standings-list">
+        {mexicanoPlayers.map((item) => (
+          <article className="americano-standing-row" key={item.name}>
+            <b>{item.place}</b>
+            <div className="standing-team">
+              <PlayerBadge player={item.name} playerPool={mexicanoPlayers} small />
+              <strong>{item.name}</strong>
+            </div>
+            <span>{item.record}</span>
+            <span>{item.points}</span>
+            <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+          </article>
+        ))}
+      </div>
+      <footer>Победитель определяется по дельте очков · Mexicano</footer>
+    </section>
+  );
+}
+
+function StandingsTable() {
+  return (
+    <section className="surface standings-card" id="standings">
+      <div className="section-title">
+        <span>Итоговая таблица</span>
+        <h2>8 пар после 7 раундов</h2>
+      </div>
+      <div className="standings-head">
+        <span>#</span>
+        <span>Пара</span>
+        <span>Игры</span>
+        <span>Очки</span>
+        <span>+/-</span>
+      </div>
+      <div className="standings-list">
+        {standings.map((item) => (
+          <article className={`standing-row ${item.focus ? "focus" : ""}`} key={item.team}>
+            <b>{item.place}</b>
+            <div className="standing-team">
+              <TeamBadge team={item.team} small />
+              <strong>{item.team}</strong>
+            </div>
+            <span>{item.record}</span>
+            <span>{item.points}</span>
+            <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+          </article>
+        ))}
+      </div>
+      <footer>8 пар · 7 раундов · PRO</footer>
+    </section>
+  );
+}
+
+function AmericanoRoundPanel() {
+  const [round, setRound] = useState(11);
+  const shownMatches = useMemo(
+    () => americanoMatches.filter((match) => match.round === round),
+    [round],
+  );
+  const roundStandings = useMemo(() => getAmericanoStandingsAfterRound(round), [round]);
+
+  return (
+    <section className="surface round-card americano-round-card" id="rounds">
+      <div className="round-head">
+        <div>
+          <span>Раунд {round}</span>
+          <h2>{round === 11 ? "Финальные смены" : "Матчи Americano"}</h2>
+        </div>
+        <div className="round-picker americano-picker" aria-label="Выбор раунда">
+          {Array.from({ length: 11 }, (_, index) => index + 1).map((item) => (
+            <button
+              className={round === item ? "active" : ""}
+              type="button"
+              onClick={() => setRound(item)}
+              key={item}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="round-body americano-round-body">
+        <div className="match-list americano-match-list">
+          <div className="match-list-title">
+            <span>Результаты игр</span>
+            <strong>{round} раунда</strong>
+          </div>
+          <div className="match-list-head americano-match-head">
+            <span>Корт</span>
+            <span>Пары</span>
+            <span>Счет</span>
+          </div>
+          {shownMatches.map((match) => (
+            <article className="match-row americano-match-row" key={match.court}>
+              <span>Корт {match.court}</span>
+              <div>
+                <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
+                  <PairRatingBadge players={match.a} />
+                  <span className="americano-pair-name">
+                    <span>{match.a[0]}</span>
+                    <span>{match.a[1]}</span>
+                  </span>
+                </p>
+                <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
+                  <PairRatingBadge players={match.b} />
+                  <span className="americano-pair-name">
+                    <span>{match.b[0]}</span>
+                    <span>{match.b[1]}</span>
+                  </span>
+                </p>
+              </div>
+              <strong>
+                {match.scoreA}
+                <small>:</small>
+                {match.scoreB}
+              </strong>
+            </article>
+          ))}
+        </div>
+        <div className="round-standings americano-live-table">
+          <div className="round-standings-title">
+            <span>Личный зачет</span>
+            <strong>После {round} раунда</strong>
+          </div>
+          <div className="americano-live-head">
+            <span>#</span>
+            <span>Игрок</span>
+            <span>Игры</span>
+            <span>Очки</span>
+            <span>+/-</span>
+          </div>
+          {roundStandings.map((player, index) => (
+            <article className="americano-live-row" key={player.name}>
+              <b>{index + 1}</b>
+              <div>
+                <PlayerBadge player={player.name} small />
+                <strong>{player.name}</strong>
+              </div>
+              <span>{player.record}</span>
+              <span>{player.points}</span>
+              <em className={player.delta >= 0 ? "positive" : "negative"}>
+                {player.delta > 0 ? `+${player.delta}` : player.delta}
+              </em>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MexicanoRoundPanel() {
+  const [round, setRound] = useState(11);
+  const shownMatches = useMemo(
+    () => mexicanoMatches.filter((match) => match.round === round),
+    [round],
+  );
+  const roundStandings = useMemo(
+    () => getIndividualStandingsAfterRound(mexicanoPlayers, mexicanoMatches, round, "delta"),
+    [round],
+  );
+
+  return (
+    <section className="surface round-card americano-round-card" id="rounds">
+      <div className="round-head">
+        <div>
+          <span>Раунд {round}</span>
+          <h2>{round === 11 ? "Финальные смены" : "Матчи Mexicano"}</h2>
+        </div>
+        <div className="round-picker americano-picker" aria-label="Выбор раунда">
+          {Array.from({ length: 11 }, (_, index) => index + 1).map((item) => (
+            <button
+              className={round === item ? "active" : ""}
+              type="button"
+              onClick={() => setRound(item)}
+              key={item}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="round-body americano-round-body">
+        <div className="match-list americano-match-list">
+          <div className="match-list-title">
+            <span>Результаты игр</span>
+            <strong>{round} раунда</strong>
+          </div>
+          <div className="match-list-head americano-match-head">
+            <span>Корт</span>
+            <span>Пары</span>
+            <span>Счет</span>
+          </div>
+          {shownMatches.map((match) => (
+            <article className="match-row americano-match-row" key={match.court}>
+              <span>Корт {match.court}</span>
+              <div>
+                <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
+                  <PairRatingBadge players={match.a} playerPool={mexicanoPlayers} />
+                  <span className="americano-pair-name">
+                    <span>{match.a[0]}</span>
+                    <span>{match.a[1]}</span>
+                  </span>
+                </p>
+                <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
+                  <PairRatingBadge players={match.b} playerPool={mexicanoPlayers} />
+                  <span className="americano-pair-name">
+                    <span>{match.b[0]}</span>
+                    <span>{match.b[1]}</span>
+                  </span>
+                </p>
+              </div>
+              <strong>
+                {match.scoreA}
+                <small>:</small>
+                {match.scoreB}
+              </strong>
+            </article>
+          ))}
+        </div>
+        <div className="round-standings americano-live-table">
+          <div className="round-standings-title">
+            <span>Личный зачет</span>
+            <strong>После {round} раунда</strong>
+          </div>
+          <div className="americano-live-head">
+            <span>#</span>
+            <span>Игрок</span>
+            <span>Игры</span>
+            <span>Очки</span>
+            <span>+/-</span>
+          </div>
+          {roundStandings.map((player, index) => (
+            <article className="americano-live-row" key={player.name}>
+              <b>{index + 1}</b>
+              <div>
+                <PlayerBadge player={player.name} playerPool={mexicanoPlayers} small />
+                <strong>{player.name}</strong>
+              </div>
+              <span>{player.record}</span>
+              <span>{player.points}</span>
+              <em className={player.delta >= 0 ? "positive" : "negative"}>
+                {player.delta > 0 ? `+${player.delta}` : player.delta}
+              </em>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RoundPanel() {
+  const [round, setRound] = useState(7);
+  const shownMatches = useMemo(
+    () => matches.filter((match) => match.round === round),
+    [round],
+  );
+  const roundStandings = useMemo(() => getStandingsAfterRound(round), [round]);
+
+  return (
+    <section className="surface round-card" id="rounds">
+      <div className="round-head">
+        <div>
+          <span>Раунд {round}</span>
+          <h2>{round === 7 ? "Финальные матчи" : "Матчи раунда"}</h2>
+        </div>
+        <div className="round-picker" aria-label="Выбор раунда">
+          {[1, 2, 3, 4, 5, 6, 7].map((item) => (
+            <button
+              className={round === item ? "active" : ""}
+              type="button"
+              onClick={() => setRound(item)}
+              key={item}
+            >
+              Раунд {item}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="round-body">
+        <div className="match-list">
+          <div className="match-list-title">
+            <span>Результаты игр</span>
+            <strong>{round} раунда</strong>
+          </div>
+          <div className="match-list-head">
+            <span>Корт</span>
+            <span>Пары</span>
+            <span>Счет</span>
+          </div>
+          {shownMatches.map((match) => (
+            <article className="match-row" key={match.court}>
+              <span>Корт {match.court}</span>
+              <div>
+                <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
+                  <TeamBadge team={match.a} small />
+                  {match.a}
+                </p>
+                <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
+                  <TeamBadge team={match.b} small />
+                  {match.b}
+                </p>
+              </div>
+              <strong>
+                {match.scoreA}
+                <small>:</small>
+                {match.scoreB}
+              </strong>
+            </article>
+          ))}
+        </div>
+        <div className="round-standings">
+          <div className="round-standings-title">
+            <span>Положение</span>
+            <strong>После {round} раунда</strong>
+          </div>
+          <div className="round-standings-head">
+            <span>#</span>
+            <span>Пара</span>
+            <span>Игры</span>
+            <span>Очки</span>
+            <span>+/-</span>
+          </div>
+          {roundStandings.map((team, index) => (
+            <article className="round-standing-row" key={team.team}>
+              <b>{index + 1}</b>
+              <div>
+                <TeamBadge team={team.team} small />
+                <strong>{team.team}</strong>
+              </div>
+              <span>{team.record}</span>
+              <span>{team.points}</span>
+              <em className={team.delta >= 0 ? "positive" : "negative"}>
+                {team.delta > 0 ? `+${team.delta}` : team.delta}
+              </em>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DescriptionPanel({ onClose }) {
+  return (
+    <section className="description-panel" id="description">
+      <article>
+        <span>О турнире</span>
+        <p>
+          THE BEST MIDDLE (PM) — еженедельный PRO-турнир Padel Brazzers в категории
+          middle. Round Robin на 8 пар: каждый играет с каждым, а итоговая таблица
+          собирается по победам, очкам и личным встречам.
+        </p>
+      </article>
+      <article>
+        <span>Правила подсчета</span>
+        <ul>
+          <li>Победа — 3 очка, ничья — 1, поражение — 0.</li>
+          <li>При равенстве очков учитываются личная встреча и разница геймов.</li>
+          <li>Матчи до 5 геймов, при счете 4–4 играется тай-брейк до 7.</li>
+        </ul>
+      </article>
+      <article>
+        <span>Что входит</span>
+        <ul className="includes">
+          <li>Вода и изотоники</li>
+          <li>Бананы и фрукты</li>
+          <li>Фото с турнира</li>
+          <li>Статистика и рейтинг</li>
+        </ul>
+      </article>
+      <button type="button" onClick={onClose}>Свернуть</button>
+    </section>
+  );
+}
+
+function AmericanoDescriptionPanel({ onClose }) {
+  return (
+    <section className="description-panel americano-description" id="description">
+      <article>
+        <span>О формате</span>
+        <p>
+          Americano на 12 игроков: каждый участник сыграл с каждым в паре по одному
+          разу и дважды против каждого соперника. Победитель определяется по числу
+          побед, затем по разнице и набранным очкам.
+        </p>
+      </article>
+      <article>
+        <span>Итог турнира</span>
+        <ul>
+          <li>Kh Ivan — 8 побед, лучшая разница +31 и первое место.</li>
+          <li>Редько Илья тоже набрал 8 побед, но уступил по качеству результата.</li>
+          <li>Рустам Мамедов взял бронзу с балансом 7–4.</li>
+        </ul>
+      </article>
+      <article>
+        <span>Номинации</span>
+        <ul className="includes">
+          <li>MVP: Kh Ivan</li>
+          <li>Оверперформер: Бессонов</li>
+          <li>Раунд нервов: 6-й</li>
+          <li>Матч турнира: 5–14</li>
+        </ul>
+      </article>
+      <button type="button" onClick={onClose}>Свернуть</button>
+    </section>
+  );
+}
+
+function MexicanoDescriptionPanel({ onClose }) {
+  return (
+    <section className="description-panel americano-description" id="description">
+      <article>
+        <span>О формате</span>
+        <p>
+          Mexicano LITE на 12 игроков: пары менялись каждый раунд, а победитель
+          определялся не по числу побед, а по дельте набранных и пропущенных очков.
+          В каждом матче играли сет до 17 очков.
+        </p>
+      </article>
+      <article>
+        <span>Итог турнира</span>
+        <ul>
+          <li>Искалдович Константин выиграл турнир с дельтой +23.</li>
+          <li>Гудини Дмитрий забрал второе место с +15, Khrapatyi Denis — третье с +9.</li>
+          <li>Калюжный Максим выиграл 8 матчей, но остался четвертым из-за дельты +7.</li>
+        </ul>
+      </article>
+      <article>
+        <span>Важное</span>
+        <ul className="includes">
+          <li>Темная лошадка: Эдуард Шевченко</li>
+          <li>Сыграл за победителя Костю</li>
+          <li>Фейл: Никита Каменный</li>
+          <li>Не явился без предупреждения</li>
+        </ul>
+      </article>
+      <button type="button" onClick={onClose}>Свернуть</button>
+    </section>
+  );
+}
+
+function PredictionBadge({ value }) {
+  return <span className="prediction-rating">{Number(value).toFixed(2)}</span>;
+}
+
+function PredictionLoginCard({ account, error, form, onChange, onLogin, onLogout }) {
+  if (account) {
+    return (
+      <section className="surface prediction-login-card">
+        <div className="section-title">
+          <span>Личный кабинет</span>
+          <h2>{account.name}</h2>
+        </div>
+        <div className="account-summary">
+          <PredictionBadge value={account.rating} />
+          <div>
+            <strong>{account.login}</strong>
+            <p>Можно менять порядок игроков до закрытия приема прогнозов.</p>
+          </div>
+        </div>
+        <button className="secondary-action" type="button" onClick={onLogout}>Выйти</button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="surface prediction-login-card">
+      <div className="section-title">
+        <span>Вход участника</span>
+        <h2>Логин и пароль</h2>
+      </div>
+      <form className="prediction-login-form" onSubmit={onLogin}>
+        <label>
+          <span>Логин</span>
+          <input
+            autoComplete="username"
+            name="login"
+            onChange={onChange}
+            placeholder="eduard"
+            type="text"
+            value={form.login}
+          />
+        </label>
+        <label>
+          <span>Пароль</span>
+          <input
+            autoComplete="current-password"
+            name="password"
+            onChange={onChange}
+            placeholder="1234"
+            type="password"
+            value={form.password}
+          />
+        </label>
+        {error && <p className="prediction-error">{error}</p>}
+        <button type="submit">Войти</button>
+      </form>
+    </section>
+  );
+}
+
+function PredictionRosterCard() {
+  return (
+    <section className="surface prediction-roster-card" id="roster">
+      <div className="section-title">
+        <span>Состав турнира</span>
+        <h2>{upcomingPredictionTournament.roster.length} участников в заявке</h2>
+      </div>
+      <div className="prediction-roster-grid">
+        {upcomingPredictionTournament.roster.map((player) => (
+          <article className="prediction-roster-player" key={player.name}>
+            <PredictionBadge value={player.rating} />
+            <strong>{player.name}</strong>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PredictionRankingCard({
+  account,
+  order,
+  draggedIndex,
+  savedAt,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onMove,
+  onSave,
+}) {
+  if (!account) {
+    return (
+      <section className="surface prediction-ranking-card locked" id="ranking">
+        <div className="section-title">
+          <span>Мой прогноз</span>
+          <h2>Войдите, чтобы собрать порядок мест</h2>
+        </div>
+        <p>После входа здесь появится список игроков, который можно перетаскивать вверх и вниз.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="surface prediction-ranking-card" id="ranking">
+      <div className="prediction-card-head">
+        <div className="section-title">
+          <span>Мой прогноз</span>
+          <h2>Распределите игроков по местам</h2>
+        </div>
+        <button type="button" onClick={onSave}>Сохранить прогноз</button>
+      </div>
+      <div className="prediction-order-list">
+        {order.map((playerName, index) => {
+          const player = upcomingPredictionTournament.roster.find((item) => item.name === playerName);
+
+          return (
+            <article
+              className={`prediction-order-row ${draggedIndex === index ? "dragging" : ""}`}
+              draggable
+              key={playerName}
+              onDragEnd={onDragEnd}
+              onDragOver={onDragOver}
+              onDragStart={(event) => onDragStart(event, index)}
+              onDrop={(event) => onDrop(event, index)}
+            >
+              <b>{index + 1}</b>
+              <span className="drag-handle" aria-hidden="true">☰</span>
+              <PredictionBadge value={player?.rating ?? 0} />
+              <strong>{playerName}</strong>
+              <div className="prediction-row-actions">
+                <button aria-label={`Поднять ${playerName}`} disabled={index === 0} type="button" onClick={() => onMove(index, index - 1)}>
+                  ↑
+                </button>
+                <button aria-label={`Опустить ${playerName}`} disabled={index === order.length - 1} type="button" onClick={() => onMove(index, index + 1)}>
+                  ↓
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <footer>
+        {savedAt ? `Сохранено: ${savedAt}` : "Прогноз еще не сохранен"}
+      </footer>
+    </section>
+  );
+}
+
+function PredictionResultsCard() {
+  const leaderboard = getCompletedPredictionLeaderboard();
+  const winners = leaderboard.filter((item) => item.score === leaderboard[0]?.score);
+
+  return (
+    <section className="prediction-results" id="results">
+      <section className="surface prediction-final-table">
+        <div className="section-title">
+          <span>{completedPredictionRound.status}</span>
+          <h2>{completedPredictionRound.title} · {completedPredictionRound.date}</h2>
+        </div>
+        <div className="prediction-final-head">
+          <span>#</span>
+          <span>Игрок</span>
+          <span>Факт</span>
+        </div>
+        {completedPredictionRound.results.map((player, index) => (
+          <article className="prediction-final-row" key={player}>
+            <b>{index + 1}</b>
+            <strong>{player}</strong>
+            <span>{mexicanoPlayers.find((item) => item.name === player)?.points ?? "—"}</span>
+          </article>
+        ))}
+      </section>
+
+      <section className="surface prediction-leaderboard">
+        <div className="section-title">
+          <span>Раунд прогнозов</span>
+          <h2>Победитель: {winners.map((item) => item.author).join(", ")}</h2>
+        </div>
+        <div className="forecast-list">
+          {leaderboard.map((prediction, index) => (
+            <article className="forecast-card" key={prediction.author}>
+              <div className="forecast-card-top">
+                <b>{index + 1}</b>
+                <div>
+                  <strong>{prediction.author}</strong>
+                  <span>{prediction.score} точных мест</span>
+                </div>
+              </div>
+              <ol>
+                {prediction.ranking.map((player, place) => (
+                  <li className={completedPredictionRound.results[place] === player ? "hit" : ""} key={`${prediction.author}-${player}`}>
+                    <span>{place + 1}</span>
+                    <strong>{player}</strong>
+                  </li>
+                ))}
+              </ol>
+            </article>
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function PredictionsScreen({ onBack }) {
+  const savedAccount = readJsonStorage("pb-prediction-account", null);
+  const [account, setAccount] = useState(savedAccount);
+  const [loginForm, setLoginForm] = useState({ login: "", password: "" });
+  const [loginError, setLoginError] = useState("");
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const initialSavedPrediction = getSavedPrediction(savedAccount);
+  const [predictionOrder, setPredictionOrder] = useState(initialSavedPrediction?.ranking ?? getDefaultPredictionOrder());
+  const [savedAt, setSavedAt] = useState(initialSavedPrediction?.savedAt ?? "");
+
+  const movePrediction = (from, to) => {
+    if (to < 0 || to >= predictionOrder.length || from === to) {
+      return;
+    }
+
+    setPredictionOrder((current) => {
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const handleLoginChange = (event) => {
+    const { name, value } = event.target;
+    setLoginForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleLogin = (event) => {
+    event.preventDefault();
+    const nextAccount = predictionUsers.find(
+      (user) => user.login === loginForm.login.trim() && user.password === loginForm.password,
+    );
+
+    if (!nextAccount) {
+      setLoginError("Проверьте логин и пароль.");
+      return;
+    }
+
+    const publicAccount = { login: nextAccount.login, name: nextAccount.name, rating: nextAccount.rating };
+    const savedPrediction = getSavedPrediction(publicAccount);
+    setAccount(publicAccount);
+    setLoginError("");
+    setLoginForm({ login: "", password: "" });
+    setPredictionOrder(savedPrediction?.ranking ?? getDefaultPredictionOrder());
+    setSavedAt(savedPrediction?.savedAt ?? "");
+    writeJsonStorage("pb-prediction-account", publicAccount);
+  };
+
+  const handleLogout = () => {
+    setAccount(null);
+    setSavedAt("");
+    setPredictionOrder(getDefaultPredictionOrder());
+    writeJsonStorage("pb-prediction-account", null);
+  };
+
+  const handleDragStart = (event, index) => {
+    setDraggedIndex(index);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (event, index) => {
+    event.preventDefault();
+    if (draggedIndex !== null) {
+      movePrediction(draggedIndex, index);
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleSave = () => {
+    if (!account) {
+      return;
+    }
+
+    const stamp = new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      month: "long",
+    }).format(new Date());
+    const payload = {
+      author: account.name,
+      ranking: predictionOrder,
+      savedAt: stamp,
+    };
+
+    writeJsonStorage(predictionStorageKey(account), payload);
+    setSavedAt(stamp);
+  };
+
+  return (
+    <main className="predictions-shell">
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
+          <span className="brand-mark">PB</span>
+          <strong>Padel Brazzers</strong>
+          <span>Forecast</span>
+        </a>
+        <nav>
+          <a href="#top">Турнир</a>
+          <a href="#roster">Состав</a>
+          <a href="#ranking">Мой порядок</a>
+          <a href="#results">Итоги</a>
+        </nav>
+        <div className="profile-chip">
+          <button className="back-link" type="button" onClick={onBack}>На главную</button>
+          <span>{account ? "✓" : "PB"}</span>
+        </div>
+      </header>
+
+      <section className="prediction-hero surface" id="top">
+        <img src="/assets/hero-court.png" alt="Падел корт перед турниром" />
+        <div className="prediction-hero-copy">
+          <span className="eyebrow">{upcomingPredictionTournament.status}</span>
+          <h1>Прогнозы на результат турнира</h1>
+          <div className="meta-row">
+            <span>{upcomingPredictionTournament.date}</span>
+            <span>{upcomingPredictionTournament.time}</span>
+            <span>{upcomingPredictionTournament.club}</span>
+          </div>
+          <p>
+            {upcomingPredictionTournament.title}: участники собирают свой порядок финиша до старта,
+            а после внесения результатов система считает точные совпадения по местам.
+          </p>
+        </div>
+        <div className="prediction-hero-stats">
+          <div><strong>{upcomingPredictionTournament.roster.length}</strong><span>участников</span></div>
+          <div><strong>1</strong><span>балл за точное место</span></div>
+          <div><strong>{completedPredictionRound.predictions.length}</strong><span>прогноза в прошлом раунде</span></div>
+        </div>
+      </section>
+
+      <section className="prediction-dashboard">
+        <PredictionLoginCard
+          account={account}
+          error={loginError}
+          form={loginForm}
+          onChange={handleLoginChange}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+        />
+        <section className="surface prediction-tournament-card">
+          <div className="section-title">
+            <span>Будущий турнир</span>
+            <h2>{upcomingPredictionTournament.title}</h2>
+          </div>
+          <div className="prediction-tournament-meta">
+            <strong>{upcomingPredictionTournament.date}</strong>
+            <span>{upcomingPredictionTournament.format}</span>
+            <span>{upcomingPredictionTournament.club}</span>
+          </div>
+          <p>Прием прогнозов открыт для авторизованных участников.</p>
+        </section>
+      </section>
+
+      <section className="prediction-workspace">
+        <PredictionRosterCard />
+        <PredictionRankingCard
+          account={account}
+          draggedIndex={draggedIndex}
+          onDragEnd={() => setDraggedIndex(null)}
+          onDragOver={handleDragOver}
+          onDragStart={handleDragStart}
+          onDrop={handleDrop}
+          onMove={movePrediction}
+          onSave={handleSave}
+          order={predictionOrder}
+          savedAt={savedAt}
+        />
+      </section>
+
+      <PredictionResultsCard />
+    </main>
+  );
+}
+
+function HomeScreen({ onOpenTournament, onOpenPredictions }) {
+  const [category, setCategory] = useState("pro");
+  const tournaments = tournamentRegistry[category];
+  const activeLabel = category.toUpperCase();
+
+  return (
+    <main className="home-shell">
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="Padel Brazzers">
+          <span className="brand-mark">PB</span>
+          <strong>Padel Brazzers</strong>
+          <span>Club</span>
+        </a>
+        <nav>
+          <a href="#registry">Турниры</a>
+          <a href="#leaders">Лидеры</a>
+          <button type="button" onClick={onOpenPredictions}>Прогнозы</button>
+          <a href="#community">Сообщество</a>
+        </nav>
+        <div className="profile-chip home-chip">
+          <span>PB</span>
+          <b>{activeLabel}</b>
+        </div>
+      </header>
+
+      <section className="home-hero surface" id="top">
+        <img src="/assets/hero-court.png" alt="Падел корт Padel Brazzers" />
+        <div className="home-hero-copy">
+          <span className="eyebrow">Vladivostok padel community</span>
+          <h1>Добро пожаловать в Padel Brazzers</h1>
+          <p>
+            Архив турниров, таблицы после каждого раунда, результаты всех кортов и
+            аналитика по главным матчам. Выбирайте PRO или LITE и открывайте нужный
+            турнир.
+          </p>
+          <div className="home-actions">
+            <a href="#registry">Смотреть турниры</a>
+            <button type="button" onClick={onOpenPredictions}>Сделать прогноз</button>
+            <button type="button" onClick={() => setCategory(category === "pro" ? "lite" : "pro")}>
+              Переключить на {category === "pro" ? "LITE" : "PRO"}
+            </button>
+          </div>
+        </div>
+        <div className="home-hero-stats" aria-label="Статистика сообщества">
+          <div><strong>2</strong><span>боевых турнира в архиве</span></div>
+          <div><strong>24</strong><span>игрока в турнирах</span></div>
+          <div><strong>66</strong><span>матчей разобрано</span></div>
+        </div>
+      </section>
+
+      <section className="home-layout" id="registry">
+        <section className="surface registry-card">
+          <div className="registry-head">
+            <div>
+              <span>Реестр турниров</span>
+              <h2>Прошедшие турниры {activeLabel}</h2>
+            </div>
+            <div className="registry-toggle" aria-label="Категория турниров">
+              <button className={category === "pro" ? "active" : ""} type="button" onClick={() => setCategory("pro")}>
+                PRO
+              </button>
+              <button className={category === "lite" ? "active" : ""} type="button" onClick={() => setCategory("lite")}>
+                LITE
+              </button>
+            </div>
+          </div>
+
+          <div className="tournament-list">
+            {tournaments.length === 0 && (
+              <div className="empty-registry">
+                <span>{activeLabel}</span>
+                <strong>Турниров пока нет</strong>
+                <p>Здесь появятся боевые турниры этой категории, когда мы загрузим реальные данные.</p>
+              </div>
+            )}
+            {tournaments.map((tournament) => (
+              <button
+                className={`tournament-row ${tournament.featured ? "featured" : ""}`}
+                type="button"
+                onClick={() => onOpenTournament(tournament.id)}
+                key={tournament.id}
+              >
+                <img src={tournament.image} alt="" />
+                <div className="tournament-copy">
+                  <span>{tournament.date} · {tournament.club}</span>
+                  <strong>{tournament.title}</strong>
+                  <p>{tournament.format} · {tournament.teams} · {tournament.rounds} · {tournament.matches}</p>
+                </div>
+                <div className="tournament-result">
+                  <span>{tournament.status}</span>
+                  <strong>{tournament.winner}</strong>
+                  <small>Открыть</small>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <aside className="home-side">
+          <section className="surface side-panel" id="leaders">
+            <div className="section-title">
+              <span>Лидеры сообщества</span>
+              <h2>Кто сейчас задает темп</h2>
+            </div>
+            <LeaderCard
+              eyebrow="За все время"
+              image="/assets/forehand.png"
+              meta="152 матча · 79% побед"
+              metric={{ label: "Рейтинг", value: "3.13" }}
+              name="Редько Илья"
+            />
+            <LeaderCard
+              eyebrow="За месяц"
+              image="/assets/handshake.png"
+              meta="24 матча · 87% побед"
+              metric={{ label: "Рост", value: "+0.234" }}
+              name="Ткачев Тимур"
+            />
+          </section>
+
+          <section className="surface side-panel prediction-teaser-panel" id="community">
+            <div className="section-title">
+              <span>Прогнозы</span>
+              <h2>Соберите свой топ до старта</h2>
+            </div>
+            <p>
+              Участник входит в кабинет, ранжирует состав будущего турнира и после
+              финала видит, сколько точных мест угадал.
+            </p>
+            <button type="button" onClick={onOpenPredictions}>Открыть прогнозы</button>
+          </section>
+        </aside>
+      </section>
+    </main>
+  );
+}
+
+function AmericanoDetail({ onBack }) {
+  const [descriptionOpen, setDescriptionOpen] = useState(true);
+
+  return (
+    <main>
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
+          <span className="brand-mark">PB</span>
+          <strong>Padel Brazzers</strong>
+          <span>PRO</span>
+        </a>
+        <nav>
+          <a href="#top">Турнир</a>
+          <a href="#standings">Личный зачет</a>
+          <a href="#rounds">Раунды</a>
+          <a href="#stories">Разбор</a>
+        </nav>
+        <div className="profile-chip">
+          <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
+          <span>1</span>
+          <PlayerBadge player="Kh Ivan" small />
+        </div>
+      </header>
+
+      <section className="page-grid americano-page-grid" id="top">
+        <section className="surface hero-card americano-hero-card">
+          <img src="/assets/handshake.png" alt="Игроки после матча Americano" />
+          <div className="hero-content americano-hero-content">
+            <span className="eyebrow">PRO category · личный зачет</span>
+            <h1>AMERICANO BRAZZERS PRO</h1>
+            <div className="meta-row">
+              <span>17 июня</span>
+              <span>20:00–22:00</span>
+              <span>Padel Pro Club</span>
+            </div>
+            <p>
+              12 игроков, 11 раундов и 33 матча. Каждый менял партнера каждый раунд,
+              а итог решил личный баланс побед и качество набранных очков.
+            </p>
+            <button type="button" onClick={() => setDescriptionOpen(true)}>
+              Полное описание
+              <span>→</span>
+            </button>
+          </div>
+          <div className="metric-strip">
+            <div><strong>12</strong><span>игроков</span></div>
+            <div><strong>11</strong><span>раундов</span></div>
+            <div><strong>33</strong><span>матча</span></div>
+            <div><strong>Americano</strong><span>формат</span></div>
+          </div>
+        </section>
+
+        <AmericanoStandingsTable />
+      </section>
+
+      <section className="leaders-row americano-highlights">
+        <LeaderCard
+          eyebrow="Победитель турнира"
+          image="/assets/trophy.png"
+          meta="8–3 · 120–89 · лучшая разница"
+          metric={{ label: "+/-", value: "+31" }}
+          name="Kh Ivan"
+        />
+        <LeaderCard
+          eyebrow="Главный оверперформер"
+          image="/assets/forehand.png"
+          meta="6–5 · +7 · самый большой рост"
+          metric={{ label: "Рейтинг", value: "+0.129" }}
+          name="Бессонов Егор"
+        />
+      </section>
+
+      <section className="lower-grid americano-lower-grid">
+        <AmericanoRoundPanel />
+        <section className="surface stories-card" id="stories">
+          <div className="section-title">
+            <span>Главные сюжеты Americano</span>
+            <h2>Что решило турнир</h2>
+          </div>
+          {americanoStories.map((card) => (
+            <article className="story-row" key={card.title}>
+              <img src={card.image} alt="" />
+              <div>
+                <span>{card.label}</span>
+                <strong>{card.title}</strong>
+                <p>{card.copy}</p>
+              </div>
+              <b>›</b>
+            </article>
+          ))}
+        </section>
+      </section>
+
+      {descriptionOpen && <AmericanoDescriptionPanel onClose={() => setDescriptionOpen(false)} />}
+    </main>
+  );
+}
+
+function MexicanoDetail({ onBack }) {
+  const [descriptionOpen, setDescriptionOpen] = useState(true);
+
+  return (
+    <main>
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
+          <span className="brand-mark">PB</span>
+          <strong>Padel Brazzers</strong>
+          <span>LITE</span>
+        </a>
+        <nav>
+          <a href="#top">Турнир</a>
+          <a href="#standings">Личный зачет</a>
+          <a href="#rounds">Раунды</a>
+          <a href="#stories">Важное</a>
+        </nav>
+        <div className="profile-chip">
+          <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
+          <span>1</span>
+          <PlayerBadge player="Искалдович Константин" playerPool={mexicanoPlayers} small />
+        </div>
+      </header>
+
+      <section className="page-grid americano-page-grid" id="top">
+        <section className="surface hero-card americano-hero-card">
+          <img src="/assets/trophy.png" alt="Кубок турнира Mexicano" />
+          <div className="hero-content americano-hero-content">
+            <span className="eyebrow">LITE category · победитель по дельте</span>
+            <h1>MEXICANO BRAZZERS LITE</h1>
+            <div className="meta-row">
+              <span>21 июня</span>
+              <span>12:00–14:00</span>
+              <span>Padel Pro Club</span>
+            </div>
+            <p>
+              12 игроков, 11 раундов и 33 матча. Еженедельный дружеский LITE-турнир,
+              где главный показатель — дельта очков после всех смен партнеров.
+            </p>
+            <button type="button" onClick={() => setDescriptionOpen(true)}>
+              Полное описание
+              <span>→</span>
+            </button>
+          </div>
+          <div className="metric-strip">
+            <div><strong>12</strong><span>игроков</span></div>
+            <div><strong>11</strong><span>раундов</span></div>
+            <div><strong>33</strong><span>матча</span></div>
+            <div><strong>Mexicano</strong><span>формат</span></div>
+          </div>
+        </section>
+
+        <MexicanoStandingsTable />
+      </section>
+
+      <section className="leaders-row americano-highlights">
+        <LeaderCard
+          eyebrow="Победитель турнира"
+          image="/assets/trophy.png"
+          meta="9–2 · 105–82 · лучшая дельта"
+          metric={{ label: "+/-", value: "+23" }}
+          name="Искалдович Константин"
+        />
+        <LeaderCard
+          eyebrow="Темная лошадка"
+          image="/assets/forehand.png"
+          meta="Сыграл за победителя Костю"
+          metric={{ label: "Роль", value: "важно" }}
+          name="Эдуард Шевченко"
+        />
+      </section>
+
+      <section className="lower-grid americano-lower-grid">
+        <MexicanoRoundPanel />
+        <section className="surface stories-card" id="stories">
+          <div className="section-title">
+            <span>Важное турнира</span>
+            <h2>Что нужно отметить после Mexicano</h2>
+          </div>
+          {mexicanoStories.map((card) => (
+            <article className="story-row" key={card.title}>
+              <img src={card.image} alt="" />
+              <div>
+                <span>{card.label}</span>
+                <strong>{card.title}</strong>
+                <p>{card.copy}</p>
+              </div>
+              <b>›</b>
+            </article>
+          ))}
+        </section>
+      </section>
+
+      {descriptionOpen && <MexicanoDescriptionPanel onClose={() => setDescriptionOpen(false)} />}
+    </main>
+  );
+}
+
+function TournamentDetail({ onBack }) {
+  const [descriptionOpen, setDescriptionOpen] = useState(true);
+
+  return (
+    <main>
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={(event) => { event.preventDefault(); onBack(); }}>
+          <span className="brand-mark">PB</span>
+          <strong>Padel Brazzers</strong>
+          <span>PRO</span>
+        </a>
+        <nav>
+          <a href="#top">Турниры</a>
+          <a href="#standings">Рейтинг</a>
+          <a href="#rounds">Игроки</a>
+          <a href="#stories">О нас</a>
+        </nav>
+        <div className="profile-chip">
+          <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
+          <span>2</span>
+          <TeamBadge team="Шевченко / Борис" small />
+        </div>
+      </header>
+
+      <section className="page-grid" id="top">
+        <section className="surface hero-card">
+          <img src="/assets/hero-court.png" alt="Матч турнира на падел корте" />
+          <div className="hero-content">
+            <span className="eyebrow">PRO category</span>
+            <h1>THE BEST MIDDLE (PM)</h1>
+            <div className="meta-row">
+              <span>13 июня</span>
+              <span>15:00–17:00</span>
+              <span>Padel Pro Club</span>
+            </div>
+            <p>
+              Round Robin на 8 пар: каждый сыграл с каждым, а первое, второе и
+              третье места решились через один-два ключевых мяча.
+            </p>
+            <button type="button" onClick={() => setDescriptionOpen(true)}>
+              Полное описание
+              <span>→</span>
+            </button>
+          </div>
+          <div className="metric-strip">
+            <div><strong>8</strong><span>пар</span></div>
+            <div><strong>7</strong><span>раундов</span></div>
+            <div><strong>28</strong><span>матчей</span></div>
+            <div><strong>Round Robin</strong><span>формат</span></div>
+          </div>
+        </section>
+
+        <StandingsTable />
+      </section>
+
+      <section className="leaders-row">
+        <LeaderCard
+          eyebrow="Лучший игрок за все время"
+          image="/assets/forehand.png"
+          meta="152 матча · 79% побед"
+          metric={{ label: "Рейтинг", value: "3.13" }}
+          name="Редько Илья"
+        />
+        <LeaderCard
+          eyebrow="Лучший за месяц"
+          image="/assets/handshake.png"
+          meta="24 матча · 87% побед"
+          metric={{ label: "Рост за месяц", value: "+0.234" }}
+          name="Ткачев Тимур"
+        />
+      </section>
+
+      <section className="lower-grid">
+        <RoundPanel />
+        <section className="surface stories-card" id="stories">
+          <div className="section-title">
+            <span>Главные сюжеты турнира</span>
+            <h2>Что стоит прочитать после игр</h2>
+          </div>
+          {storyCards.map((card) => (
+            <article className="story-row" key={card.title}>
+              <img src={card.image} alt="" />
+              <div>
+                <span>{card.label}</span>
+                <strong>{card.title}</strong>
+                <p>{card.copy}</p>
+              </div>
+              <b>›</b>
+            </article>
+          ))}
+        </section>
+      </section>
+
+      {descriptionOpen && <DescriptionPanel onClose={() => setDescriptionOpen(false)} />}
+    </main>
+  );
+}
+
+export function App() {
+  const [screen, setScreen] = useState({ name: "home" });
+
+  if (screen.name === "predictions") {
+    return <PredictionsScreen onBack={() => setScreen({ name: "home" })} />;
+  }
+
+  if (screen.name === "detail") {
+    if (screen.tournamentId === "mexicano-brazzers-lite") {
+      return <MexicanoDetail onBack={() => setScreen({ name: "home" })} />;
+    }
+
+    return <AmericanoDetail onBack={() => setScreen({ name: "home" })} />;
+  }
+
+  return (
+    <HomeScreen
+      onOpenPredictions={() => setScreen({ name: "predictions" })}
+      onOpenTournament={(tournamentId) => {
+        setScreen({ name: "detail", tournamentId });
+      }}
+    />
+  );
+}
