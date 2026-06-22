@@ -39,7 +39,7 @@ const defaultScoringMethod = {
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
-    writeFileSync(storePath, JSON.stringify({ forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] }, null, 2));
+    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] }, null, 2));
   }
 }
 
@@ -53,13 +53,14 @@ function readStore() {
       : [defaultScoringMethod];
 
     return {
+      forecastPredictions: Array.isArray(parsed.forecastPredictions) ? parsed.forecastPredictions : [],
       forecastTournaments: Array.isArray(parsed.forecastTournaments) ? parsed.forecastTournaments : [],
       scoringMethods,
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
   } catch {
-    return { forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] };
+    return { forecastPredictions: [], forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] };
   }
 }
 
@@ -124,6 +125,21 @@ function sanitizeScoringMethod(method) {
   };
 }
 
+function sanitizeForecastPrediction(prediction) {
+  if (!prediction) {
+    return null;
+  }
+
+  return {
+    createdAt: prediction.createdAt,
+    id: prediction.id,
+    placements: Array.isArray(prediction.placements) ? prediction.placements : [],
+    tournamentId: prediction.tournamentId,
+    updatedAt: prediction.updatedAt,
+    userId: prediction.userId,
+  };
+}
+
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
   const hash = pbkdf2Sync(password, salt, 120000, 64, "sha512").toString("hex");
   return { hash, salt };
@@ -181,6 +197,54 @@ function authPayload(store, user = null, token) {
     user: sanitizeUser(user),
     users: isActiveAdmin(user) ? store.users.map(sanitizeUser) : [],
   };
+}
+
+function parseVladivostokDateTime(value) {
+  if (!value || !value.includes("T")) {
+    return null;
+  }
+
+  return new Date(`${value}:00+10:00`);
+}
+
+function normalizePredictionPlacements(body, tournament) {
+  const roster = Array.isArray(tournament.roster) ? tournament.roster : [];
+  const rosterIds = new Set(roster.map((player) => String(player.id ?? player.name)));
+  const requiredIds = roster.slice(0, 16).map((player) => String(player.id ?? player.name));
+  const sourcePlacements = Array.isArray(body.placements) ? body.placements : [];
+  const placements = sourcePlacements
+    .map((placement, index) => {
+      if (!placement) {
+        return null;
+      }
+
+      const place = Number(placement.place ?? index + 1);
+      const playerId = String(placement.playerId ?? "").trim();
+      if (!Number.isInteger(place) || place < 1 || place > 16 || !playerId || !rosterIds.has(playerId)) {
+        return null;
+      }
+
+      return { place, playerId };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.place - b.place);
+
+  const seenPlaces = new Set();
+  const seenPlayers = new Set();
+  for (const placement of placements) {
+    if (seenPlaces.has(placement.place) || seenPlayers.has(placement.playerId)) {
+      return { error: "В прогнозе не должно быть повторяющихся мест или игроков." };
+    }
+
+    seenPlaces.add(placement.place);
+    seenPlayers.add(placement.playerId);
+  }
+
+  if (requiredIds.length === 0 || !requiredIds.every((playerId) => seenPlayers.has(playerId))) {
+    return { error: "Расставь всех игроков из состава турнира перед сохранением прогноза." };
+  }
+
+  return { placements };
 }
 
 function buildForecastTournamentFromBody(body, store, existingTournament = null) {
@@ -274,6 +338,64 @@ async function handleApi(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/scoring-methods") {
     jsonResponse(response, 200, { methods: store.scoringMethods.map(sanitizeScoringMethod) });
+    return;
+  }
+
+  const ownPredictionMatch = url.pathname.match(/^\/api\/forecast-tournaments\/([^/]+)\/prediction$/);
+  if ((request.method === "GET" || request.method === "PUT") && ownPredictionMatch) {
+    const user = getAuthedUser(store, request);
+    if (user?.status !== "active") {
+      jsonResponse(response, 403, { message: "Прогнозы доступны только подтвержденным участникам." });
+      return;
+    }
+
+    const tournament = store.forecastTournaments.find((item) => item.id === ownPredictionMatch[1]);
+    if (!tournament) {
+      jsonResponse(response, 404, { message: "Турнир не найден." });
+      return;
+    }
+
+    const existingPrediction = store.forecastPredictions.find((prediction) => (
+      prediction.tournamentId === tournament.id && prediction.userId === user.id
+    ));
+
+    if (request.method === "GET") {
+      jsonResponse(response, 200, { prediction: sanitizeForecastPrediction(existingPrediction) });
+      return;
+    }
+
+    const closeAt = parseVladivostokDateTime(tournament.predictionCloseAt);
+    if (closeAt && Date.now() >= closeAt.getTime()) {
+      jsonResponse(response, 400, { message: "Прием прогнозов уже закрыт." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const normalized = normalizePredictionPlacements(body, tournament);
+    if (normalized.error) {
+      jsonResponse(response, 400, { message: normalized.error });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const prediction = {
+      createdAt: existingPrediction?.createdAt ?? now,
+      id: existingPrediction?.id ?? `prediction-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      placements: normalized.placements,
+      tournamentId: tournament.id,
+      updatedAt: now,
+      userId: user.id,
+    };
+
+    if (existingPrediction) {
+      const index = store.forecastPredictions.findIndex((item) => item.id === existingPrediction.id);
+      store.forecastPredictions[index] = prediction;
+    } else {
+      store.forecastPredictions.push(prediction);
+    }
+
+    writeStore(store);
+    jsonResponse(response, 200, { prediction: sanitizeForecastPrediction(prediction) });
     return;
   }
 
@@ -415,6 +537,7 @@ async function handleApi(request, response, url) {
 
     if (request.method === "DELETE") {
       const [deletedTournament] = store.forecastTournaments.splice(tournamentIndex, 1);
+      store.forecastPredictions = store.forecastPredictions.filter((prediction) => prediction.tournamentId !== deletedTournament.id);
       writeStore(store);
       jsonResponse(response, 200, {
         deletedTournament: sanitizeTournament(deletedTournament),

@@ -379,6 +379,22 @@ function formatVladivostokDateTime(value) {
   return `${formatVladivostokDate(date)} ${time} VLAT`;
 }
 
+function formatVladivostokInstant(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Vladivostok",
+    year: "numeric",
+  }).format(new Date(value)).replace(",", "");
+}
+
 function describeScoringMethod(method) {
   if (!method) {
     return "Методика не выбрана";
@@ -407,6 +423,25 @@ function getTournamentScoringMethod(tournament, scoringMethods) {
     ?? scoringMethods.find((method) => method.id === tournament.scoringMethodId)
     ?? scoringMethods[0]
     ?? fallbackScoringMethods[0];
+}
+
+function buildForecastSlotsFromPrediction(prediction, roster) {
+  const nextSlots = Array.from({ length: 16 }, () => null);
+  const rosterById = new Map(roster.map((player) => [String(player.id ?? player.name), player]));
+
+  if (!prediction?.placements?.length) {
+    return nextSlots;
+  }
+
+  prediction.placements.forEach((placement) => {
+    const slotIndex = Number(placement.place) - 1;
+    const player = rosterById.get(String(placement.playerId));
+    if (slotIndex >= 0 && slotIndex < nextSlots.length && player) {
+      nextSlots[slotIndex] = player;
+    }
+  });
+
+  return nextSlots;
 }
 
 function getStandingsAfterRound(round) {
@@ -1863,9 +1898,11 @@ function ForecastTournamentDetail({
   forecastTournaments,
   onBack,
   onDeleteTournament,
+  onLoadForecastPrediction,
   onOpenHome,
   onOpenPlaceholder,
   onOpenPredictions,
+  onSaveForecastPrediction,
   onUpdateTournament,
   scoringMethods,
   tournament,
@@ -1877,7 +1914,10 @@ function ForecastTournamentDetail({
   );
   const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: 16 }, () => null));
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastSaving, setForecastSaving] = useState(false);
   const [forecastSaveMessage, setForecastSaveMessage] = useState("");
+  const [forecastSaveTone, setForecastSaveTone] = useState("success");
   const [adminEditing, setAdminEditing] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -1894,9 +1934,43 @@ function ForecastTournamentDetail({
     setForecastSlots(Array.from({ length: 16 }, () => null));
     setSelectedPlayerId(null);
     setForecastSaveMessage("");
+    setForecastSaveTone("success");
     setAdminEditing(false);
     setAdminMessage("");
-  }, [tournament.id]);
+  }, [tournament.id, auth.currentUser?.id]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadPrediction = async () => {
+      if (!auth.currentUser?.id || !tournament.id) {
+        return;
+      }
+
+      setForecastLoading(true);
+      const result = await onLoadForecastPrediction(tournament.id);
+      if (ignore) {
+        return;
+      }
+
+      setForecastLoading(false);
+      if (!result.ok) {
+        setForecastSaveMessage(result.message);
+        setForecastSaveTone("error");
+        return;
+      }
+
+      setForecastSlots(buildForecastSlotsFromPrediction(result.prediction, sortedRoster));
+      setForecastSaveMessage(result.prediction ? `Загружен твой сохраненный прогноз от ${formatVladivostokInstant(result.prediction.updatedAt)} VLAT.` : "");
+      setForecastSaveTone("success");
+    };
+
+    loadPrediction();
+
+    return () => {
+      ignore = true;
+    };
+  }, [auth.currentUser?.id, tournament.id, tournament.roster]);
 
   const placePlayer = (slotIndex, playerId) => {
     const player = sortedRoster.find((item) => getPlayerKey(item) === playerId);
@@ -1911,11 +1985,13 @@ function ForecastTournamentDetail({
     });
     setSelectedPlayerId(null);
     setForecastSaveMessage("");
+    setForecastSaveTone("success");
   };
 
   const clearSlot = (slotIndex) => {
     setForecastSlots((current) => current.map((slot, index) => (index === slotIndex ? null : slot)));
     setForecastSaveMessage("");
+    setForecastSaveTone("success");
   };
 
   const handleSlotDrop = (event, slotIndex) => {
@@ -1930,6 +2006,7 @@ function ForecastTournamentDetail({
           return next;
         });
         setForecastSaveMessage("");
+        setForecastSaveTone("success");
       }
       return;
     }
@@ -1938,12 +2015,28 @@ function ForecastTournamentDetail({
     placePlayer(slotIndex, playerId);
   };
 
-  const saveForecast = () => {
+  const saveForecast = async () => {
     if (!isForecastComplete) {
       return;
     }
 
-    setForecastSaveMessage("Прогноз сохранен на этом устройстве. Скоро подключим общий рейтинг прогнозов.");
+    setForecastSaving(true);
+    setForecastSaveMessage("");
+    setForecastSaveTone("success");
+    const placements = forecastSlots
+      .map((slot, index) => (slot ? { place: index + 1, playerId: String(getPlayerKey(slot)) } : null))
+      .filter(Boolean);
+    const result = await onSaveForecastPrediction(tournament.id, { placements });
+    setForecastSaving(false);
+
+    if (!result.ok) {
+      setForecastSaveMessage(result.message);
+      setForecastSaveTone("error");
+      return;
+    }
+
+    setForecastSaveMessage(`Прогноз сохранен на сервере: ${formatVladivostokInstant(result.prediction.updatedAt)} VLAT.`);
+    setForecastSaveTone("success");
   };
 
   const submitTournamentUpdate = async (payload) => {
@@ -2110,9 +2203,11 @@ function ForecastTournamentDetail({
               <span>Мой прогноз</span>
               <h2>16 мест турнира</h2>
             </div>
-            <button disabled={!isForecastComplete} type="button" onClick={saveForecast}>Сохранить прогноз</button>
+            <button disabled={!isForecastComplete || forecastLoading || forecastSaving} type="button" onClick={saveForecast}>
+              {forecastSaving ? "Сохраняем..." : "Сохранить прогноз"}
+            </button>
           </div>
-          {forecastSaveMessage && <strong className="prediction-save-message">{forecastSaveMessage}</strong>}
+          {forecastSaveMessage && <strong className={`prediction-save-message ${forecastSaveTone}`}>{forecastSaveMessage}</strong>}
           {tournament.roster.length === 0 ? (
             <div className="prediction-empty-list tall">
               <strong>Расстановка откроется после публикации состава</strong>
@@ -2123,7 +2218,9 @@ function ForecastTournamentDetail({
               <div className="prediction-placement-hint">
                 {selectedPlayer
                   ? `Выбран: ${selectedPlayer.name}. Нажми на место справа.`
-                  : `Расставлено ${filledSlots} из ${expectedPlayerIds.length}. Перетаскивай игроков в места справа, а занятые места можно менять между собой.`}
+                  : forecastLoading
+                    ? "Загружаем твой сохраненный прогноз..."
+                    : `Расставлено ${filledSlots} из ${expectedPlayerIds.length}. Перетаскивай игроков в места справа, а занятые места можно менять между собой.`}
               </div>
               <div className="prediction-slot-grid">
                 {forecastSlots.map((slot, index) => (
@@ -2695,6 +2792,27 @@ export function App() {
     }
   };
 
+  const loadForecastPrediction = async (tournamentId) => {
+    try {
+      const result = await apiRequest(`/api/forecast-tournaments/${tournamentId}/prediction`);
+      return { ok: true, prediction: result.prediction ?? null };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const saveForecastPrediction = async (tournamentId, payload) => {
+    try {
+      const result = await apiRequest(`/api/forecast-tournaments/${tournamentId}/prediction`, {
+        body: JSON.stringify(payload),
+        method: "PUT",
+      });
+      return { ok: true, prediction: result.prediction };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
   const createScoringMethod = async (payload) => {
     try {
       const result = await apiRequest("/api/admin/scoring-methods", {
@@ -2856,9 +2974,11 @@ export function App() {
           forecastTournaments={forecastTournaments}
           onBack={() => setScreen({ name: "predictions" })}
           onDeleteTournament={deleteForecastTournament}
+          onLoadForecastPrediction={loadForecastPrediction}
           onOpenHome={() => setScreen({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
+          onSaveForecastPrediction={saveForecastPrediction}
           onUpdateTournament={updateForecastTournament}
           scoringMethods={scoringMethods}
           tournament={tournament}

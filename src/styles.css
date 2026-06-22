@@ -1661,6 +1661,12 @@ main {
   padding: 10px 12px;
 }
 
+.prediction-save-message.error {
+  background: rgba(219, 63, 74, 0.08);
+  border-color: rgba(219, 63, 74, 0.18);
+  color: var(--loss);
+}
+
 .prediction-slot-grid {
   display: grid;
   gap: 8px;
