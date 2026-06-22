@@ -288,36 +288,47 @@ const forecastTournaments = [
   },
 ];
 
-const authStorageKey = "padel-brazzers-auth";
-const emptyAuthState = { users: [], sessionUserId: null };
+const authTokenStorageKey = "padel-brazzers-auth-token";
+const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, users: [] };
 
-function createUserId() {
-  return `user-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function normalizeEmail(email) {
-  return email.trim().toLowerCase();
-}
-
-function loadAuthState() {
+function getStoredAuthToken() {
   if (typeof window === "undefined") {
-    return emptyAuthState;
+    return "";
   }
 
-  try {
-    const stored = window.localStorage.getItem(authStorageKey);
-    if (!stored) {
-      return emptyAuthState;
-    }
+  return window.localStorage.getItem(authTokenStorageKey) ?? "";
+}
 
-    const parsed = JSON.parse(stored);
-    return {
-      users: Array.isArray(parsed.users) ? parsed.users : [],
-      sessionUserId: parsed.sessionUserId ?? null,
-    };
-  } catch {
-    return emptyAuthState;
+function storeAuthToken(token) {
+  if (typeof window === "undefined") {
+    return;
   }
+
+  if (token) {
+    window.localStorage.setItem(authTokenStorageKey, token);
+    return;
+  }
+
+  window.localStorage.removeItem(authTokenStorageKey);
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getStoredAuthToken();
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers ?? {}),
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Не удалось выполнить запрос.");
+  }
+
+  return payload;
 }
 
 function getInitials(user) {
@@ -980,9 +991,10 @@ function MexicanoDescriptionPanel({ onClose }) {
   );
 }
 
-function AuthControls({ currentUser, onLogin, onLogout, onRegister }) {
+function AuthControls({ currentUser, onLogin, onLogout, onOpenAdmin, onRegister }) {
   if (currentUser) {
     const isPending = currentUser.status === "pending";
+    const canOpenAdmin = currentUser.role === "admin" && currentUser.status === "active";
 
     return (
       <div className="auth-user-card">
@@ -991,6 +1003,7 @@ function AuthControls({ currentUser, onLogin, onLogout, onRegister }) {
           <strong>{getUserDisplayName(currentUser)}</strong>
           <small>{isPending ? "Ожидает подтверждения" : currentUser.role === "admin" ? "Админ" : "Участник"}</small>
         </div>
+        {canOpenAdmin && <button type="button" onClick={onOpenAdmin}>Кабинет</button>}
         <button type="button" onClick={onLogout}>Выйти</button>
       </div>
     );
@@ -1004,7 +1017,7 @@ function AuthControls({ currentUser, onLogin, onLogout, onRegister }) {
   );
 }
 
-function AuthModal({ mode, onClose, onLogin, onRegister, usersCount }) {
+function AuthModal({ hasUsers, mode, onClose, onLogin, onRegister }) {
   const isLogin = mode === "login";
   const [form, setForm] = useState({
     firstName: "",
@@ -1015,23 +1028,29 @@ function AuthModal({ mode, onClose, onLogin, onRegister, usersCount }) {
     password: "",
   });
   const [error, setError] = useState("");
-  const isFirstUser = usersCount === 0;
+  const [submitting, setSubmitting] = useState(false);
+  const isFirstUser = !hasUsers;
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
     setError("");
   };
 
-  const submitForm = (event) => {
+  const submitForm = async (event) => {
     event.preventDefault();
+    setSubmitting(true);
 
-    const result = isLogin ? onLogin(form.email, form.password) : onRegister(form);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    try {
+      const result = await (isLogin ? onLogin(form.email, form.password) : onRegister(form));
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+
+      onClose();
+    } finally {
+      setSubmitting(false);
     }
-
-    onClose();
   };
 
   return (
@@ -1093,7 +1112,9 @@ function AuthModal({ mode, onClose, onLogin, onRegister, usersCount }) {
 
           {error && <strong className="prediction-error">{error}</strong>}
 
-          <button type="submit">{isLogin ? "Войти" : "Отправить регистрацию"}</button>
+          <button disabled={submitting} type="submit">
+            {submitting ? "Проверяем..." : isLogin ? "Войти" : "Отправить регистрацию"}
+          </button>
         </form>
       </section>
     </div>
@@ -1152,6 +1173,67 @@ function AdminApprovalPanel({ users, onApproveUser }) {
         </div>
       )}
     </section>
+  );
+}
+
+function AdminCabinetScreen({ auth, onOpenHome, onOpenPredictions }) {
+  const pendingUsers = auth.users.filter((user) => user.status === "pending");
+  const activeMembers = auth.users.filter((user) => user.status === "active" && user.role !== "admin");
+
+  return (
+    <main className="admin-cabinet-shell">
+      <MainNav
+        active="admin"
+        label="Admin"
+        onOpenHome={onOpenHome}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
+      />
+
+      <section className="admin-cabinet-hero surface" id="top">
+        <div>
+          <span className="eyebrow">Личный кабинет админа</span>
+          <h1>Акцепт заявок участников</h1>
+          <p>
+            Все новые регистрации попадают сюда. Пока заявка не принята, участник
+            может войти в аккаунт, но не сможет открыть прогнозы и ставить места.
+          </p>
+        </div>
+        <div className="admin-cabinet-stats">
+          <div><strong>{pendingUsers.length}</strong><span>ожидают принятия</span></div>
+          <div><strong>{activeMembers.length}</strong><span>принятых участников</span></div>
+          <div><strong>{auth.users.length}</strong><span>аккаунтов всего</span></div>
+        </div>
+      </section>
+
+      <section className="admin-cabinet-grid">
+        <AdminApprovalPanel users={auth.users} onApproveUser={auth.onApproveUser} />
+
+        <section className="surface side-panel admin-members-panel">
+          <div className="section-title">
+            <span>Уже приняты</span>
+            <h2>Активные участники</h2>
+          </div>
+
+          {activeMembers.length === 0 ? (
+            <p>Пока нет принятых участников.</p>
+          ) : (
+            <div className="member-list">
+              {activeMembers.map((user) => (
+                <article className="member-row" key={user.id}>
+                  <span>{getInitials(user)}</span>
+                  <div>
+                    <strong>{getUserDisplayName(user)}</strong>
+                    <small>{user.lundaNick} · {user.email}</small>
+                  </div>
+                  <b>Активен</b>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
   );
 }
 
@@ -1280,9 +1362,6 @@ function ForecastRegistryScreen({ auth, onOpenHome, onOpenPredictions, onOpenTou
               формат, состав и статус приема прогнозов.
             </p>
           </section>
-          {auth.currentUser?.role === "admin" && (
-            <AdminApprovalPanel users={auth.users} onApproveUser={auth.onApproveUser} />
-          )}
         </aside>
       </section>
     </main>
@@ -1801,14 +1880,48 @@ function TournamentDetail({ onBack }) {
 
 export function App() {
   const [screen, setScreen] = useState({ name: "home" });
-  const [authState, setAuthState] = useState(loadAuthState);
+  const [authState, setAuthState] = useState(emptyAuthState);
   const [authMode, setAuthMode] = useState(null);
-  const currentUser = authState.users.find((user) => user.id === authState.sessionUserId) ?? null;
+  const currentUser = authState.currentUser;
   const canOpenPredictions = currentUser?.status === "active";
+  const canOpenAdmin = currentUser?.role === "admin" && currentUser?.status === "active";
 
   useEffect(() => {
-    window.localStorage.setItem(authStorageKey, JSON.stringify(authState));
-  }, [authState]);
+    const loadServerAuthState = async () => {
+      try {
+        const payload = await apiRequest("/api/auth/state");
+        setAuthState({
+          currentUser: payload.user ?? null,
+          hasUsers: payload.hasUsers,
+          loading: false,
+          users: payload.users ?? [],
+        });
+      } catch {
+        storeAuthToken("");
+        setAuthState({ ...emptyAuthState, loading: false });
+      }
+    };
+
+    loadServerAuthState();
+  }, []);
+
+  const applyAuthPayload = (payload) => {
+    if (payload.token !== undefined) {
+      storeAuthToken(payload.token);
+    }
+
+    setAuthState({
+      currentUser: payload.user ?? null,
+      hasUsers: payload.hasUsers ?? true,
+      loading: false,
+      users: payload.users ?? [],
+    });
+  };
+
+  const refreshAuthState = async () => {
+    const payload = await apiRequest("/api/auth/state");
+    applyAuthPayload(payload);
+  };
 
   const openPredictions = () => {
     setScreen({ name: "predictions" });
@@ -1817,73 +1930,112 @@ export function App() {
     }
   };
 
-  const registerUser = (payload) => {
-    const email = normalizeEmail(payload.email);
-    const isFirstUser = authState.users.length === 0;
-    const emailTaken = authState.users.some((user) => user.email === email);
-    const nickTaken = authState.users.some((user) => user.lundaNick.trim().toLowerCase() === payload.lundaNick.trim().toLowerCase());
-
-    if (emailTaken) {
-      return { ok: false, message: "Аккаунт с такой почтой уже есть." };
-    }
-
-    if (nickTaken) {
-      return { ok: false, message: "Этот ник в Lunda уже занят." };
-    }
-
-    const user = {
-      id: createUserId(),
-      firstName: payload.firstName.trim(),
-      lastName: payload.lastName.trim(),
-      lundaNick: payload.lundaNick.trim(),
-      email,
-      phone: payload.phone.trim(),
-      password: payload.password,
-      role: isFirstUser ? "admin" : "member",
-      status: isFirstUser ? "active" : "pending",
-      createdAt: new Date().toISOString(),
-    };
-
-    setAuthState((state) => ({
-      users: [...state.users, user],
-      sessionUserId: user.id,
-    }));
-    setScreen({ name: "predictions" });
-
-    return { ok: true };
+  const openAdminCabinet = () => {
+    setScreen({ name: "admin" });
   };
 
-  const loginUser = (emailInput, password) => {
-    const email = normalizeEmail(emailInput);
-    const user = authState.users.find((item) => item.email === email && item.password === password);
-
-    if (!user) {
-      return { ok: false, message: "Почта или пароль не совпали." };
+  const registerUser = async (payload) => {
+    try {
+      const result = await apiRequest("/api/auth/register", {
+        body: JSON.stringify(payload),
+        method: "POST",
+      });
+      applyAuthPayload(result);
+      setScreen({ name: "predictions" });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
     }
-
-    setAuthState((state) => ({ ...state, sessionUserId: user.id }));
-    setScreen({ name: "predictions" });
-
-    return { ok: true };
   };
 
-  const approveUser = (userId) => {
-    setAuthState((state) => ({
-      ...state,
-      users: state.users.map((user) => (
-        user.id === userId ? { ...user, status: "active", approvedAt: new Date().toISOString() } : user
-      )),
-    }));
+  const loginUser = async (email, password) => {
+    try {
+      const result = await apiRequest("/api/auth/login", {
+        body: JSON.stringify({ email, password }),
+        method: "POST",
+      });
+      applyAuthPayload(result);
+      setScreen({ name: "predictions" });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const logoutUser = async () => {
+    try {
+      await apiRequest("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Session cleanup is best-effort; local token removal is enough for the UI.
+    }
+
+    storeAuthToken("");
+    setAuthState((state) => ({ ...state, currentUser: null, users: [] }));
+    setScreen({ name: "home" });
+  };
+
+  const approveUser = async (userId) => {
+    await apiRequest(`/api/admin/users/${userId}/approve`, { method: "POST" });
+    await refreshAuthState();
   };
 
   const auth = {
     currentUser,
+    hasUsers: authState.hasUsers,
     users: authState.users,
     onApproveUser: approveUser,
+    onOpenAdmin: openAdminCabinet,
     onLogin: () => setAuthMode("login"),
-    onLogout: () => setAuthState((state) => ({ ...state, sessionUserId: null })),
+    onLogout: logoutUser,
     onRegister: () => setAuthMode("register"),
   };
+
+  const authModal = authMode && (
+    <AuthModal
+      hasUsers={authState.hasUsers}
+      mode={authMode}
+      onClose={() => setAuthMode(null)}
+      onLogin={loginUser}
+      onRegister={registerUser}
+    />
+  );
+
+  if (authState.loading) {
+    return (
+      <main className="predictions-shell">
+        <section className="surface prediction-empty-list tall" id="top">
+          <strong>Загружаем кабинет</strong>
+          <p>Проверяем сессию и статус регистрации.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (screen.name === "admin") {
+    if (!canOpenAdmin) {
+      return (
+        <>
+          <LockedPredictionsScreen
+            auth={auth}
+            onOpenHome={() => setScreen({ name: "home" })}
+            onOpenPredictions={openPredictions}
+          />
+          {authModal}
+        </>
+      );
+    }
+
+    return (
+      <>
+        <AdminCabinetScreen
+          auth={auth}
+          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenPredictions={openPredictions}
+        />
+        {authModal}
+      </>
+    );
+  }
 
   if (screen.name === "forecast-detail") {
     const tournament = forecastTournaments.find((item) => item.id === screen.tournamentId) ?? forecastTournaments[0];
@@ -1896,15 +2048,7 @@ export function App() {
             onOpenHome={() => setScreen({ name: "home" })}
             onOpenPredictions={openPredictions}
           />
-          {authMode && (
-            <AuthModal
-              mode={authMode}
-              onClose={() => setAuthMode(null)}
-              onLogin={loginUser}
-              onRegister={registerUser}
-              usersCount={authState.users.length}
-            />
-          )}
+          {authModal}
         </>
       );
     }
@@ -1918,15 +2062,7 @@ export function App() {
           onOpenPredictions={openPredictions}
           tournament={tournament}
         />
-        {authMode && (
-          <AuthModal
-            mode={authMode}
-            onClose={() => setAuthMode(null)}
-            onLogin={loginUser}
-            onRegister={registerUser}
-            usersCount={authState.users.length}
-          />
-        )}
+        {authModal}
       </>
     );
   }
@@ -1940,15 +2076,7 @@ export function App() {
             onOpenHome={() => setScreen({ name: "home" })}
             onOpenPredictions={openPredictions}
           />
-          {authMode && (
-            <AuthModal
-              mode={authMode}
-              onClose={() => setAuthMode(null)}
-              onLogin={loginUser}
-              onRegister={registerUser}
-              usersCount={authState.users.length}
-            />
-          )}
+          {authModal}
         </>
       );
     }
@@ -1961,15 +2089,7 @@ export function App() {
           onOpenPredictions={openPredictions}
           onOpenTournament={(tournamentId) => setScreen({ name: "forecast-detail", tournamentId })}
         />
-        {authMode && (
-          <AuthModal
-            mode={authMode}
-            onClose={() => setAuthMode(null)}
-            onLogin={loginUser}
-            onRegister={registerUser}
-            usersCount={authState.users.length}
-          />
-        )}
+        {authModal}
       </>
     );
   }
@@ -1991,15 +2111,7 @@ export function App() {
           setScreen({ name: "detail", tournamentId });
         }}
       />
-      {authMode && (
-        <AuthModal
-          mode={authMode}
-          onClose={() => setAuthMode(null)}
-          onLogin={loginUser}
-          onRegister={registerUser}
-          usersCount={authState.users.length}
-        />
-      )}
+      {authModal}
     </>
   );
 }
