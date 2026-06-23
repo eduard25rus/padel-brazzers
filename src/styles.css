@@ -1558,6 +1558,37 @@ main {
   text-transform: uppercase;
 }
 
+.prediction-count-card {
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.prediction-count-card span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.prediction-count-card strong {
+  color: #1b241d;
+  font-size: 36px;
+  line-height: 1;
+}
+
+.prediction-count-card p {
+  color: #526054;
+  font-size: 13px;
+  font-weight: 750;
+  margin: 0;
+}
+
 .prediction-admin-actions {
   border-top: 1px solid var(--line);
   display: flex;

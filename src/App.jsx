@@ -2039,6 +2039,8 @@ function ForecastTournamentDetail({
     setForecastSaveTone("success");
   };
 
+  const predictionCount = Number(tournament.predictionCount ?? 0);
+
   const submitTournamentUpdate = async (payload) => {
     const result = await onUpdateTournament(tournament.id, payload);
     if (result.ok) {
@@ -2140,6 +2142,11 @@ function ForecastTournamentDetail({
             </div>
           )}
           {adminMessage && <strong className="prediction-error">{adminMessage}</strong>}
+          <div className="prediction-count-card">
+            <span>Прогнозы участников</span>
+            <strong>{predictionCount}</strong>
+            <p>столько игроков уже сделали прогноз на этот турнир</p>
+          </div>
         </section>
       </section>
 
@@ -2812,7 +2819,12 @@ export function App() {
         body: JSON.stringify(payload),
         method: "PUT",
       });
-      return { ok: true, prediction: result.prediction };
+      setForecastTournaments((current) => current.map((tournament) => (
+        tournament.id === tournamentId
+          ? { ...tournament, predictionCount: result.predictionCount ?? tournament.predictionCount ?? 0 }
+          : tournament
+      )));
+      return { ok: true, prediction: result.prediction, predictionCount: result.predictionCount ?? 0 };
     } catch (error) {
       return { ok: false, message: error.message };
     }

@@ -83,7 +83,15 @@ function sanitizeUser(user) {
   return safeUser;
 }
 
-function sanitizeTournament(tournament) {
+function getTournamentPredictionCount(tournamentId, forecastPredictions = []) {
+  return new Set(
+    forecastPredictions
+      .filter((prediction) => prediction.tournamentId === tournamentId)
+      .map((prediction) => prediction.userId),
+  ).size;
+}
+
+function sanitizeTournament(tournament, forecastPredictions = []) {
   const roster = Array.isArray(tournament.roster) ? tournament.roster : [];
 
   return {
@@ -95,6 +103,7 @@ function sanitizeTournament(tournament) {
     id: tournament.id,
     image: tournament.image ?? "/assets/hero-court.png",
     players: tournament.players ?? `${roster.length} игроков`,
+    predictionCount: getTournamentPredictionCount(tournament.id, forecastPredictions),
     pointsToWin: tournament.pointsToWin ?? "",
     predictionCloseAt: tournament.predictionCloseAt ?? "",
     roster,
@@ -332,7 +341,7 @@ async function handleApi(request, response, url) {
   }
 
   if (request.method === "GET" && url.pathname === "/api/forecast-tournaments") {
-    jsonResponse(response, 200, { tournaments: store.forecastTournaments.map(sanitizeTournament) });
+    jsonResponse(response, 200, { tournaments: store.forecastTournaments.map((tournament) => sanitizeTournament(tournament, store.forecastPredictions)) });
     return;
   }
 
@@ -395,7 +404,10 @@ async function handleApi(request, response, url) {
     }
 
     writeStore(store);
-    jsonResponse(response, 200, { prediction: sanitizeForecastPrediction(prediction) });
+    jsonResponse(response, 200, {
+      prediction: sanitizeForecastPrediction(prediction),
+      predictionCount: getTournamentPredictionCount(tournament.id, store.forecastPredictions),
+    });
     return;
   }
 
@@ -515,8 +527,8 @@ async function handleApi(request, response, url) {
     store.forecastTournaments.unshift(tournament);
     writeStore(store);
     jsonResponse(response, 201, {
-      tournament: sanitizeTournament(tournament),
-      tournaments: store.forecastTournaments.map(sanitizeTournament),
+      tournament: sanitizeTournament(tournament, store.forecastPredictions),
+      tournaments: store.forecastTournaments.map((item) => sanitizeTournament(item, store.forecastPredictions)),
     });
     return;
   }
@@ -540,8 +552,8 @@ async function handleApi(request, response, url) {
       store.forecastPredictions = store.forecastPredictions.filter((prediction) => prediction.tournamentId !== deletedTournament.id);
       writeStore(store);
       jsonResponse(response, 200, {
-        deletedTournament: sanitizeTournament(deletedTournament),
-        tournaments: store.forecastTournaments.map(sanitizeTournament),
+        deletedTournament: sanitizeTournament(deletedTournament, store.forecastPredictions),
+        tournaments: store.forecastTournaments.map((item) => sanitizeTournament(item, store.forecastPredictions)),
       });
       return;
     }
@@ -556,8 +568,8 @@ async function handleApi(request, response, url) {
     store.forecastTournaments[tournamentIndex] = result.tournament;
     writeStore(store);
     jsonResponse(response, 200, {
-      tournament: sanitizeTournament(result.tournament),
-      tournaments: store.forecastTournaments.map(sanitizeTournament),
+      tournament: sanitizeTournament(result.tournament, store.forecastPredictions),
+      tournaments: store.forecastTournaments.map((item) => sanitizeTournament(item, store.forecastPredictions)),
     });
     return;
   }
