@@ -2163,6 +2163,11 @@ function ForecastTournamentDetail({
             <span>Состав турнира</span>
             <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Игроки появятся из управляющей части"}</h2>
           </div>
+          {tournament.roster.length > 0 && (
+            <div className="prediction-placement-hint">
+              Выбери игрока и перетащи в правую часть.
+            </div>
+          )}
           {tournament.roster.length === 0 ? (
             <div className="prediction-empty-list">
               <strong>Состав пока не опубликован</strong>
@@ -2220,7 +2225,7 @@ function ForecastTournamentDetail({
                   ? `Выбран: ${selectedPlayer.name}. Нажми на место справа.`
                   : forecastLoading
                     ? "Загружаем твой сохраненный прогноз..."
-                    : `Расставлено ${filledSlots} из ${expectedPlayerIds.length}. Перетаскивай игроков в места справа, а занятые места можно менять между собой.`}
+                    : `Расставлено ${filledSlots} из ${expectedPlayerIds.length}. Расставь всех игроков согласно твоему прогнозу.`}
               </div>
               <div className="prediction-slot-grid">
                 {forecastSlots.map((slot, index) => (

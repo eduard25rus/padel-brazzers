@@ -1639,13 +1639,16 @@ main {
 }
 
 .prediction-placement-hint {
+  align-items: center;
   background: rgba(29, 93, 42, 0.08);
   border: 1px solid rgba(29, 93, 42, 0.14);
   border-radius: 8px;
   color: var(--green);
+  display: flex;
   font-size: 13px;
   font-weight: 850;
   margin-bottom: 12px;
+  min-height: 56px;
   padding: 10px 12px;
 }
 
