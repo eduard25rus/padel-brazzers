@@ -1012,3 +1012,17 @@ const server = createServer(async (request, response) => {
 server.listen(port, "0.0.0.0", () => {
   console.log(`Padel Brazzers server is running on port ${port}`);
 });
+
+function shutdown(signal) {
+  console.log(`Received ${signal}, shutting down gracefully`);
+  server.close(() => {
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    process.exit(0);
+  }, 5000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
