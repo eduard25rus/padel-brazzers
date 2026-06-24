@@ -344,6 +344,10 @@ function getInitialScreenFromLocation() {
   const parts = path.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
 
   if (parts[0] === "predictions") {
+    if (parts[2] === "results") {
+      return parts[1] ? { name: "forecast-results-import", tournamentId: parts[1] } : { name: "predictions" };
+    }
+
     return parts[1] ? { name: "forecast-detail", tournamentId: parts[1] } : { name: "predictions" };
   }
 
@@ -377,6 +381,10 @@ function pathForScreen(screen) {
 
   if (screen.name === "forecast-detail") {
     return `/predictions/${encodeURIComponent(screen.tournamentId)}`;
+  }
+
+  if (screen.name === "forecast-results-import") {
+    return `/predictions/${encodeURIComponent(screen.tournamentId)}/results`;
   }
 
   if (screen.name === "admin") {
@@ -908,6 +916,24 @@ function formatTournamentRecord(wins, losses, draws = 0) {
 
 function formatScorePair(pointsFor, pointsAgainst) {
   return `${Number(pointsFor ?? 0)}–${Number(pointsAgainst ?? 0)}`;
+}
+
+function formatRatingChange(value) {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number)) {
+    return "0.000";
+  }
+  return `${number > 0 ? "+" : ""}${number.toFixed(3)}`;
+}
+
+function formatInsightMetric(insight) {
+  const label = String(insight?.metric_label ?? insight?.metricLabel ?? "").trim();
+  const value = String(insight?.metric_value ?? insight?.metricValue ?? "").trim();
+  const fallback = String(insight?.insight_type ?? insight?.insightType ?? "Инсайт").trim();
+  if (label && value) {
+    return `${label}: ${value}`;
+  }
+  return label || value || fallback;
 }
 
 function PairRatingBadge({ players, playerPool = americanoPlayers }) {
@@ -2521,7 +2547,63 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
   const [preview, setPreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const previewStandings = preview?.standings ?? [];
-  const previewInsights = preview?.insights?.slice(0, 4) ?? [];
+  const previewInsights = preview?.insights ?? [];
+
+  const updatePreviewInsight = (index, patch) => {
+    setPreview((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const insights = [...(current.insights ?? [])];
+      insights[index] = { ...insights[index], ...patch };
+      return { ...current, insights };
+    });
+  };
+
+  const addPreviewInsight = () => {
+    setPreview((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const currentInsights = current.insights ?? [];
+      const nextOrder = Math.max(0, ...currentInsights.map((insight) => Number(insight.insight_order ?? 0))) + 1;
+      return {
+        ...current,
+        insights: [
+          ...currentInsights,
+          {
+            evidence: "Добавлено администратором в предпросмотре.",
+            insight_order: nextOrder,
+            insight_type: "custom",
+            metric_label: "Заметка",
+            metric_value: "Админ",
+            player_name: "",
+            related_player_2: "",
+            source_ref: "",
+            summary: "Напиши короткий комментарий к турниру.",
+            title: "Новый сюжет турнира",
+          },
+        ],
+      };
+    });
+  };
+
+  const removePreviewInsight = (index) => {
+    setPreview((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        insights: (current.insights ?? [])
+          .filter((_, itemIndex) => itemIndex !== index)
+          .map((insight, itemIndex) => ({ ...insight, insight_order: itemIndex + 1 })),
+      };
+    });
+  };
 
   const uploadPreview = async (event) => {
     event.preventDefault();
@@ -2611,7 +2693,7 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
             )}
           </article>
 
-          <article className="surface standings-card americano-final-card results-preview-standings">
+          <article className="surface standings-card americano-final-card imported-rating-table results-preview-standings">
             <div className="section-title">
               <span>Итоговая таблица</span>
               <h2>{previewStandings.length} игроков после турнира</h2>
@@ -2622,6 +2704,7 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
               <span>Игры</span>
               <span>Очки</span>
               <span>+/-</span>
+              <span>Рейт.</span>
               <span>Клуб</span>
             </div>
             <div className="standings-list">
@@ -2635,6 +2718,7 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
                   <span>{formatTournamentRecord(row.wins, row.losses, row.draws)}</span>
                   <span>{formatScorePair(row.points_for, row.points_against)}</span>
                   <em className={Number(row.delta) >= 0 ? "positive" : "negative"}>{Number(row.delta) > 0 ? `+${row.delta}` : row.delta}</em>
+                  <em className={Number(row.rating_change) >= 0 ? "positive" : "negative"}>{formatRatingChange(row.rating_change)}</em>
                   <strong className="club-points">+{row.club_points}</strong>
                 </article>
               ))}
@@ -2647,17 +2731,41 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
               <span>Инсайты</span>
               <h2>Сюжеты турнира</h2>
             </div>
-            {previewInsights.map((insight) => (
-              <article className="story-row" key={`${insight.insight_order}-${insight.title}`}>
+            <div className="results-preview-insight-list">
+              {previewInsights.map((insight, index) => (
+              <article className="story-row editable-story-row" key={`${insight.insight_order}-${index}`}>
                 <img src="/assets/trophy.png" alt="" />
                 <div>
-                  <span>{insight.metric_label ? `${insight.metric_label}: ${insight.metric_value}` : insight.insight_type}</span>
-                  <strong>{insight.title}</strong>
-                  <p>{insight.summary}</p>
+                  <label>
+                    <span>Зеленая строка</span>
+                    <input
+                      value={formatInsightMetric(insight)}
+                      onChange={(event) => updatePreviewInsight(index, { metric_label: event.target.value, metric_value: "" })}
+                    />
+                  </label>
+                  <label>
+                    <span>Заголовок</span>
+                    <input
+                      value={insight.title ?? ""}
+                      onChange={(event) => updatePreviewInsight(index, { title: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    <span>Описание</span>
+                    <textarea
+                      rows="3"
+                      value={insight.summary ?? ""}
+                      onChange={(event) => updatePreviewInsight(index, { summary: event.target.value })}
+                    />
+                  </label>
                 </div>
-                <b>{insight.insight_order}</b>
+                <button aria-label="Удалить сюжет" type="button" onClick={() => removePreviewInsight(index)}>×</button>
               </article>
-            ))}
+              ))}
+            </div>
+            <button className="add-insight-button" type="button" onClick={addPreviewInsight}>
+              Добавить сюжет
+            </button>
           </article>
 
           <footer>
@@ -2672,17 +2780,57 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
   );
 }
 
+function ForecastResultsImportScreen({
+  auth,
+  onConfirmResultsImport,
+  onOpenHome,
+  onOpenPlaceholder,
+  onOpenPredictions,
+  onPreviewResultsImport,
+  tournament,
+}) {
+  return (
+    <main className="predictions-shell">
+      <MainNav
+        active="predictions"
+        auth={auth}
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
+      />
+
+      <section className="surface results-import-hero">
+        <div className="section-title">
+          <span>Админ · результаты</span>
+          <h1>Выставить результаты турнира</h1>
+        </div>
+        <p>{tournament.title} · {formatVladivostokDate(tournament.date)} · {tournament.club}</p>
+        <button type="button" onClick={() => onOpenPredictions(tournament.id)}>
+          Вернуться к прогнозу
+        </button>
+      </section>
+
+      <ResultsImportPanel
+        onConfirmResultsImport={onConfirmResultsImport}
+        onPreviewResultsImport={onPreviewResultsImport}
+        tournament={tournament}
+      />
+    </main>
+  );
+}
+
 function ForecastTournamentDetail({
   auth,
   forecastTournaments,
   onDeleteTournament,
-  onConfirmResultsImport,
   onLoadForecastPrediction,
   onLoadForecastPredictionSummary,
   onOpenHome,
   onOpenPlaceholder,
   onOpenPredictions,
-  onPreviewResultsImport,
+  onOpenResultsImport,
   onSaveForecastPrediction,
   onUpdateTournament,
   scoringMethods,
@@ -2704,7 +2852,6 @@ function ForecastTournamentDetail({
   const [adminPredictionSummaryLoading, setAdminPredictionSummaryLoading] = useState(false);
   const [predictionRegistryOpen, setPredictionRegistryOpen] = useState(false);
   const [adminEditing, setAdminEditing] = useState(false);
-  const [adminResultsImportOpen, setAdminResultsImportOpen] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
   const currentForecastSlots = forecastSlots.filter((slot) => slot && !slot.invalid);
@@ -2748,7 +2895,6 @@ function ForecastTournamentDetail({
     setForecastSaveMessage("");
     setForecastSaveTone("success");
     setAdminEditing(false);
-    setAdminResultsImportOpen(false);
     setAdminMessage("");
   }, [tournament.id, auth.currentUser?.id]);
 
@@ -2962,8 +3108,8 @@ function ForecastTournamentDetail({
               <button type="button" onClick={() => { setAdminEditing((value) => !value); setAdminMessage(""); }}>
                 {adminEditing ? "Закрыть редактор" : "Редактировать"}
               </button>
-              <button type="button" onClick={() => { setAdminResultsImportOpen((value) => !value); setAdminMessage(""); }}>
-                {adminResultsImportOpen ? "Закрыть результаты" : "Выставить результаты"}
+              <button type="button" onClick={() => onOpenResultsImport(tournament.id)}>
+                Выставить результаты
               </button>
               <button className="danger" disabled={deleting} type="button" onClick={deleteTournament}>
                 {deleting ? "Удаляем..." : "Удалить"}
@@ -3023,14 +3169,6 @@ function ForecastTournamentDetail({
             successMessage="Турнир обновлен."
           />
         </section>
-      )}
-
-      {canManageTournament && adminResultsImportOpen && (
-        <ResultsImportPanel
-          onConfirmResultsImport={onConfirmResultsImport}
-          onPreviewResultsImport={onPreviewResultsImport}
-          tournament={tournament}
-        />
       )}
 
       <section className="prediction-workspace">
@@ -3190,7 +3328,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
           </div>
         </section>
 
-        <section className="surface standings-card americano-final-card" id="standings">
+        <section className="surface standings-card americano-final-card imported-rating-table" id="standings">
           <div className="section-title">
             <span>Итоговая таблица</span>
             <h2>{result.standings?.length ?? 0} игроков после турнира</h2>
@@ -3201,6 +3339,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
             <span>Игры</span>
             <span>Очки</span>
             <span>+/-</span>
+            <span>Рейт.</span>
             <span>Клуб</span>
           </div>
           <div className="standings-list">
@@ -3214,6 +3353,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
                 <span>{formatTournamentRecord(item.wins, item.losses, item.draws)}</span>
                 <span>{formatScorePair(item.pointsFor, item.pointsAgainst)}</span>
                 <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+                <em className={Number(item.ratingChange) >= 0 ? "positive" : "negative"}>{formatRatingChange(item.ratingChange)}</em>
                 <strong className="club-points">+{item.clubPoints}</strong>
               </article>
             ))}
@@ -3271,11 +3411,11 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
             <span>Инсайты</span>
             <h2>Сюжеты турнира</h2>
           </div>
-          {(result.insights ?? []).slice(0, 4).map((insight) => (
+          {(result.insights ?? []).map((insight) => (
             <article className="story-row" key={`${insight.insightOrder}-${insight.title}`}>
               <img src="/assets/trophy.png" alt="" />
               <div>
-                <span>{insight.metricLabel ? `${insight.metricLabel}: ${insight.metricValue}` : insight.insightType}</span>
+                <span>{formatInsightMetric(insight)}</span>
                 <strong>{insight.title}</strong>
                 <p>{insight.summary}</p>
               </div>
@@ -4461,11 +4601,44 @@ export function App() {
           onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
-          onPreviewResultsImport={previewTournamentResultsImport}
+          onOpenResultsImport={(tournamentId) => navigate({ name: "forecast-results-import", tournamentId })}
           onSaveForecastPrediction={saveForecastPrediction}
           onUpdateTournament={updateForecastTournament}
           scoringMethods={scoringMethods}
           settings={settings}
+          tournament={tournament}
+        />
+        {authModal}
+      </>
+    );
+  }
+
+  if (screen.name === "forecast-results-import") {
+    const tournament = forecastTournaments.find((item) => item.id === screen.tournamentId) ?? forecastTournaments[0] ?? fallbackForecastTournaments[0];
+
+    if (!canOpenAdmin) {
+      return (
+        <>
+          <LockedPredictionsScreen
+            auth={auth}
+            onOpenHome={() => navigate({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
+            onOpenPredictions={openPredictions}
+          />
+          {authModal}
+        </>
+      );
+    }
+
+    return (
+      <>
+        <ForecastResultsImportScreen
+          auth={auth}
+          onConfirmResultsImport={confirmTournamentResultsImport}
+          onOpenHome={() => navigate({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
+          onOpenPredictions={openPredictions}
+          onPreviewResultsImport={previewTournamentResultsImport}
           tournament={tournament}
         />
         {authModal}

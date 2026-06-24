@@ -1980,8 +1980,58 @@ main {
   padding: 22px 22px 14px;
 }
 
+.imported-rating-table .americano-standings-head,
+.imported-rating-table .americano-standing-row {
+  grid-template-columns: 28px minmax(188px, 1fr) 54px 72px 42px 66px 62px;
+}
+
 .results-preview-insights {
   padding: 22px;
+}
+
+.results-import-hero {
+  align-items: end;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 14px;
+  padding: 26px;
+}
+
+.results-import-hero .section-title {
+  margin-bottom: 0;
+}
+
+.results-import-hero h1 {
+  font-size: clamp(34px, 4vw, 58px);
+  letter-spacing: 0;
+  line-height: 0.95;
+  margin: 0;
+}
+
+.results-import-hero p {
+  color: #526054;
+  font-size: 16px;
+  font-weight: 750;
+  grid-column: 1;
+  margin: 0;
+}
+
+.results-import-hero button {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--green);
+  cursor: pointer;
+  font-weight: 900;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 12px 16px;
+}
+
+.results-preview-insight-list {
+  display: grid;
+  gap: 0;
 }
 
 .results-preview-insights .story-row {
@@ -2004,6 +2054,80 @@ main {
   height: 28px;
   justify-content: center;
   width: 28px;
+}
+
+.editable-story-row {
+  align-items: start;
+}
+
+.editable-story-row label {
+  display: grid;
+  gap: 5px;
+}
+
+.editable-story-row label + label {
+  margin-top: 8px;
+}
+
+.editable-story-row label span {
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editable-story-row input,
+.editable-story-row textarea {
+  background: rgba(255, 254, 250, 0.78);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 850;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.editable-story-row textarea {
+  color: #526054;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.editable-story-row input:focus,
+.editable-story-row textarea:focus {
+  border-color: rgba(29, 93, 42, 0.28);
+  outline: none;
+}
+
+.editable-story-row > button {
+  align-items: center;
+  background: var(--green-soft);
+  border-radius: 50%;
+  color: var(--green);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 20px;
+  font-weight: 900;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
+  width: 28px;
+}
+
+.add-insight-button {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--green);
+  cursor: pointer;
+  font-weight: 900;
+  margin-top: 14px;
+  padding: 12px 14px;
+  width: 100%;
 }
 
 .results-preview-grid footer {
@@ -3951,6 +4075,23 @@ p {
   .americano-standing-row {
     grid-template-columns: 24px minmax(132px, 1fr) 48px 62px 36px 58px;
     min-width: 490px;
+  }
+
+  .imported-rating-table .americano-standings-head,
+  .imported-rating-table .americano-standing-row {
+    grid-template-columns: 24px minmax(142px, 1fr) 48px 62px 36px 58px 58px;
+    min-width: 560px;
+  }
+
+  .results-import-hero {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .results-import-hero p,
+  .results-import-hero button {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .americano-picker {

@@ -330,6 +330,7 @@ function sanitizeCompletedTournamentResult(result) {
     standings: standings.map((row) => ({
       clubPoints: Number(row.clubPoints ?? row.club_points ?? 0),
       delta: Number(row.delta ?? 0),
+      draws: Number(row.draws ?? 0),
       losses: Number(row.losses ?? 0),
       place: Number(row.place),
       playerName: row.playerName ?? row.player_name ?? "",
@@ -495,6 +496,70 @@ function rowsToObjects(rows) {
     .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])));
 }
 
+function normalizeImportPlayerName(value) {
+  return String(value ?? "")
+    .replace(/\s*\|\s*LOCKED IN\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function addImportRecordPlayer(records, name, scoreFor, scoreAgainst) {
+  const key = normalizeImportPlayerName(name);
+  if (!key) {
+    return;
+  }
+
+  const current = records.get(key) ?? { draws: 0, losses: 0, wins: 0 };
+  if (scoreFor > scoreAgainst) {
+    current.wins += 1;
+  } else if (scoreFor < scoreAgainst) {
+    current.losses += 1;
+  } else {
+    current.draws += 1;
+  }
+  records.set(key, current);
+}
+
+function getImportMatchRecords(matches = []) {
+  const records = new Map();
+
+  for (const match of matches) {
+    const scoreA = Number(match.score_a ?? match.scoreA);
+    const scoreB = Number(match.score_b ?? match.scoreB);
+    if (!Number.isFinite(scoreA) || !Number.isFinite(scoreB)) {
+      continue;
+    }
+
+    addImportRecordPlayer(records, match.team_a_player_1 ?? match.teamAPlayer1, scoreA, scoreB);
+    addImportRecordPlayer(records, match.team_a_player_2 ?? match.teamAPlayer2, scoreA, scoreB);
+    addImportRecordPlayer(records, match.team_b_player_1 ?? match.teamBPlayer1, scoreB, scoreA);
+    addImportRecordPlayer(records, match.team_b_player_2 ?? match.teamBPlayer2, scoreB, scoreA);
+  }
+
+  return records;
+}
+
+function enrichImportStandingsWithMatchRecords(standings = [], matches = []) {
+  const records = getImportMatchRecords(matches);
+  return standings.map((row) => {
+    const record = records.get(normalizeImportPlayerName(row.player_name ?? row.playerName));
+    if (!record) {
+      return row;
+    }
+
+    const rawWins = String(row.wins ?? "").trim();
+    const rawLosses = String(row.losses ?? "").trim();
+    const rawDraws = String(row.draws ?? "").trim();
+    return {
+      ...row,
+      draws: rawDraws === "" ? String(record.draws) : row.draws,
+      losses: rawLosses === "" || (Number(rawLosses) === 0 && record.losses > 0) ? String(record.losses) : row.losses,
+      wins: rawWins === "" || (Number(rawWins) === 0 && record.wins > 0) ? String(record.wins) : row.wins,
+    };
+  });
+}
+
 function parseResultsWorkbook(fileBuffer) {
   const entries = readZipEntries(fileBuffer);
   const sharedStrings = parseSharedStrings(entries.get("xl/sharedStrings.xml") ?? "");
@@ -522,7 +587,7 @@ function parseResultsWorkbook(fileBuffer) {
 
   const participants = rowsToObjects(sheets.participants);
   const matches = rowsToObjects(sheets.matches);
-  const standings = rowsToObjects(sheets.standings);
+  const standings = enrichImportStandingsWithMatchRecords(rowsToObjects(sheets.standings), matches);
   const insights = rowsToObjects(sheets.insights);
   const validation = rowsToObjects(sheets.validation);
   const warnings = [];
@@ -573,6 +638,7 @@ function buildCompletedResultFromImport({ fileName, preview, tournament }) {
   const standings = (preview.standings ?? []).map((row) => ({
     clubPoints: Number(row.club_points ?? 0),
     delta: Number(row.delta ?? 0),
+    draws: Number(row.draws ?? 0),
     losses: Number(row.losses ?? 0),
     place: Number(row.place),
     playerName: String(row.player_name ?? "").trim(),
