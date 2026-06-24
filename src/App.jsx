@@ -3931,7 +3931,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
             <LeaderCard
               eyebrow="Лучший прогнозист"
               image="/assets/trophy.png"
-              meta={forecastLeader ? `${forecastLeader.periodPredictions} прогнозов · ${forecastLeader.periodReady} готово` : "Прогнозы появятся после ставок"}
+              meta={forecastLeader ? `${forecastLeader.periodPoints} очков · ${forecastLeader.periodPredictions} прогнозов` : "Очки появятся после результатов"}
               metric={{ label: "Очки", value: forecastLeader?.periodPoints ?? 0 }}
               name={forecastLeader?.name ?? "Пока нет"}
             />
@@ -4327,7 +4327,7 @@ function LeadersScreen({ auth, completedTournamentResults, forecastLeaders, onOp
         <article className="surface leaders-summary-card">
           <span>Прогнозисты</span>
           <strong>{forecastWinner?.name ?? "Пока нет"}</strong>
-          <p>{forecastWinner ? `${forecastWinner.periodPredictions} прогнозов · ${forecastWinner.periodReady} готово · ${forecastWinner.periodNeedsReview} на корректировке` : "Когда участники сохранят прогнозы, они появятся здесь."}</p>
+          <p>{forecastWinner ? `${forecastWinner.periodPoints} очков · ${forecastWinner.periodPredictions} прогнозов · ${forecastWinner.periodReady} готово` : "Боевые очки появятся после внесения результатов."}</p>
           <div>
             <b>{forecastWinner?.periodPoints ?? 0}</b>
             <small>очков у лидера</small>
@@ -4387,7 +4387,7 @@ function LeadersScreen({ auth, completedTournamentResults, forecastLeaders, onOp
         <section className="surface leaders-board">
           <div className="section-title">
             <span>Прогнозы</span>
-            <h2>Активность прогнозистов</h2>
+            <h2>Рейтинг прогнозистов</h2>
           </div>
           <div className="leaders-table-head forecast">
             <span>#</span>

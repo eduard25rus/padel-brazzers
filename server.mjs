@@ -190,13 +190,20 @@ function getForecastLeaderboard(store) {
       const predictions = store.forecastPredictions.filter((prediction) => prediction.userId === user.id);
       const months = {};
       let needsReviewCount = 0;
+      let forecastPoints = 0;
 
       for (const prediction of predictions) {
         const tournament = tournamentById.get(prediction.tournamentId);
         const details = tournament ? getPredictionDetails(prediction, tournament) : { needsReview: Boolean(prediction.needsReview) };
-        const monthKey = getVladivostokMonthKey(prediction.updatedAt ?? prediction.createdAt);
+        const result = tournament ? getCompletedResultForTournament(store, tournament) : null;
+        const scoringMethod = tournament ? getForecastScoringMethod(store, tournament) : defaultScoringMethod;
+        const score = result ? scoreForecastPrediction({ prediction, result, scoringMethod, tournament }) : null;
+        const points = score?.points ?? 0;
+        const monthKey = getVladivostokMonthKey(result?.date ?? result?.importedAt ?? prediction.updatedAt ?? prediction.createdAt);
         months[monthKey] = months[monthKey] ?? { needsReview: 0, points: 0, predictions: 0 };
         months[monthKey].predictions += 1;
+        months[monthKey].points += points;
+        forecastPoints += points;
 
         if (details.needsReview) {
           needsReviewCount += 1;
@@ -205,7 +212,7 @@ function getForecastLeaderboard(store) {
       }
 
       return {
-        forecastPoints: 0,
+        forecastPoints,
         lastPredictionAt: predictions
           .map((prediction) => prediction.updatedAt ?? prediction.createdAt)
           .filter(Boolean)
@@ -221,7 +228,7 @@ function getForecastLeaderboard(store) {
       };
     })
     .filter((row) => row.predictionCount > 0)
-    .sort((a, b) => b.predictionCount - a.predictionCount || b.readyCount - a.readyCount || String(b.lastPredictionAt).localeCompare(String(a.lastPredictionAt)));
+    .sort((a, b) => b.forecastPoints - a.forecastPoints || b.predictionCount - a.predictionCount || b.readyCount - a.readyCount || String(b.lastPredictionAt).localeCompare(String(a.lastPredictionAt)));
 }
 
 function getUserCabinet(store, user) {
@@ -229,8 +236,11 @@ function getUserCabinet(store, user) {
     .filter((prediction) => prediction.userId === user.id)
     .map((prediction) => {
       const tournament = store.forecastTournaments.find((item) => item.id === prediction.tournamentId);
+      const result = tournament ? getCompletedResultForTournament(store, tournament) : null;
+      const scoringMethod = tournament ? getForecastScoringMethod(store, tournament) : defaultScoringMethod;
+      const score = result ? scoreForecastPrediction({ prediction, result, scoringMethod, tournament }) : null;
       return {
-        forecastPoints: 0,
+        forecastPoints: score?.points ?? 0,
         prediction: sanitizeForecastPrediction(prediction, tournament),
         tournament: tournament ? sanitizeTournament(tournament, store.forecastPredictions) : null,
       };
@@ -239,7 +249,7 @@ function getUserCabinet(store, user) {
   const needsReviewCount = predictions.filter((item) => item.prediction?.needsReview).length;
 
   return {
-    forecastPoints: 0,
+    forecastPoints: predictions.reduce((sum, item) => sum + Number(item.forecastPoints ?? 0), 0),
     needsReviewCount,
     predictionCount: predictions.length,
     predictions,
