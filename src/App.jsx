@@ -304,6 +304,7 @@ const fallbackScoringMethods = [
 
 const authTokenStorageKey = "padel-brazzers-auth-token";
 const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, notifications: [], users: [] };
+const defaultSettings = { predictionRegistryVisibility: "admin" };
 
 function getStoredAuthToken() {
   if (typeof window === "undefined") {
@@ -1674,6 +1675,68 @@ function AdminScoringMethodsPanel({ onCreateScoringMethod, scoringMethods }) {
   );
 }
 
+function AdminPredictionSettingsPanel({ onUpdateSettings, settings }) {
+  const [form, setForm] = useState(() => ({
+    predictionRegistryVisibility: settings.predictionRegistryVisibility ?? "admin",
+  }));
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setForm({ predictionRegistryVisibility: settings.predictionRegistryVisibility ?? "admin" });
+    setMessage("");
+  }, [settings.predictionRegistryVisibility]);
+
+  const submitSettings = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    const result = await onUpdateSettings(form);
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+
+    setMessage("Настройки сохранены.");
+  };
+
+  return (
+    <section className="surface admin-settings-panel">
+      <div className="section-title">
+        <span>CRM</span>
+        <h2>Видимость реестра прогнозов</h2>
+      </div>
+
+      <form className="admin-tournament-form admin-settings-form" onSubmit={submitSettings}>
+        <label>
+          <span>Кто видит список прогнозов</span>
+          <select
+            value={form.predictionRegistryVisibility}
+            onChange={(event) => {
+              setForm({ predictionRegistryVisibility: event.target.value });
+              setMessage("");
+            }}
+          >
+            <option value="admin">Только админ</option>
+            <option value="all">Все подтвержденные участники</option>
+          </select>
+        </label>
+        <p>
+          При открытом режиме участники видят только имена и статус прогноза. Почта остается видна только админу.
+        </p>
+
+        {message && <strong className={message.includes("сохранены") ? "admin-form-success" : "prediction-error"}>{message}</strong>}
+
+        <footer>
+          <span>{form.predictionRegistryVisibility === "all" ? "Список открыт участникам" : "Список закрыт для админа"}</span>
+          <button disabled={submitting} type="submit">{submitting ? "Сохраняем..." : "Сохранить настройки"}</button>
+        </footer>
+      </form>
+    </section>
+  );
+}
+
 function AdminSectionShell({ children, eyebrow, onBack, title }) {
   return (
     <section className="admin-section-shell">
@@ -1689,7 +1752,7 @@ function AdminSectionShell({ children, eyebrow, onBack, title }) {
   );
 }
 
-function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, scoringMethods }) {
+function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onUpdateSettings, scoringMethods, settings }) {
   const [activeSection, setActiveSection] = useState(null);
   const pendingUsers = auth.users.filter((user) => user.status === "pending");
   const activeMembers = auth.users.filter((user) => user.status === "active");
@@ -1727,6 +1790,14 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
       return (
         <AdminSectionShell eyebrow="Члены клуба" onBack={() => setActiveSection(null)} title="Все зарегистрированные участники">
           <AdminMembersPanel users={auth.users} />
+        </AdminSectionShell>
+      );
+    }
+
+    if (activeSection === "settings") {
+      return (
+        <AdminSectionShell eyebrow="Настройки CRM" onBack={() => setActiveSection(null)} title="Права видимости на сайте">
+          <AdminPredictionSettingsPanel onUpdateSettings={onUpdateSettings} settings={settings} />
         </AdminSectionShell>
       );
     }
@@ -1786,6 +1857,12 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
             <span>Члены клуба</span>
             <strong>{activeMembers.length} активных из {auth.users.length}</strong>
             <p>Полный список зарегистрированных аккаунтов со статусами и контактами.</p>
+          </button>
+
+          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("settings")}>
+            <span>Настройки</span>
+            <strong>{settings.predictionRegistryVisibility === "all" ? "Реестр открыт" : "Только админ"}</strong>
+            <p>Выбрать, кто может раскрывать список участников, уже сделавших прогноз.</p>
           </button>
         </section>
       )}
@@ -1949,12 +2026,14 @@ function ForecastTournamentDetail({
   onBack,
   onDeleteTournament,
   onLoadForecastPrediction,
+  onLoadForecastPredictionSummary,
   onOpenHome,
   onOpenPlaceholder,
   onOpenPredictions,
   onSaveForecastPrediction,
   onUpdateTournament,
   scoringMethods,
+  settings,
   tournament,
 }) {
   const getPlayerKey = (player) => player.id ?? player.name;
@@ -1968,6 +2047,9 @@ function ForecastTournamentDetail({
   const [forecastSaving, setForecastSaving] = useState(false);
   const [forecastSaveMessage, setForecastSaveMessage] = useState("");
   const [forecastSaveTone, setForecastSaveTone] = useState("success");
+  const [adminPredictionSummary, setAdminPredictionSummary] = useState(null);
+  const [adminPredictionSummaryLoading, setAdminPredictionSummaryLoading] = useState(false);
+  const [predictionRegistryOpen, setPredictionRegistryOpen] = useState(false);
   const [adminEditing, setAdminEditing] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -1977,9 +2059,24 @@ function ForecastTournamentDetail({
   const expectedPlayerIds = sortedRoster.slice(0, 16).map((player) => String(getPlayerKey(player)));
   const isForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => forecastPlayerIds.has(playerId));
   const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
+  const canViewPredictionRegistry = canManageTournament || settings.predictionRegistryVisibility === "all";
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
 
   const selectedPlayer = sortedRoster.find((player) => getPlayerKey(player) === selectedPlayerId);
+
+  const loadAdminPredictionSummary = async () => {
+    if (!canViewPredictionRegistry) {
+      setAdminPredictionSummary(null);
+      return;
+    }
+
+    setAdminPredictionSummaryLoading(true);
+    const result = await onLoadForecastPredictionSummary(tournament.id);
+    setAdminPredictionSummaryLoading(false);
+    if (result.ok) {
+      setAdminPredictionSummary(result.summary);
+    }
+  };
 
   useEffect(() => {
     setForecastSlots(Array.from({ length: 16 }, () => null));
@@ -2028,6 +2125,16 @@ function ForecastTournamentDetail({
       ignore = true;
     };
   }, [auth.currentUser?.id, tournament.id, tournament.roster]);
+
+  useEffect(() => {
+    loadAdminPredictionSummary();
+  }, [canViewPredictionRegistry, tournament.id, tournament.predictionCount, tournament.rosterChangeRevision]);
+
+  useEffect(() => {
+    if (!canViewPredictionRegistry) {
+      setPredictionRegistryOpen(false);
+    }
+  }, [canViewPredictionRegistry]);
 
   const placePlayer = (slotIndex, playerId) => {
     const player = sortedRoster.find((item) => getPlayerKey(item) === playerId);
@@ -2094,9 +2201,11 @@ function ForecastTournamentDetail({
 
     setForecastSaveMessage(`Прогноз сохранен на сервере: ${formatVladivostokInstant(result.prediction.updatedAt)} VLAT.`);
     setForecastSaveTone("success");
+    loadAdminPredictionSummary();
   };
 
   const predictionCount = Number(tournament.predictionCount ?? 0);
+  const needsReviewCount = adminPredictionSummary?.needsReviewCount ?? 0;
 
   const submitTournamentUpdate = async (payload) => {
     const result = await onUpdateTournament(tournament.id, payload);
@@ -2199,10 +2308,42 @@ function ForecastTournamentDetail({
             </div>
           )}
           {adminMessage && <strong className="prediction-error">{adminMessage}</strong>}
-          <div className="prediction-count-card">
-            <span>Прогнозы участников</span>
-            <strong>{predictionCount}</strong>
-            <p>столько игроков уже сделали прогноз на этот турнир</p>
+          <div className={`prediction-count-card ${canViewPredictionRegistry ? "can-open" : ""}`}>
+            <button
+              className="prediction-count-trigger"
+              disabled={!canViewPredictionRegistry}
+              type="button"
+              onClick={() => setPredictionRegistryOpen((value) => !value)}
+            >
+              <span>Прогнозы участников</span>
+              <strong>{predictionCount}</strong>
+              <p>столько игроков уже сделали прогноз на этот турнир</p>
+              {canManageTournament && (
+                <b className={needsReviewCount > 0 ? "has-review" : ""}>{needsReviewCount} требуют корректировки</b>
+              )}
+              {canViewPredictionRegistry && (
+                <small>{predictionRegistryOpen ? "Скрыть реестр" : "Показать реестр"}</small>
+              )}
+            </button>
+            {canViewPredictionRegistry && predictionRegistryOpen && (
+              <div className="admin-prediction-summary">
+                {adminPredictionSummaryLoading ? (
+                  <small>Загружаем список...</small>
+                ) : adminPredictionSummary?.predictions?.length ? (
+                  adminPredictionSummary.predictions.map((prediction) => (
+                    <article className={prediction.needsReview ? "needs-review" : ""} key={prediction.userId}>
+                      <div>
+                        <strong>{prediction.name}</strong>
+                        <small>{prediction.lundaNick || prediction.email || "Участник клуба"}</small>
+                      </div>
+                      <span>{prediction.needsReview ? "Корректировка" : "Готово"}</span>
+                    </article>
+                  ))
+                ) : (
+                  <small>Пока никто не сохранил прогноз.</small>
+                )}
+              </div>
+            )}
           </div>
         </section>
       </section>
@@ -2773,6 +2914,7 @@ export function App() {
   const [authMode, setAuthMode] = useState(null);
   const [forecastTournaments, setForecastTournaments] = useState([]);
   const [scoringMethods, setScoringMethods] = useState(fallbackScoringMethods);
+  const [settings, setSettings] = useState(defaultSettings);
   const currentUser = authState.currentUser;
   const canOpenPredictions = currentUser?.status === "active";
   const canOpenAdmin = currentUser?.role === "admin" && currentUser?.status === "active";
@@ -2780,10 +2922,11 @@ export function App() {
   useEffect(() => {
     const loadServerAuthState = async () => {
       try {
-        const [payload, forecastPayload, scoringPayload] = await Promise.all([
+        const [payload, forecastPayload, scoringPayload, settingsPayload] = await Promise.all([
           apiRequest("/api/auth/state"),
           apiRequest("/api/forecast-tournaments"),
           apiRequest("/api/scoring-methods"),
+          apiRequest("/api/settings"),
         ]);
         setAuthState({
           currentUser: payload.user ?? null,
@@ -2794,11 +2937,13 @@ export function App() {
         });
         setForecastTournaments(forecastPayload.tournaments ?? []);
         setScoringMethods(scoringPayload.methods?.length ? scoringPayload.methods : fallbackScoringMethods);
+        setSettings(settingsPayload.settings ?? defaultSettings);
       } catch {
         storeAuthToken("");
         setAuthState({ ...emptyAuthState, loading: false });
         setForecastTournaments(fallbackForecastTournaments);
         setScoringMethods(fallbackScoringMethods);
+        setSettings(defaultSettings);
       }
     };
 
@@ -2817,6 +2962,9 @@ export function App() {
       notifications: payload.notifications ?? [],
       users: payload.users ?? [],
     });
+    if (payload.settings) {
+      setSettings(payload.settings);
+    }
   };
 
   const refreshAuthState = async () => {
@@ -2872,6 +3020,15 @@ export function App() {
     }
   };
 
+  const loadForecastPredictionSummary = async (tournamentId) => {
+    try {
+      const result = await apiRequest(`/api/forecast-tournaments/${tournamentId}/predictions-summary`);
+      return { ok: true, summary: result };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
   const saveForecastPrediction = async (tournamentId, payload) => {
     try {
       const result = await apiRequest(`/api/forecast-tournaments/${tournamentId}/prediction`, {
@@ -2896,6 +3053,19 @@ export function App() {
         method: "POST",
       });
       setScoringMethods(result.methods?.length ? result.methods : fallbackScoringMethods);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const updateSettings = async (payload) => {
+    try {
+      const result = await apiRequest("/api/admin/settings", {
+        body: JSON.stringify(payload),
+        method: "PUT",
+      });
+      setSettings(result.settings ?? defaultSettings);
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -3031,7 +3201,9 @@ export function App() {
           onOpenHome={() => setScreen({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
+          onUpdateSettings={updateSettings}
           scoringMethods={scoringMethods}
+          settings={settings}
         />
         {authModal}
       </>
@@ -3063,12 +3235,14 @@ export function App() {
           onBack={() => setScreen({ name: "predictions" })}
           onDeleteTournament={deleteForecastTournament}
           onLoadForecastPrediction={loadForecastPrediction}
+          onLoadForecastPredictionSummary={loadForecastPredictionSummary}
           onOpenHome={() => setScreen({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           onSaveForecastPrediction={saveForecastPrediction}
           onUpdateTournament={updateForecastTournament}
           scoringMethods={scoringMethods}
+          settings={settings}
           tournament={tournament}
         />
         {authModal}

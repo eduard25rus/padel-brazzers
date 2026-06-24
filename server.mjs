@@ -39,10 +39,20 @@ const defaultScoringMethod = {
   twoPositionError: 1,
 };
 
+const defaultSettings = {
+  predictionRegistryVisibility: "admin",
+};
+
+function sanitizeSettings(settings = {}) {
+  return {
+    predictionRegistryVisibility: settings.predictionRegistryVisibility === "all" ? "all" : "admin",
+  };
+}
+
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
-    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] }, null, 2));
+    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] }, null, 2));
   }
 }
 
@@ -61,10 +71,11 @@ function readStore() {
       notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
       scoringMethods,
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      settings: sanitizeSettings(parsed.settings),
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
   } catch {
-    return { forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] };
+    return { forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] };
   }
 }
 
@@ -311,6 +322,7 @@ function authPayload(store, user = null, token) {
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
       .slice(0, 12)
       .map(sanitizeNotification) : [],
+    settings: sanitizeSettings(store.settings),
     user: sanitizeUser(user),
     users: isActiveAdmin(user) ? store.users.map(sanitizeUser) : [],
   };
@@ -603,6 +615,11 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/settings") {
+    jsonResponse(response, 200, { settings: sanitizeSettings(store.settings) });
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/scoring-methods") {
     jsonResponse(response, 200, { methods: store.scoringMethods.map(sanitizeScoringMethod) });
     return;
@@ -765,6 +782,48 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  const predictionsSummaryMatch = url.pathname.match(/^\/api\/(?:admin\/)?forecast-tournaments\/([^/]+)\/predictions-summary$/);
+  if (request.method === "GET" && predictionsSummaryMatch) {
+    const viewer = getAuthedUser(store, request);
+    const isAdminRequest = url.pathname.startsWith("/api/admin/");
+    const canViewRegistry = isActiveAdmin(viewer) || (viewer?.status === "active" && sanitizeSettings(store.settings).predictionRegistryVisibility === "all");
+    if ((isAdminRequest && !isActiveAdmin(viewer)) || !canViewRegistry) {
+      jsonResponse(response, 403, { message: "Реестр прогнозов сейчас доступен только админу." });
+      return;
+    }
+
+    const tournament = store.forecastTournaments.find((item) => item.id === predictionsSummaryMatch[1]);
+    if (!tournament) {
+      jsonResponse(response, 404, { message: "Турнир не найден." });
+      return;
+    }
+
+    const predictions = store.forecastPredictions
+      .filter((prediction) => prediction.tournamentId === tournament.id)
+      .map((prediction) => {
+        const predictionUser = store.users.find((item) => item.id === prediction.userId);
+        const details = getPredictionDetails(prediction, tournament);
+
+        return {
+          email: isActiveAdmin(viewer) ? predictionUser?.email ?? "" : "",
+          lundaNick: predictionUser?.lundaNick ?? "",
+          name: predictionUser ? `${predictionUser.firstName} ${predictionUser.lastName}`.trim() || predictionUser.lundaNick : "Участник",
+          needsReview: details.needsReview,
+          updatedAt: prediction.updatedAt,
+          userId: prediction.userId,
+        };
+      })
+      .sort((a, b) => Number(b.needsReview) - Number(a.needsReview) || String(a.name).localeCompare(String(b.name)));
+
+    jsonResponse(response, 200, {
+      needsReviewCount: predictions.filter((prediction) => prediction.needsReview).length,
+      predictionCount: predictions.length,
+      predictions,
+      visibility: sanitizeSettings(store.settings).predictionRegistryVisibility,
+    });
+    return;
+  }
+
   const approveMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/approve$/);
   if (request.method === "POST" && approveMatch) {
     const admin = getAuthedUser(store, request);
@@ -898,6 +957,23 @@ async function handleApi(request, response, url) {
       method: sanitizeScoringMethod(method),
       methods: store.scoringMethods.map(sanitizeScoringMethod),
     });
+    return;
+  }
+
+  if (request.method === "PUT" && url.pathname === "/api/admin/settings") {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const body = await readJson(request);
+    store.settings = sanitizeSettings({
+      ...store.settings,
+      predictionRegistryVisibility: body.predictionRegistryVisibility,
+    });
+    writeStore(store);
+    jsonResponse(response, 200, { settings: sanitizeSettings(store.settings) });
     return;
   }
 

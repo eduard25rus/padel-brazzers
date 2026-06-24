@@ -1133,7 +1133,8 @@ main {
   padding: 22px;
 }
 
-.admin-scoring-panel {
+.admin-scoring-panel,
+.admin-settings-panel {
   padding: 22px;
 }
 
@@ -1183,6 +1184,14 @@ main {
   min-height: 94px;
   padding: 12px;
   resize: vertical;
+}
+
+.admin-settings-form p {
+  color: #526054;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .admin-tournament-form input:focus,
@@ -1615,12 +1624,32 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
-  gap: 5px;
+  gap: 10px;
   margin-top: 16px;
   padding: 14px;
 }
 
-.prediction-count-card span {
+.prediction-count-card.can-open {
+  border-color: rgba(29, 93, 42, 0.2);
+}
+
+.prediction-count-trigger {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: default;
+  display: grid;
+  gap: 5px;
+  opacity: 1;
+  padding: 0;
+  text-align: left;
+}
+
+.prediction-count-trigger:not(:disabled) {
+  cursor: pointer;
+}
+
+.prediction-count-trigger span {
   color: var(--green);
   font-size: 11px;
   font-weight: 900;
@@ -1628,17 +1657,87 @@ main {
   text-transform: uppercase;
 }
 
-.prediction-count-card strong {
+.prediction-count-trigger strong {
   color: #1b241d;
   font-size: 36px;
   line-height: 1;
 }
 
-.prediction-count-card p {
+.prediction-count-trigger p {
   color: #526054;
   font-size: 13px;
   font-weight: 750;
   margin: 0;
+}
+
+.prediction-count-trigger b {
+  color: #526054;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.prediction-count-trigger b.has-review {
+  color: var(--loss);
+}
+
+.prediction-count-trigger small {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-prediction-summary {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.admin-prediction-summary article {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 8px 9px;
+}
+
+.admin-prediction-summary article.needs-review {
+  background: rgba(219, 63, 74, 0.08);
+  border-color: rgba(219, 63, 74, 0.2);
+}
+
+.admin-prediction-summary article div {
+  min-width: 0;
+}
+
+.admin-prediction-summary article strong,
+.admin-prediction-summary article small {
+  display: block;
+}
+
+.admin-prediction-summary article strong {
+  font-size: 13px;
+}
+
+.admin-prediction-summary article small,
+.admin-prediction-summary > small {
+  color: #526054;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.admin-prediction-summary article span {
+  color: var(--green);
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.admin-prediction-summary article.needs-review span {
+  color: var(--loss);
 }
 
 .prediction-admin-actions {
