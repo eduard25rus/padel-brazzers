@@ -3,6 +3,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } 
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateRawSync } from "node:zlib";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const distDir = join(rootDir, "dist");
@@ -87,7 +88,7 @@ function normalizeTournamentLeague(value, title = "") {
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
-    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] }, null, 2));
+    writeFileSync(storePath, JSON.stringify({ completedTournamentResults: [], forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] }, null, 2));
   }
 }
 
@@ -104,6 +105,7 @@ function readStore() {
       : [defaultLeaderboardPointMethod];
 
     return {
+      completedTournamentResults: Array.isArray(parsed.completedTournamentResults) ? parsed.completedTournamentResults : [],
       forecastPredictions: Array.isArray(parsed.forecastPredictions) ? parsed.forecastPredictions : [],
       forecastTournaments: Array.isArray(parsed.forecastTournaments) ? parsed.forecastTournaments : [],
       leaderboardPointMethods,
@@ -114,7 +116,7 @@ function readStore() {
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
   } catch {
-    return { forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] };
+    return { completedTournamentResults: [], forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] };
   }
 }
 
@@ -241,6 +243,7 @@ function sanitizeTournament(tournament, forecastPredictions = []) {
 
   return {
     club: tournament.club ?? "Padel Pro Club",
+    completedResultId: tournament.completedResultId ?? null,
     conditions: tournament.conditions ?? "",
     createdAt: tournament.createdAt,
     date: tournament.date ?? "",
@@ -259,11 +262,402 @@ function sanitizeTournament(tournament, forecastPredictions = []) {
     status: tournament.status ?? "Прием прогнозов",
     rosterChangedAt: tournament.rosterChangedAt ?? null,
     rosterChangeRevision: tournament.rosterChangeRevision ?? 0,
+    resultsImportedAt: tournament.resultsImportedAt ?? null,
     time: tournament.time ?? "",
     timezone: tournament.timezone ?? "Asia/Vladivostok",
     title: tournament.title ?? "Будущий турнир",
     updatedAt: tournament.updatedAt ?? null,
   };
+}
+
+function sanitizeCompletedTournamentResult(result) {
+  const standings = Array.isArray(result.standings) ? result.standings : [];
+  const matches = Array.isArray(result.matches) ? result.matches : [];
+  const insights = Array.isArray(result.insights) ? result.insights : [];
+  const participants = Array.isArray(result.participants) ? result.participants : [];
+  const meta = result.meta && typeof result.meta === "object" ? result.meta : {};
+
+  return {
+    club: result.club ?? meta.club ?? "Padel Pro Club",
+    createdAt: result.createdAt ?? null,
+    date: result.date ?? meta.tournament_date ?? "",
+    forecastTournamentId: result.forecastTournamentId ?? "",
+    format: result.format ?? meta.format ?? "",
+    id: result.id,
+    image: result.image ?? "/assets/trophy.png",
+    importedAt: result.importedAt ?? null,
+    insights: insights.map((insight) => ({
+      evidence: insight.evidence ?? "",
+      insightOrder: Number(insight.insightOrder ?? insight.insight_order ?? 0),
+      insightType: insight.insightType ?? insight.insight_type ?? "custom",
+      metricLabel: insight.metricLabel ?? insight.metric_label ?? "",
+      metricValue: insight.metricValue ?? insight.metric_value ?? "",
+      playerName: insight.playerName ?? insight.player_name ?? "",
+      relatedPlayer2: insight.relatedPlayer2 ?? insight.related_player_2 ?? "",
+      sourceRef: insight.sourceRef ?? insight.source_ref ?? "",
+      summary: insight.summary ?? "",
+      title: insight.title ?? "",
+    })),
+    league: normalizeTournamentLeague(result.league ?? meta.league, result.title ?? meta.tournament_title),
+    matches: matches.map((match) => ({
+      court: match.court ?? "",
+      matchId: match.matchId ?? match.match_id ?? "",
+      notes: match.notes ?? "",
+      round: Number(match.round),
+      scoreA: Number(match.scoreA ?? match.score_a),
+      scoreB: Number(match.scoreB ?? match.score_b),
+      sourceRef: match.sourceRef ?? match.source_ref ?? "",
+      teamAPlayer1: match.teamAPlayer1 ?? match.team_a_player_1 ?? "",
+      teamAPlayer2: match.teamAPlayer2 ?? match.team_a_player_2 ?? "",
+      teamBPlayer1: match.teamBPlayer1 ?? match.team_b_player_1 ?? "",
+      teamBPlayer2: match.teamBPlayer2 ?? match.team_b_player_2 ?? "",
+      winner: match.winner ?? "",
+    })),
+    meta,
+    participants: participants.map((participant) => ({
+      lundaNick: participant.lundaNick ?? participant.lunda_nick ?? "",
+      notes: participant.notes ?? "",
+      participantId: participant.participantId ?? participant.participant_id ?? "",
+      playerName: participant.playerName ?? participant.player_name ?? "",
+      ratingAfter: participant.ratingAfter ?? participant.rating_after ?? "",
+      ratingBefore: participant.ratingBefore ?? participant.rating_before ?? "",
+      ratingChange: participant.ratingChange ?? participant.rating_change ?? "",
+      seed: participant.seed ?? "",
+    })),
+    players: result.players ?? `${standings.length} игроков`,
+    rounds: result.rounds ?? `${new Set(matches.map((match) => Number(match.round)).filter(Boolean)).size} раундов`,
+    scoringScale: result.scoringScale ?? meta.scoring_scale ?? "",
+    standings: standings.map((row) => ({
+      clubPoints: Number(row.clubPoints ?? row.club_points ?? 0),
+      delta: Number(row.delta ?? 0),
+      losses: Number(row.losses ?? 0),
+      place: Number(row.place),
+      playerName: row.playerName ?? row.player_name ?? "",
+      pointsAgainst: Number(row.pointsAgainst ?? row.points_against ?? 0),
+      pointsFor: Number(row.pointsFor ?? row.points_for ?? 0),
+      ratingAfter: row.ratingAfter ?? row.rating_after ?? "",
+      ratingBefore: row.ratingBefore ?? row.rating_before ?? "",
+      ratingChange: row.ratingChange ?? row.rating_change ?? "",
+      sourceRef: row.sourceRef ?? row.source_ref ?? "",
+      teamName: row.teamName ?? row.team_name ?? "",
+      teamPlayer1: row.teamPlayer1 ?? row.team_player_1 ?? "",
+      teamPlayer2: row.teamPlayer2 ?? row.team_player_2 ?? "",
+      tiebreakNote: row.tiebreakNote ?? row.tiebreak_note ?? "",
+      wins: Number(row.wins ?? 0),
+    })),
+    status: result.status ?? "Боевой турнир",
+    time: result.time ?? meta.start_time ?? "",
+    title: result.title ?? meta.tournament_title ?? "Завершенный турнир",
+    updatedAt: result.updatedAt ?? null,
+    validation: result.validation ?? [],
+  };
+}
+
+function xmlDecode(value) {
+  return String(value ?? "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+function stripXmlTags(value) {
+  return xmlDecode(String(value ?? "").replace(/<[^>]*>/g, ""));
+}
+
+function getXmlAttribute(value, name) {
+  const match = String(value ?? "").match(new RegExp(`${name}="([^"]*)"`));
+  return match ? xmlDecode(match[1]) : "";
+}
+
+function columnIndexFromCellRef(cellRef) {
+  const letters = String(cellRef ?? "").match(/[A-Z]+/i)?.[0] ?? "A";
+  return [...letters.toUpperCase()].reduce((sum, letter) => sum * 26 + letter.charCodeAt(0) - 64, 0) - 1;
+}
+
+function readZipEntries(buffer) {
+  const eocdSignature = 0x06054b50;
+  let eocdOffset = -1;
+  for (let index = buffer.length - 22; index >= Math.max(0, buffer.length - 66000); index -= 1) {
+    if (buffer.readUInt32LE(index) === eocdSignature) {
+      eocdOffset = index;
+      break;
+    }
+  }
+
+  if (eocdOffset === -1) {
+    throw new Error("Excel-файл не похож на .xlsx архив.");
+  }
+
+  const entryCount = buffer.readUInt16LE(eocdOffset + 10);
+  const centralDirectoryOffset = buffer.readUInt32LE(eocdOffset + 16);
+  const entries = new Map();
+  let offset = centralDirectoryOffset;
+
+  for (let index = 0; index < entryCount; index += 1) {
+    if (buffer.readUInt32LE(offset) !== 0x02014b50) {
+      throw new Error("Не удалось прочитать структуру .xlsx.");
+    }
+
+    const method = buffer.readUInt16LE(offset + 10);
+    const compressedSize = buffer.readUInt32LE(offset + 20);
+    const uncompressedSize = buffer.readUInt32LE(offset + 24);
+    const fileNameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    const localHeaderOffset = buffer.readUInt32LE(offset + 42);
+    const name = buffer.slice(offset + 46, offset + 46 + fileNameLength).toString("utf8");
+    const localNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
+    const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    const compressed = buffer.slice(dataStart, dataStart + compressedSize);
+    let data;
+
+    if (method === 0) {
+      data = compressed;
+    } else if (method === 8) {
+      data = inflateRawSync(compressed);
+    } else {
+      throw new Error(`Файл .xlsx использует неподдерживаемое сжатие: ${method}.`);
+    }
+
+    if (uncompressedSize && data.length !== uncompressedSize) {
+      throw new Error(`Не совпал размер файла внутри .xlsx: ${name}.`);
+    }
+
+    entries.set(name, data.toString("utf8"));
+    offset += 46 + fileNameLength + extraLength + commentLength;
+  }
+
+  return entries;
+}
+
+function parseSharedStrings(xml = "") {
+  return [...xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map((match) => stripXmlTags(match[1]));
+}
+
+function parseWorksheetRows(xml = "", sharedStrings = []) {
+  return [...xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)].map((rowMatch) => {
+    const values = [];
+    for (const cellMatch of rowMatch[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>|<c\b([^>]*)\/>/g)) {
+      const attrs = cellMatch[1] ?? cellMatch[3] ?? "";
+      const body = cellMatch[2] ?? "";
+      const ref = getXmlAttribute(attrs, "r");
+      const columnIndex = columnIndexFromCellRef(ref);
+      const type = getXmlAttribute(attrs, "t");
+      let value = "";
+      const inlineMatch = body.match(/<is\b[^>]*>([\s\S]*?)<\/is>/);
+      const valueMatch = body.match(/<v\b[^>]*>([\s\S]*?)<\/v>/);
+
+      if (type === "inlineStr" && inlineMatch) {
+        value = stripXmlTags(inlineMatch[1]);
+      } else if (type === "s" && valueMatch) {
+        value = sharedStrings[Number(stripXmlTags(valueMatch[1]))] ?? "";
+      } else if (valueMatch) {
+        value = stripXmlTags(valueMatch[1]);
+      }
+
+      values[columnIndex] = value;
+    }
+
+    return values.map((value) => value ?? "");
+  });
+}
+
+function getWorkbookSheets(entries) {
+  const workbookXml = entries.get("xl/workbook.xml");
+  const relsXml = entries.get("xl/_rels/workbook.xml.rels");
+  if (!workbookXml || !relsXml) {
+    throw new Error("В .xlsx нет workbook.xml.");
+  }
+
+  const rels = new Map([...relsXml.matchAll(/<Relationship\b([^>]*)\/>/g)].map((match) => {
+    const id = getXmlAttribute(match[1], "Id");
+    const target = getXmlAttribute(match[1], "Target");
+    return [id, target.startsWith("xl/") ? target : `xl/${target}`];
+  }));
+
+  return [...workbookXml.matchAll(/<sheet\b([^>]*)\/>/g)].map((match) => ({
+    name: getXmlAttribute(match[1], "name"),
+    path: rels.get(getXmlAttribute(match[1], "r:id")),
+  }));
+}
+
+function rowsToObjects(rows) {
+  if (!rows.length) {
+    return [];
+  }
+
+  const headers = rows[0].map((header) => String(header ?? "").trim());
+  return rows.slice(1)
+    .filter((row) => row.some((value) => String(value ?? "").trim() !== ""))
+    .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])));
+}
+
+function parseResultsWorkbook(fileBuffer) {
+  const entries = readZipEntries(fileBuffer);
+  const sharedStrings = parseSharedStrings(entries.get("xl/sharedStrings.xml") ?? "");
+  const sheets = {};
+
+  for (const sheet of getWorkbookSheets(entries)) {
+    if (!sheet.path || !entries.has(sheet.path)) {
+      continue;
+    }
+
+    sheets[sheet.name] = parseWorksheetRows(entries.get(sheet.path), sharedStrings);
+  }
+
+  const requiredSheets = ["meta", "participants", "matches", "standings", "insights", "validation"];
+  const missingSheets = requiredSheets.filter((name) => !sheets[name]);
+  if (missingSheets.length) {
+    throw new Error(`В Excel нет обязательных листов: ${missingSheets.join(", ")}.`);
+  }
+
+  const metaRows = rowsToObjects(sheets.meta);
+  const meta = Object.fromEntries(metaRows.map((row) => [String(row.field ?? "").trim(), row.value ?? ""]));
+  if (meta.format_version !== "PB_RESULTS_IMPORT_V1") {
+    throw new Error("Файл должен быть в формате PB_RESULTS_IMPORT_V1.");
+  }
+
+  const participants = rowsToObjects(sheets.participants);
+  const matches = rowsToObjects(sheets.matches);
+  const standings = rowsToObjects(sheets.standings);
+  const insights = rowsToObjects(sheets.insights);
+  const validation = rowsToObjects(sheets.validation);
+  const warnings = [];
+
+  if (!standings.length) {
+    warnings.push("На листе standings нет итоговой таблицы.");
+  }
+
+  if (!matches.length) {
+    warnings.push("На листе matches нет матчей.");
+  }
+
+  const roundsCount = new Set(matches.map((match) => Number(match.round)).filter(Boolean)).size;
+  const winner = standings.find((row) => Number(row.place) === 1)?.player_name ?? standings[0]?.player_name ?? "";
+
+  return {
+    fileFormat: meta.format_version,
+    importedAt: new Date().toISOString(),
+    insights,
+    matches,
+    meta,
+    participants,
+    standings,
+    summary: {
+      club: meta.club ?? "",
+      date: meta.tournament_date ?? "",
+      format: meta.format ?? "",
+      league: normalizeTournamentLeague(meta.league, meta.tournament_title),
+      matches: matches.length,
+      players: standings.length || participants.length,
+      rounds: roundsCount,
+      scoringScale: meta.scoring_scale ?? "",
+      title: meta.tournament_title ?? "",
+      winner,
+    },
+    validation,
+    warnings,
+  };
+}
+
+function toNumberOrBlank(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && String(value).trim() !== "" ? number : "";
+}
+
+function buildCompletedResultFromImport({ fileName, preview, tournament }) {
+  const meta = preview.meta ?? {};
+  const standings = (preview.standings ?? []).map((row) => ({
+    clubPoints: Number(row.club_points ?? 0),
+    delta: Number(row.delta ?? 0),
+    losses: Number(row.losses ?? 0),
+    place: Number(row.place),
+    playerName: String(row.player_name ?? "").trim(),
+    pointsAgainst: Number(row.points_against ?? 0),
+    pointsFor: Number(row.points_for ?? 0),
+    ratingAfter: toNumberOrBlank(row.rating_after),
+    ratingBefore: toNumberOrBlank(row.rating_before),
+    ratingChange: toNumberOrBlank(row.rating_change),
+    sourceRef: row.source_ref ?? "",
+    teamName: row.team_name ?? "",
+    teamPlayer1: row.team_player_1 ?? "",
+    teamPlayer2: row.team_player_2 ?? "",
+    tiebreakNote: row.tiebreak_note ?? "",
+    wins: Number(row.wins ?? 0),
+  })).filter((row) => Number.isInteger(row.place) && row.playerName);
+  const matches = (preview.matches ?? []).map((row) => ({
+    court: row.court ?? "",
+    matchId: row.match_id ?? "",
+    notes: row.notes ?? "",
+    round: Number(row.round),
+    scoreA: Number(row.score_a),
+    scoreB: Number(row.score_b),
+    sourceRef: row.source_ref ?? "",
+    teamAPlayer1: row.team_a_player_1 ?? "",
+    teamAPlayer2: row.team_a_player_2 ?? "",
+    teamBPlayer1: row.team_b_player_1 ?? "",
+    teamBPlayer2: row.team_b_player_2 ?? "",
+    winner: row.winner ?? "",
+  })).filter((row) => Number.isInteger(row.round) && Number.isFinite(row.scoreA) && Number.isFinite(row.scoreB));
+  const insights = (preview.insights ?? []).map((row) => ({
+    evidence: row.evidence ?? "",
+    insightOrder: Number(row.insight_order),
+    insightType: row.insight_type ?? "custom",
+    metricLabel: row.metric_label ?? "",
+    metricValue: row.metric_value ?? "",
+    playerName: row.player_name ?? "",
+    relatedPlayer2: row.related_player_2 ?? "",
+    sourceRef: row.source_ref ?? "",
+    summary: row.summary ?? "",
+    title: row.title ?? "",
+  })).filter((row) => Number.isInteger(row.insightOrder) && row.title);
+
+  if (!standings.length || !matches.length) {
+    return { error: "В импортируемом файле должны быть матчи и итоговая таблица." };
+  }
+
+  const date = meta.tournament_date || tournament.date || "";
+  const result = {
+    club: meta.club || tournament.club || "Padel Pro Club",
+    createdAt: new Date().toISOString(),
+    date,
+    forecastTournamentId: tournament.id,
+    format: meta.format || tournament.format || "",
+    id: `completed-${date || Date.now()}-${randomUUID().slice(0, 8)}`,
+    image: tournament.image ?? "/assets/trophy.png",
+    importedAt: new Date().toISOString(),
+    insights,
+    league: normalizeTournamentLeague(meta.league || tournament.league, meta.tournament_title || tournament.title),
+    matches,
+    meta: {
+      ...meta,
+      source_file: fileName ?? "",
+    },
+    participants: (preview.participants ?? []).map((row) => ({
+      lundaNick: row.lunda_nick ?? "",
+      notes: row.notes ?? "",
+      participantId: row.participant_id ?? "",
+      playerName: row.player_name ?? "",
+      ratingAfter: toNumberOrBlank(row.rating_after),
+      ratingBefore: toNumberOrBlank(row.rating_before),
+      ratingChange: toNumberOrBlank(row.rating_change),
+      seed: row.seed ?? "",
+    })),
+    players: `${standings.length} игроков`,
+    rounds: `${new Set(matches.map((match) => match.round)).size} раундов`,
+    scoringScale: meta.scoring_scale ?? "",
+    standings,
+    status: "Боевой турнир",
+    time: meta.start_time || tournament.time || "",
+    title: meta.tournament_title || tournament.title,
+    updatedAt: null,
+    validation: preview.validation ?? [],
+  };
+
+  return { result: sanitizeCompletedTournamentResult(result) };
 }
 
 function sanitizeScoringMethod(method) {
@@ -739,6 +1133,15 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/completed-tournament-results") {
+    jsonResponse(response, 200, {
+      results: store.completedTournamentResults
+        .map(sanitizeCompletedTournamentResult)
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.importedAt).localeCompare(String(a.importedAt))),
+    });
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/settings") {
     jsonResponse(response, 200, { settings: sanitizeSettings(store.settings) });
     return;
@@ -1010,6 +1413,103 @@ async function handleApi(request, response, url) {
     writeStore(store);
     jsonResponse(response, 201, {
       tournament: sanitizeTournament(tournament, store.forecastPredictions),
+      tournaments: store.forecastTournaments.map((item) => sanitizeTournament(item, store.forecastPredictions)),
+    });
+    return;
+  }
+
+  const forecastTournamentResultsPreviewMatch = url.pathname.match(/^\/api\/admin\/forecast-tournaments\/([^/]+)\/results\/preview$/);
+  if (request.method === "POST" && forecastTournamentResultsPreviewMatch) {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const tournament = store.forecastTournaments.find((item) => item.id === forecastTournamentResultsPreviewMatch[1]);
+    if (!tournament) {
+      jsonResponse(response, 404, { message: "Турнир не найден." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const fileDataBase64 = String(body.fileDataBase64 ?? "");
+    if (!fileDataBase64) {
+      jsonResponse(response, 400, { message: "Загрузи Excel-файл с результатами." });
+      return;
+    }
+
+    try {
+      const preview = parseResultsWorkbook(Buffer.from(fileDataBase64, "base64"));
+      jsonResponse(response, 200, {
+        preview: {
+          ...preview,
+          fileName: String(body.fileName ?? ""),
+          previewId: `results-preview-${Date.now()}-${randomUUID().slice(0, 8)}`,
+          targetTournament: sanitizeTournament(tournament, store.forecastPredictions),
+        },
+      });
+    } catch (error) {
+      jsonResponse(response, 400, { message: error.message || "Excel не удалось распознать." });
+    }
+    return;
+  }
+
+  const forecastTournamentResultsConfirmMatch = url.pathname.match(/^\/api\/admin\/forecast-tournaments\/([^/]+)\/results\/confirm$/);
+  if (request.method === "POST" && forecastTournamentResultsConfirmMatch) {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const tournamentIndex = store.forecastTournaments.findIndex((item) => item.id === forecastTournamentResultsConfirmMatch[1]);
+    if (tournamentIndex === -1) {
+      jsonResponse(response, 404, { message: "Турнир не найден." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const preview = body.preview && typeof body.preview === "object" ? body.preview : null;
+    if (!preview) {
+      jsonResponse(response, 400, { message: "Сначала распознай Excel и проверь предпросмотр." });
+      return;
+    }
+
+    const built = buildCompletedResultFromImport({
+      fileName: body.fileName,
+      preview,
+      tournament: store.forecastTournaments[tournamentIndex],
+    });
+    if (built.error) {
+      jsonResponse(response, 400, { message: built.error });
+      return;
+    }
+
+    const previousResultIndex = store.completedTournamentResults.findIndex((result) => result.forecastTournamentId === store.forecastTournaments[tournamentIndex].id);
+    if (previousResultIndex >= 0) {
+      store.completedTournamentResults[previousResultIndex] = {
+        ...built.result,
+        id: store.completedTournamentResults[previousResultIndex].id,
+        createdAt: store.completedTournamentResults[previousResultIndex].createdAt,
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      store.completedTournamentResults.unshift(built.result);
+    }
+
+    store.forecastTournaments[tournamentIndex] = {
+      ...store.forecastTournaments[tournamentIndex],
+      completedResultId: previousResultIndex >= 0 ? store.completedTournamentResults[previousResultIndex].id : built.result.id,
+      resultsImportedAt: new Date().toISOString(),
+      status: "Результаты внесены",
+      updatedAt: new Date().toISOString(),
+    };
+    writeStore(store);
+    jsonResponse(response, 200, {
+      result: sanitizeCompletedTournamentResult(previousResultIndex >= 0 ? store.completedTournamentResults[previousResultIndex] : built.result),
+      results: store.completedTournamentResults.map(sanitizeCompletedTournamentResult),
+      tournament: sanitizeTournament(store.forecastTournaments[tournamentIndex], store.forecastPredictions),
       tournaments: store.forecastTournaments.map((item) => sanitizeTournament(item, store.forecastPredictions)),
     });
     return;

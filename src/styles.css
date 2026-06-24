@@ -1858,6 +1858,168 @@ main {
   margin-top: 14px;
 }
 
+.results-import-panel {
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 24px;
+}
+
+.results-import-form {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.results-import-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.results-import-form label span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.results-import-form input {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 750;
+  padding: 12px;
+}
+
+.results-import-form button,
+.results-preview-grid footer button {
+  background: var(--green);
+  border-radius: 8px;
+  color: #fffefa;
+  cursor: pointer;
+  font-weight: 850;
+  padding: 12px 14px;
+}
+
+.results-import-form button:disabled,
+.results-preview-grid footer button:disabled {
+  background: #d8dfd7;
+  color: #748075;
+  cursor: not-allowed;
+}
+
+.results-preview-grid {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding-top: 14px;
+}
+
+.results-preview-summary,
+.results-preview-table {
+  background: rgba(255, 254, 250, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.results-preview-summary {
+  grid-column: 1 / -1;
+}
+
+.results-preview-summary > span,
+.results-preview-table > span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.results-preview-summary > strong {
+  font-size: 24px;
+  line-height: 1.12;
+}
+
+.results-preview-summary > div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.results-preview-summary b {
+  background: var(--green-soft);
+  border: 1px solid rgba(29, 93, 42, 0.13);
+  border-radius: 8px;
+  color: var(--green);
+  display: grid;
+  font-size: 18px;
+  gap: 2px;
+  padding: 10px;
+}
+
+.results-preview-summary small {
+  color: #526054;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.results-preview-table div {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  padding-top: 8px;
+}
+
+.results-preview-table div b {
+  align-items: center;
+  background: var(--green-soft);
+  border-radius: 50%;
+  color: var(--green);
+  display: inline-flex;
+  font-size: 13px;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.results-preview-table div strong,
+.results-preview-table div small {
+  display: block;
+}
+
+.results-preview-table div small {
+  color: #526054;
+  font-size: 12px;
+  font-weight: 750;
+  grid-column: 2;
+}
+
+.results-preview-grid footer {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  padding-top: 14px;
+}
+
+.results-preview-grid footer span {
+  color: #526054;
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .prediction-empty-list strong {
   color: #1b241d;
   font-size: 20px;
@@ -2610,6 +2772,14 @@ p {
   gap: 16px;
   grid-template-columns: 58px minmax(0, 1fr) auto;
   min-height: 104px;
+  padding: 18px;
+}
+
+.imported-round-card {
+  margin-top: 14px;
+}
+
+.imported-match-list {
   padding: 18px;
 }
 
@@ -3558,6 +3728,7 @@ p {
   .admin-cabinet-hero,
   .admin-cabinet-grid,
   .admin-menu-grid,
+  .results-preview-grid,
   .forecast-registry-layout {
     grid-template-columns: 1fr;
   }
@@ -3883,9 +4054,15 @@ p {
 
   .admin-player-head,
   .admin-section-head,
-  .admin-tournament-form footer {
+  .admin-tournament-form footer,
+  .results-preview-grid footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .results-import-form,
+  .results-preview-summary > div {
+    grid-template-columns: 1fr;
   }
 
   .admin-player-row {

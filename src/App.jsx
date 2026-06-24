@@ -442,6 +442,50 @@ async function apiRequest(path, options = {}) {
   return payload;
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const result = String(reader.result ?? "");
+      resolve(result.includes(",") ? result.split(",").at(-1) : result);
+    });
+    reader.addEventListener("error", () => reject(new Error("Файл не удалось прочитать.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatCompletedTournamentDate(date) {
+  if (!date || !date.includes("-")) {
+    return date || "Дата не указана";
+  }
+
+  const [year, month, day] = date.split("-");
+  const monthName = new Intl.DateTimeFormat("ru-RU", { month: "long", timeZone: "Asia/Vladivostok" })
+    .format(new Date(`${year}-${month}-01T00:00:00+10:00`));
+  return `${Number(day)} ${monthName}`;
+}
+
+function completedResultToRegistryItem(result) {
+  const rounds = new Set((result.matches ?? []).map((match) => Number(match.round)).filter(Boolean)).size;
+  return {
+    club: result.club,
+    date: formatCompletedTournamentDate(result.date),
+    dateOrder: result.date || result.importedAt || "",
+    featured: true,
+    format: String(result.format || "").toUpperCase() || "Tournament",
+    id: result.id,
+    image: result.image || "/assets/trophy.png",
+    imported: true,
+    league: normalizeTournamentLeague(result.league, result.title),
+    matches: `${result.matches?.length ?? 0} матчей`,
+    rounds: `${rounds} раундов`,
+    status: result.status || "Боевой турнир",
+    teams: result.players || `${result.standings?.length ?? 0} игроков`,
+    title: result.title,
+    winner: result.standings?.[0]?.playerName || result.standings?.[0]?.teamName || "Победитель",
+  };
+}
+
 function getInitials(user) {
   if (!user) {
     return "PB";
@@ -584,8 +628,25 @@ function normalizeLeaderboardName(name) {
   return playerNameAliases[name] ?? name;
 }
 
-function getCompletedTournamentSources(pointMethod) {
+function getCompletedTournamentSources(pointMethod, completedResults = []) {
   return [
+    ...completedResults.map((result) => ({
+      id: result.id,
+      league: normalizeTournamentLeague(result.league, result.title),
+      month: result.date?.slice(0, 7) || "unknown",
+      title: result.title,
+      type: result.meta?.draw_type === "team" ? "Парный" : "Личный",
+      rows: (result.standings ?? []).map((row) => {
+        const participants = row.teamPlayer1 || row.teamPlayer2
+          ? [row.teamPlayer1, row.teamPlayer2].filter(Boolean)
+          : [row.playerName].filter(Boolean);
+        return {
+          participants,
+          place: row.place,
+          points: Number(row.clubPoints) || getLeaderboardPoints(pointMethod, result.scoringScale, row.place),
+        };
+      }),
+    })),
     {
       id: "mexicano-brazzers-lite",
       league: "lite",
@@ -613,9 +674,9 @@ function getCompletedTournamentSources(pointMethod) {
   ];
 }
 
-function getTournamentLeaders(pointMethod, period = "all", league = "pro") {
+function getTournamentLeaders(pointMethod, period = "all", league = "pro", completedResults = []) {
   const rowsByName = new Map();
-  const tournaments = getCompletedTournamentSources(pointMethod).filter((tournament) => (
+  const tournaments = getCompletedTournamentSources(pointMethod, completedResults).filter((tournament) => (
     (period === "all" || tournament.month === period)
     && normalizeTournamentLeague(tournament.league, tournament.title) === league
   ));
@@ -699,11 +760,11 @@ function getUserNameCandidates(user) {
     .map((name) => normalizeLeaderboardName(String(name)).toLowerCase());
 }
 
-function getMyTournamentStats(user, pointMethod) {
+function getMyTournamentStats(user, pointMethod, completedResults = []) {
   const candidates = new Set(getUserNameCandidates(user));
   const rows = [];
 
-  for (const tournament of getCompletedTournamentSources(pointMethod)) {
+  for (const tournament of getCompletedTournamentSources(pointMethod, completedResults)) {
     for (const row of tournament.rows) {
       const isMine = row.participants.some((participant) => candidates.has(normalizeLeaderboardName(participant).toLowerCase()));
       if (!isMine) {
@@ -2443,15 +2504,147 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
   );
 }
 
+function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, tournament }) {
+  const [file, setFile] = useState(null);
+  const [message, setMessage] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const previewStandings = preview?.standings?.slice(0, 8) ?? [];
+  const previewInsights = preview?.insights?.slice(0, 4) ?? [];
+
+  const uploadPreview = async (event) => {
+    event.preventDefault();
+    if (!file) {
+      setMessage("Выбери Excel-файл с результатами.");
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage("");
+    try {
+      const fileDataBase64 = await fileToBase64(file);
+      const result = await onPreviewResultsImport(tournament.id, {
+        fileDataBase64,
+        fileName: file.name,
+      });
+      if (!result.ok) {
+        setPreview(null);
+        setMessage(result.message);
+        return;
+      }
+
+      setPreview(result.preview);
+      setMessage("Файл распознан. Проверь данные перед сохранением.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!preview) {
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage("");
+    const result = await onConfirmResultsImport(tournament.id, {
+      fileName: preview.fileName ?? file?.name ?? "",
+      preview,
+    });
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+
+    setMessage("Результаты сохранены. Турнир добавлен в прошедшие на главной.");
+  };
+
+  return (
+    <section className="surface results-import-panel" id="results-import">
+      <div className="section-title">
+        <span>Результаты турнира</span>
+        <h2>Загрузить Excel и проверить импорт</h2>
+      </div>
+
+      <form className="results-import-form" onSubmit={uploadPreview}>
+        <label>
+          <span>Excel по формату PB_RESULTS_IMPORT_V1</span>
+          <input accept=".xlsx" type="file" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setMessage(""); }} />
+        </label>
+        <button disabled={submitting || !file} type="submit">
+          {submitting ? "Распознаем..." : "Распознать файл"}
+        </button>
+      </form>
+
+      {message && (
+        <strong className={message.includes("сохранены") || message.includes("распознан") ? "admin-form-success" : "prediction-error"}>
+          {message}
+        </strong>
+      )}
+
+      {preview && (
+        <div className="results-preview-grid">
+          <article className="results-preview-summary">
+            <span>Предпросмотр</span>
+            <strong>{preview.summary?.title || tournament.title}</strong>
+            <div>
+              <b>{preview.summary?.players ?? 0}<small>игроков</small></b>
+              <b>{preview.summary?.matches ?? 0}<small>матчей</small></b>
+              <b>{preview.summary?.rounds ?? 0}<small>раундов</small></b>
+              <b>{preview.summary?.winner || "—"}<small>победитель</small></b>
+            </div>
+            {preview.warnings?.length > 0 && (
+              <p>{preview.warnings.join(" ")}</p>
+            )}
+          </article>
+
+          <article className="results-preview-table">
+            <span>Итоговая таблица</span>
+            {previewStandings.map((row) => (
+              <div key={`${row.place}-${row.player_name}`}>
+                <b>{row.place}</b>
+                <strong>{row.player_name}</strong>
+                <small>{row.wins}-0-{row.losses} · {row.points_for}-{row.points_against} · {Number(row.delta) > 0 ? `+${row.delta}` : row.delta}</small>
+              </div>
+            ))}
+          </article>
+
+          <article className="results-preview-table insights">
+            <span>Инсайты</span>
+            {previewInsights.map((insight) => (
+              <div key={`${insight.insight_order}-${insight.title}`}>
+                <b>{insight.insight_order}</b>
+                <strong>{insight.title}</strong>
+                <small>{insight.metric_label ? `${insight.metric_label}: ${insight.metric_value} · ` : ""}{insight.summary}</small>
+              </div>
+            ))}
+          </article>
+
+          <footer>
+            <span>После подтверждения турнир появится в прошедших турнирах на главной странице.</span>
+            <button disabled={submitting} type="button" onClick={confirmImport}>
+              {submitting ? "Сохраняем..." : "Подтвердить и сохранить результаты"}
+            </button>
+          </footer>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ForecastTournamentDetail({
   auth,
   forecastTournaments,
   onDeleteTournament,
+  onConfirmResultsImport,
   onLoadForecastPrediction,
   onLoadForecastPredictionSummary,
   onOpenHome,
   onOpenPlaceholder,
   onOpenPredictions,
+  onPreviewResultsImport,
   onSaveForecastPrediction,
   onUpdateTournament,
   scoringMethods,
@@ -2473,6 +2666,7 @@ function ForecastTournamentDetail({
   const [adminPredictionSummaryLoading, setAdminPredictionSummaryLoading] = useState(false);
   const [predictionRegistryOpen, setPredictionRegistryOpen] = useState(false);
   const [adminEditing, setAdminEditing] = useState(false);
+  const [adminResultsImportOpen, setAdminResultsImportOpen] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
   const currentForecastSlots = forecastSlots.filter((slot) => slot && !slot.invalid);
@@ -2516,6 +2710,7 @@ function ForecastTournamentDetail({
     setForecastSaveMessage("");
     setForecastSaveTone("success");
     setAdminEditing(false);
+    setAdminResultsImportOpen(false);
     setAdminMessage("");
   }, [tournament.id, auth.currentUser?.id]);
 
@@ -2729,6 +2924,9 @@ function ForecastTournamentDetail({
               <button type="button" onClick={() => { setAdminEditing((value) => !value); setAdminMessage(""); }}>
                 {adminEditing ? "Закрыть редактор" : "Редактировать"}
               </button>
+              <button type="button" onClick={() => { setAdminResultsImportOpen((value) => !value); setAdminMessage(""); }}>
+                {adminResultsImportOpen ? "Закрыть результаты" : "Выставить результаты"}
+              </button>
               <button className="danger" disabled={deleting} type="button" onClick={deleteTournament}>
                 {deleting ? "Удаляем..." : "Удалить"}
               </button>
@@ -2787,6 +2985,14 @@ function ForecastTournamentDetail({
             successMessage="Турнир обновлен."
           />
         </section>
+      )}
+
+      {canManageTournament && adminResultsImportOpen && (
+        <ResultsImportPanel
+          onConfirmResultsImport={onConfirmResultsImport}
+          onPreviewResultsImport={onPreviewResultsImport}
+          tournament={tournament}
+        />
       )}
 
       <section className="prediction-workspace">
@@ -2902,8 +3108,146 @@ function ForecastTournamentDetail({
   );
 }
 
-function HomeScreen({ auth, forecastLeaders, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament, pointMethod }) {
-  const tournaments = tournamentRegistry;
+function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, result }) {
+  const [round, setRound] = useState(1);
+  const rounds = useMemo(() => [...new Set((result.matches ?? []).map((match) => Number(match.round)).filter(Boolean))].sort((a, b) => a - b), [result.matches]);
+  const shownMatches = result.matches?.filter((match) => Number(match.round) === round) ?? [];
+
+  useEffect(() => {
+    setRound(rounds[0] ?? 1);
+  }, [result.id]);
+
+  return (
+    <main>
+      <MainNav
+        active="tournaments"
+        auth={auth}
+        label={getTournamentLeagueLabel(result.league)}
+        onOpenHome={onBack}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
+      />
+
+      <section className="page-grid americano-page-grid" id="top">
+        <section className="surface hero-card americano-hero-card">
+          <img src={result.image || "/assets/trophy.png"} alt="" />
+          <div className="hero-content americano-hero-content">
+            <span className="eyebrow">{getTournamentLeagueLabel(result.league)} · импорт из Excel</span>
+            <h1>{result.title}</h1>
+            <div className="meta-row">
+              <span>{formatCompletedTournamentDate(result.date)}</span>
+              <span>{result.time ? `${result.time} VLAT` : "VLAT"}</span>
+              <span>{result.club}</span>
+            </div>
+            <p>
+              Результаты загружены через админский импорт: матчи, итоговая таблица и инсайты турнира.
+            </p>
+          </div>
+          <div className="metric-strip">
+            <div><strong>{result.standings?.length ?? 0}</strong><span>игроков</span></div>
+            <div><strong>{rounds.length}</strong><span>раундов</span></div>
+            <div><strong>{result.matches?.length ?? 0}</strong><span>матчей</span></div>
+            <div><strong>{String(result.format || "").toUpperCase()}</strong><span>формат</span></div>
+          </div>
+        </section>
+
+        <section className="surface standings-card americano-final-card" id="standings">
+          <div className="section-title">
+            <span>Итоговая таблица</span>
+            <h2>{result.standings?.length ?? 0} игроков после турнира</h2>
+          </div>
+          <div className="americano-standings-head">
+            <span>#</span>
+            <span>Игрок</span>
+            <span>Игры</span>
+            <span>Очки</span>
+            <span>+/-</span>
+            <span>Клуб</span>
+          </div>
+          <div className="standings-list">
+            {(result.standings ?? []).map((item) => (
+              <article className="americano-standing-row" key={`${item.place}-${item.playerName}`}>
+                <b>{item.place}</b>
+                <div className="standing-team">
+                  <span className="team-badge player-rating small">{Number(item.ratingAfter || item.ratingBefore || 0).toFixed(1)}</span>
+                  <strong>{item.playerName}</strong>
+                </div>
+                <span>{item.wins}-0-{item.losses}</span>
+                <span>{item.pointsFor}-{item.pointsAgainst}</span>
+                <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+                <strong className="club-points">+{item.clubPoints}</strong>
+              </article>
+            ))}
+          </div>
+          <footer>{result.meta?.winner_rule ? `Победитель определяется: ${result.meta.winner_rule}` : "Результаты из импортированного Excel"}</footer>
+        </section>
+      </section>
+
+      <section className="leaders-row americano-highlights imported-insights">
+        {(result.insights ?? []).slice(0, 4).map((insight) => (
+          <LeaderCard
+            eyebrow={insight.title}
+            image="/assets/trophy.png"
+            key={`${insight.insightOrder}-${insight.title}`}
+            meta={insight.summary}
+            metric={{ label: insight.metricLabel || "Факт", value: insight.metricValue || insight.insightType }}
+            name={insight.playerName || insight.relatedPlayer2 || "Турнир"}
+          />
+        ))}
+      </section>
+
+      <section className="surface round-card americano-round-card imported-round-card" id="rounds">
+        <div className="round-head">
+          <div>
+            <span>Раунд {round}</span>
+            <h2>Матчи из Excel</h2>
+          </div>
+          <div className="round-picker americano-picker" aria-label="Выбор раунда">
+            {rounds.map((item) => (
+              <button className={round === item ? "active" : ""} type="button" onClick={() => setRound(item)} key={item}>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="match-list americano-match-list imported-match-list">
+          <div className="match-list-head americano-match-head">
+            <span>Корт</span>
+            <span>Пары</span>
+            <span>Счет</span>
+          </div>
+          {shownMatches.map((match) => (
+            <article className="match-row americano-match-row" key={match.matchId || `${match.round}-${match.court}`}>
+              <span>Корт {match.court}</span>
+              <div>
+                <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
+                  <span className="americano-pair-name">
+                    <span>{match.teamAPlayer1}</span>
+                    <span>{match.teamAPlayer2}</span>
+                  </span>
+                </p>
+                <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
+                  <span className="americano-pair-name">
+                    <span>{match.teamBPlayer1}</span>
+                    <span>{match.teamBPlayer2}</span>
+                  </span>
+                </p>
+              </div>
+              <strong>{match.scoreA}<small>:</small>{match.scoreB}</strong>
+            </article>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament, pointMethod }) {
+  const tournaments = [
+    ...completedTournamentResults.map(completedResultToRegistryItem),
+    ...tournamentRegistry,
+  ].sort((a, b) => String(b.dateOrder).localeCompare(String(a.dateOrder)));
   const openForecastTournaments = forecastTournaments
     .filter((tournament) => {
       const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
@@ -2911,8 +3255,8 @@ function HomeScreen({ auth, forecastLeaders, forecastTournaments, onOpenHome, on
     })
     .sort((a, b) => (getVladivostokDeadlineMs(a.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER) - (getVladivostokDeadlineMs(b.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER));
   const nearestForecast = openForecastTournaments[0];
-  const proLeader = getTournamentLeaders(pointMethod, "all", "pro")[0];
-  const liteLeader = getTournamentLeaders(pointMethod, "all", "lite")[0];
+  const proLeader = getTournamentLeaders(pointMethod, "all", "pro", completedTournamentResults)[0];
+  const liteLeader = getTournamentLeaders(pointMethod, "all", "lite", completedTournamentResults)[0];
   const forecastLeader = getForecastLeadersForPeriod(forecastLeaders, "all")[0];
 
   return (
@@ -2943,9 +3287,9 @@ function HomeScreen({ auth, forecastLeaders, forecastTournaments, onOpenHome, on
           </div>
         </div>
         <div className="home-hero-stats" aria-label="Статистика сообщества">
-          <div><strong>2</strong><span>боевых турнира в архиве</span></div>
-          <div><strong>24</strong><span>игрока в турнирах</span></div>
-          <div><strong>66</strong><span>матчей разобрано</span></div>
+          <div><strong>{tournaments.length}</strong><span>боевых турниров в архиве</span></div>
+          <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.teams, 10) || 0), 0)}</strong><span>игроков в турнирах</span></div>
+          <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.matches, 10) || 0), 0)}</strong><span>матчей разобрано</span></div>
         </div>
       </section>
 
@@ -3344,9 +3688,9 @@ function PlaceholderScreen({ active, auth, onOpenHome, onOpenPlaceholder, onOpen
   );
 }
 
-function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
+function LeadersScreen({ auth, completedTournamentResults, forecastLeaders, onOpenHome, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
   const availableMonths = useMemo(() => {
-    const months = new Set(getCompletedTournamentSources(pointMethod).map((tournament) => tournament.month));
+    const months = new Set(getCompletedTournamentSources(pointMethod, completedTournamentResults).map((tournament) => tournament.month));
     for (const leader of forecastLeaders) {
       Object.keys(leader.months ?? {}).forEach((month) => {
         if (month !== "unknown") {
@@ -3356,11 +3700,11 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
     }
 
     return ["all", ...[...months].sort((a, b) => b.localeCompare(a))];
-  }, [forecastLeaders, pointMethod]);
+  }, [completedTournamentResults, forecastLeaders, pointMethod]);
   const [period, setPeriod] = useState("all");
   const [tournamentLeague, setTournamentLeague] = useState("pro");
   const tournamentLeagueLabel = getTournamentLeagueLabel(tournamentLeague);
-  const tournamentLeaders = useMemo(() => getTournamentLeaders(pointMethod, period, tournamentLeague), [pointMethod, period, tournamentLeague]);
+  const tournamentLeaders = useMemo(() => getTournamentLeaders(pointMethod, period, tournamentLeague, completedTournamentResults), [completedTournamentResults, pointMethod, period, tournamentLeague]);
   const forecastRows = useMemo(() => getForecastLeadersForPeriod(forecastLeaders, period), [forecastLeaders, period]);
   const tournamentWinner = tournamentLeaders[0];
   const forecastWinner = forecastRows[0];
@@ -3501,9 +3845,9 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
   );
 }
 
-function MemberCabinetScreen({ auth, cabinet, loading, onOpenForecastTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, pointMethod, section }) {
+function MemberCabinetScreen({ auth, cabinet, completedTournamentResults, loading, onOpenForecastTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, pointMethod, section }) {
   const activeSection = section ?? "forecasts";
-  const myTournamentStats = useMemo(() => getMyTournamentStats(auth.currentUser, pointMethod), [auth.currentUser, pointMethod]);
+  const myTournamentStats = useMemo(() => getMyTournamentStats(auth.currentUser, pointMethod, completedTournamentResults), [auth.currentUser, completedTournamentResults, pointMethod]);
   const forecastPoints = cabinet?.forecastPoints ?? 0;
   const predictionCount = cabinet?.predictionCount ?? 0;
   const readyPredictionCount = cabinet?.readyPredictionCount ?? 0;
@@ -3628,6 +3972,7 @@ export function App() {
   const [screen, setScreen] = useState(() => getInitialScreenFromLocation());
   const [authState, setAuthState] = useState(emptyAuthState);
   const [authMode, setAuthMode] = useState(null);
+  const [completedTournamentResults, setCompletedTournamentResults] = useState([]);
   const [forecastTournaments, setForecastTournaments] = useState([]);
   const [forecastLeaders, setForecastLeaders] = useState([]);
   const [leaderboardPointMethods, setLeaderboardPointMethods] = useState(fallbackLeaderboardPointMethods);
@@ -3664,9 +4009,10 @@ export function App() {
   useEffect(() => {
     const loadServerAuthState = async () => {
       try {
-        const [payload, forecastPayload, scoringPayload, leaderboardPayload, forecastLeadersPayload, settingsPayload] = await Promise.all([
+        const [payload, forecastPayload, completedResultsPayload, scoringPayload, leaderboardPayload, forecastLeadersPayload, settingsPayload] = await Promise.all([
           apiRequest("/api/auth/state"),
           apiRequest("/api/forecast-tournaments"),
+          apiRequest("/api/completed-tournament-results"),
           apiRequest("/api/scoring-methods"),
           apiRequest("/api/leaderboard-point-methods"),
           apiRequest("/api/forecast-leaderboard"),
@@ -3680,6 +4026,7 @@ export function App() {
           users: payload.users ?? [],
         });
         setForecastTournaments(forecastPayload.tournaments ?? []);
+        setCompletedTournamentResults(completedResultsPayload.results ?? []);
         setForecastLeaders(forecastLeadersPayload.leaders ?? []);
         setLeaderboardPointMethods(leaderboardPayload.methods?.length ? leaderboardPayload.methods : fallbackLeaderboardPointMethods);
         setScoringMethods(scoringPayload.methods?.length ? scoringPayload.methods : fallbackScoringMethods);
@@ -3687,6 +4034,7 @@ export function App() {
       } catch {
         storeAuthToken("");
         setAuthState({ ...emptyAuthState, loading: false });
+        setCompletedTournamentResults([]);
         setForecastTournaments(fallbackForecastTournaments);
         setForecastLeaders([]);
         setLeaderboardPointMethods(fallbackLeaderboardPointMethods);
@@ -3760,6 +4108,32 @@ export function App() {
       setForecastTournaments(result.tournaments ?? []);
       navigate({ name: "predictions" }, { replace: true });
       return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const previewTournamentResultsImport = async (tournamentId, payload) => {
+    try {
+      const result = await apiRequest(`/api/admin/forecast-tournaments/${tournamentId}/results/preview`, {
+        body: JSON.stringify(payload),
+        method: "POST",
+      });
+      return { ok: true, preview: result.preview };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const confirmTournamentResultsImport = async (tournamentId, payload) => {
+    try {
+      const result = await apiRequest(`/api/admin/forecast-tournaments/${tournamentId}/results/confirm`, {
+        body: JSON.stringify(payload),
+        method: "POST",
+      });
+      setCompletedTournamentResults(result.results ?? []);
+      setForecastTournaments(result.tournaments ?? []);
+      return { ok: true, result: result.result };
     } catch (error) {
       return { ok: false, message: error.message };
     }
@@ -4035,12 +4409,14 @@ export function App() {
         <ForecastTournamentDetail
           auth={auth}
           forecastTournaments={forecastTournaments}
+          onConfirmResultsImport={confirmTournamentResultsImport}
           onDeleteTournament={deleteForecastTournament}
           onLoadForecastPrediction={loadForecastPrediction}
           onLoadForecastPredictionSummary={loadForecastPredictionSummary}
           onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
+          onPreviewResultsImport={previewTournamentResultsImport}
           onSaveForecastPrediction={saveForecastPrediction}
           onUpdateTournament={updateForecastTournament}
           scoringMethods={scoringMethods}
@@ -4102,6 +4478,7 @@ export function App() {
         <MemberCabinetScreen
           auth={auth}
           cabinet={memberCabinet}
+          completedTournamentResults={completedTournamentResults}
           loading={memberCabinetLoading}
           onOpenForecastTournament={(tournamentId) => navigate({ name: "forecast-detail", tournamentId })}
           onOpenHome={() => navigate({ name: "home" })}
@@ -4117,6 +4494,22 @@ export function App() {
   }
 
   if (screen.name === "detail") {
+    const importedResult = completedTournamentResults.find((result) => result.id === screen.tournamentId);
+    if (importedResult) {
+      return (
+        <>
+          <ImportedTournamentDetail
+            auth={auth}
+            onBack={() => navigate({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
+            onOpenPredictions={openPredictions}
+            result={importedResult}
+          />
+          {authModal}
+        </>
+      );
+    }
+
     if (screen.tournamentId === "mexicano-brazzers-lite") {
       return (
         <>
@@ -4151,6 +4544,7 @@ export function App() {
       <>
         <LeadersScreen
           auth={auth}
+          completedTournamentResults={completedTournamentResults}
           forecastLeaders={forecastLeaders}
           onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
@@ -4182,6 +4576,7 @@ export function App() {
     <>
       <HomeScreen
         auth={auth}
+        completedTournamentResults={completedTournamentResults}
         forecastLeaders={forecastLeaders}
         forecastTournaments={forecastTournaments}
         onOpenHome={() => navigate({ name: "home" })}
