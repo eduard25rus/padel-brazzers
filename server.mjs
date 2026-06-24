@@ -514,6 +514,20 @@ function normalizeImportPlayerName(value) {
     .toLowerCase();
 }
 
+function getPlayerNameKeys(value) {
+  const normalized = normalizeImportPlayerName(value);
+  if (!normalized) {
+    return [];
+  }
+
+  const parts = normalized.split(" ").filter(Boolean);
+  const keys = new Set([normalized]);
+  if (parts.length === 2) {
+    keys.add(`${parts[1]} ${parts[0]}`);
+  }
+  return [...keys];
+}
+
 function addImportRecordPlayer(records, name, scoreFor, scoreAgainst) {
   const key = normalizeImportPlayerName(name);
   if (!key) {
@@ -578,11 +592,21 @@ function cleanImportPlayerName(value) {
 }
 
 function normalizeImportPreviewNames(preview, tournament) {
-  const rosterNameByKey = new Map((tournament?.roster ?? []).map((player) => [
-    normalizeImportPlayerName(player.name),
-    player.name,
-  ]));
-  const displayName = (name) => rosterNameByKey.get(normalizeImportPlayerName(name)) ?? cleanImportPlayerName(name);
+  const rosterNameByKey = new Map();
+  for (const player of tournament?.roster ?? []) {
+    for (const key of getPlayerNameKeys(player.name)) {
+      rosterNameByKey.set(key, player.name);
+    }
+  }
+  const displayName = (name) => {
+    for (const key of getPlayerNameKeys(name)) {
+      const rosterName = rosterNameByKey.get(key);
+      if (rosterName) {
+        return rosterName;
+      }
+    }
+    return cleanImportPlayerName(name);
+  };
   const normalizeRowNames = (row, fields) => Object.fromEntries(
     Object.entries(row).map(([key, value]) => [key, fields.includes(key) ? displayName(value) : value]),
   );
@@ -904,14 +928,33 @@ function getCompletedResultForTournament(store, tournament) {
 
 function scoreForecastPrediction({ prediction, result, scoringMethod, tournament }) {
   const finalRows = sanitizeCompletedTournamentResult(result).standings;
-  const actualByName = new Map(finalRows.map((row) => [normalizeImportPlayerName(row.playerName), row]));
+  const rosterById = new Map((tournament?.roster ?? []).map((player) => [getPlayerKey(player), player]));
+  const actualByName = new Map();
+  for (const row of finalRows) {
+    for (const key of getPlayerNameKeys(row.playerName)) {
+      actualByName.set(key, row);
+    }
+  }
+  for (const player of tournament?.roster ?? []) {
+    const actual = actualByName.get(normalizeImportPlayerName(player.name))
+      ?? getPlayerNameKeys(player.name).map((key) => actualByName.get(key)).find(Boolean);
+    if (!actual) {
+      continue;
+    }
+    for (const key of getPlayerNameKeys(player.name)) {
+      actualByName.set(key, actual);
+    }
+    actualByName.set(getPlayerKey(player), actual);
+  }
   const actualTop3 = finalRows.slice(0, 3).map((row) => normalizeImportPlayerName(row.playerName));
   const actualLast = finalRows.at(-1);
   const details = getPredictionDetails(prediction, tournament);
   const rows = details.effectivePlacements
     .map((placement) => {
-      const predictedName = placement.playerName ?? "";
-      const actual = actualByName.get(normalizeImportPlayerName(predictedName));
+      const predictedName = placement.playerName ?? rosterById.get(String(placement.playerId))?.name ?? "";
+      const actual = actualByName.get(String(placement.playerId))
+        ?? actualByName.get(normalizeImportPlayerName(predictedName))
+        ?? getPlayerNameKeys(predictedName).map((key) => actualByName.get(key)).find(Boolean);
       const predictedPlace = Number(placement.place);
       const actualPlace = Number(actual?.place ?? 0);
       const diff = actualPlace ? Math.abs(predictedPlace - actualPlace) : null;
