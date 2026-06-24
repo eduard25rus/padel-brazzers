@@ -972,6 +972,77 @@ function EditableInsightField({ as = "span", multiline = false, onChange, value 
   );
 }
 
+function EditableTournamentTitle({ canEdit, onRename, title, tournamentId }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(title);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(title);
+    }
+  }, [editing, title]);
+
+  const commit = async () => {
+    const nextTitle = draft.trim();
+    if (!nextTitle || nextTitle === title) {
+      setDraft(title);
+      setEditing(false);
+      return;
+    }
+
+    setSaving(true);
+    const result = await onRename(tournamentId, nextTitle);
+    setSaving(false);
+    if (!result.ok) {
+      setDraft(title);
+      setEditing(false);
+      return;
+    }
+    setEditing(false);
+  };
+
+  if (canEdit && editing) {
+    return (
+      <input
+        autoFocus
+        className="tournament-title-editor"
+        value={draft}
+        disabled={saving}
+        onBlur={commit}
+        onChange={(event) => setDraft(event.target.value)}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            commit();
+          }
+          if (event.key === "Escape") {
+            setDraft(title);
+            setEditing(false);
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <strong
+      className={canEdit ? "editable-tournament-title" : ""}
+      title={canEdit ? "Нажми, чтобы переименовать" : undefined}
+      onClick={(event) => {
+        if (!canEdit) {
+          return;
+        }
+
+        event.stopPropagation();
+        setEditing(true);
+      }}
+    >
+      {title}
+    </strong>
+  );
+}
+
 function PairRatingBadge({ players, playerPool = americanoPlayers }) {
   return <span className="pair-rating-badge">{getPairRating(players, playerPool).toFixed(1)}</span>;
 }
@@ -1039,6 +1110,81 @@ function getIndividualStandingsAfterRound(playerPool, matchPool, round, sortMode
 
 function getAmericanoStandingsAfterRound(round) {
   return getIndividualStandingsAfterRound(americanoPlayers, americanoMatches, round);
+}
+
+function getImportedStandingsAfterRound(finalStandings = [], matchPool = [], round = 1) {
+  const table = new Map(
+    finalStandings.map((player, index) => [
+      player.playerName,
+      {
+        against: 0,
+        delta: 0,
+        for: 0,
+        index,
+        losses: 0,
+        name: player.playerName,
+        rating: Number(player.ratingAfter || player.ratingBefore || 0),
+        wins: 0,
+      },
+    ]),
+  );
+
+  const ensurePlayer = (name) => {
+    const playerName = String(name ?? "").trim();
+    if (!playerName) {
+      return null;
+    }
+
+    if (!table.has(playerName)) {
+      table.set(playerName, {
+        against: 0,
+        delta: 0,
+        for: 0,
+        index: table.size,
+        losses: 0,
+        name: playerName,
+        rating: 0,
+        wins: 0,
+      });
+    }
+
+    return table.get(playerName);
+  };
+
+  const applyScore = (name, own, opponent) => {
+    const player = ensurePlayer(name);
+    if (!player) {
+      return;
+    }
+
+    player.for += own;
+    player.against += opponent;
+    if (own > opponent) {
+      player.wins += 1;
+    } else if (own < opponent) {
+      player.losses += 1;
+    }
+    player.delta = player.for - player.against;
+  };
+
+  matchPool
+    .filter((match) => Number(match.round) <= Number(round))
+    .forEach((match) => {
+      const scoreA = Number(match.scoreA);
+      const scoreB = Number(match.scoreB);
+      applyScore(match.teamAPlayer1, scoreA, scoreB);
+      applyScore(match.teamAPlayer2, scoreA, scoreB);
+      applyScore(match.teamBPlayer1, scoreB, scoreA);
+      applyScore(match.teamBPlayer2, scoreB, scoreA);
+    });
+
+  return [...table.values()]
+    .map((player) => ({
+      ...player,
+      points: formatScorePair(player.for, player.against),
+      record: formatTournamentRecord(player.wins, player.losses),
+    }))
+    .sort((a, b) => b.wins - a.wins || b.delta - a.delta || b.for - a.for || a.index - b.index);
 }
 
 function LeaderCard({ eyebrow, name, meta, metric, image }) {
@@ -3313,6 +3459,11 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
   const [round, setRound] = useState(1);
   const rounds = useMemo(() => [...new Set((result.matches ?? []).map((match) => Number(match.round)).filter(Boolean))].sort((a, b) => a - b), [result.matches]);
   const shownMatches = result.matches?.filter((match) => Number(match.round) === round) ?? [];
+  const roundStandings = useMemo(
+    () => getImportedStandingsAfterRound(result.standings ?? [], result.matches ?? [], round),
+    [result.standings, result.matches, round],
+  );
+  const formatLabel = String(result.format || "турнир").toUpperCase();
 
   useEffect(() => {
     setRound(rounds[0] ?? 1);
@@ -3334,7 +3485,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
         <section className="surface hero-card americano-hero-card">
           <img src={result.image || "/assets/trophy.png"} alt="" />
           <div className="hero-content americano-hero-content">
-            <span className="eyebrow">{getTournamentLeagueLabel(result.league)} · импорт из Excel</span>
+            <span className="eyebrow">{getTournamentLeagueLabel(result.league)} · {formatLabel}</span>
             <h1>{result.title}</h1>
             <div className="meta-row">
               <span>{formatCompletedTournamentDate(result.date)}</span>
@@ -3342,7 +3493,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
               <span>{result.club}</span>
             </div>
             <p>
-              Результаты загружены через админский импорт: матчи, итоговая таблица и инсайты турнира.
+              {result.standings?.length ?? 0} игроков, {rounds.length} раундов и {result.matches?.length ?? 0} матчей. Все результаты собраны в таблицу, раунды и главные сюжеты турнира.
             </p>
           </div>
           <div className="metric-strip">
@@ -3383,7 +3534,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
               </article>
             ))}
           </div>
-          <footer>{result.meta?.winner_rule ? `Победитель определяется: ${result.meta.winner_rule}` : "Результаты из импортированного Excel"}</footer>
+          <footer>{result.meta?.winner_rule ? `Победитель определяется: ${result.meta.winner_rule}` : `Итоговая таблица · ${formatLabel}`}</footer>
         </section>
       </section>
 
@@ -3392,7 +3543,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
           <div className="round-head">
             <div>
               <span>Раунд {round}</span>
-              <h2>Матчи из Excel</h2>
+              <h2>{round === rounds.at(-1) ? "Финальные смены" : `Матчи ${formatLabel}`}</h2>
             </div>
             <div className="round-picker americano-picker" aria-label="Выбор раунда">
               {rounds.map((item) => (
@@ -3402,32 +3553,65 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
               ))}
             </div>
           </div>
-          <div className="match-list americano-match-list imported-match-list">
-            <div className="match-list-head americano-match-head">
-              <span>Корт</span>
-              <span>Пары</span>
-              <span>Счет</span>
+          <div className="round-body americano-round-body">
+            <div className="match-list americano-match-list imported-match-list">
+              <div className="match-list-title">
+                <span>Результаты игр</span>
+                <strong>{round} раунда</strong>
+              </div>
+              <div className="match-list-head americano-match-head">
+                <span>Корт</span>
+                <span>Пары</span>
+                <span>Счет</span>
+              </div>
+              {shownMatches.map((match) => (
+                <article className="match-row americano-match-row" key={match.matchId || `${match.round}-${match.court}`}>
+                  <span>Корт {match.court}</span>
+                  <div>
+                    <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
+                      <span className="americano-pair-name">
+                        <span>{match.teamAPlayer1}</span>
+                        <span>{match.teamAPlayer2}</span>
+                      </span>
+                    </p>
+                    <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
+                      <span className="americano-pair-name">
+                        <span>{match.teamBPlayer1}</span>
+                        <span>{match.teamBPlayer2}</span>
+                      </span>
+                    </p>
+                  </div>
+                  <strong>{match.scoreA}<small>:</small>{match.scoreB}</strong>
+                </article>
+              ))}
             </div>
-            {shownMatches.map((match) => (
-              <article className="match-row americano-match-row" key={match.matchId || `${match.round}-${match.court}`}>
-                <span>Корт {match.court}</span>
-                <div>
-                  <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
-                    <span className="americano-pair-name">
-                      <span>{match.teamAPlayer1}</span>
-                      <span>{match.teamAPlayer2}</span>
-                    </span>
-                  </p>
-                  <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
-                    <span className="americano-pair-name">
-                      <span>{match.teamBPlayer1}</span>
-                      <span>{match.teamBPlayer2}</span>
-                    </span>
-                  </p>
-                </div>
-                <strong>{match.scoreA}<small>:</small>{match.scoreB}</strong>
-              </article>
-            ))}
+            <div className="round-standings americano-live-table">
+              <div className="round-standings-title">
+                <span>Личный зачет</span>
+                <strong>После {round} раунда</strong>
+              </div>
+              <div className="americano-live-head">
+                <span>#</span>
+                <span>Игрок</span>
+                <span>Игры</span>
+                <span>Очки</span>
+                <span>+/-</span>
+              </div>
+              {roundStandings.map((player, index) => (
+                <article className="americano-live-row" key={player.name}>
+                  <b>{index + 1}</b>
+                  <div>
+                    <span className="team-badge player-rating small">{player.rating ? player.rating.toFixed(1) : "—"}</span>
+                    <strong>{player.name}</strong>
+                  </div>
+                  <span>{player.record}</span>
+                  <span>{player.points}</span>
+                  <em className={player.delta >= 0 ? "positive" : "negative"}>
+                    {player.delta > 0 ? `+${player.delta}` : player.delta}
+                  </em>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -3452,7 +3636,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
   );
 }
 
-function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament, pointMethod }) {
+function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament, onRenameCompletedTournament, pointMethod }) {
   const tournaments = [
     ...completedTournamentResults.map(completedResultToRegistryItem),
     ...tournamentRegistry,
@@ -3520,16 +3704,27 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
               </div>
             )}
             {tournaments.map((tournament) => (
-              <button
+              <article
                 className={`tournament-row ${tournament.featured ? "featured" : ""}`}
-                type="button"
                 onClick={() => onOpenTournament(tournament.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    onOpenTournament(tournament.id);
+                  }
+                }}
+                role="button"
+                tabIndex="0"
                 key={tournament.id}
               >
                 <img src={tournament.image} alt="" />
                 <div className="tournament-copy">
                   <span>{tournament.date} · {tournament.club}</span>
-                  <strong>{tournament.title}</strong>
+                  <EditableTournamentTitle
+                    canEdit={auth.currentUser?.role === "admin" && tournament.imported}
+                    onRename={onRenameCompletedTournament}
+                    title={tournament.title}
+                    tournamentId={tournament.id}
+                  />
                   <p>{tournament.format} · {tournament.teams} · {tournament.rounds} · {tournament.matches}</p>
                 </div>
                 <div className="tournament-result">
@@ -3537,7 +3732,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
                   <strong>{tournament.winner}</strong>
                   <small>Открыть</small>
                 </div>
-              </button>
+              </article>
             ))}
           </div>
         </section>
@@ -4348,6 +4543,19 @@ export function App() {
     }
   };
 
+  const renameCompletedTournament = async (tournamentId, title) => {
+    try {
+      const result = await apiRequest(`/api/admin/completed-tournament-results/${tournamentId}`, {
+        body: JSON.stringify({ title }),
+        method: "PUT",
+      });
+      setCompletedTournamentResults(result.results ?? []);
+      return { ok: true, result: result.result };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
   const loadForecastPrediction = async (tournamentId) => {
     try {
       const result = await apiRequest(`/api/forecast-tournaments/${tournamentId}/prediction`);
@@ -4827,6 +5035,7 @@ export function App() {
         onOpenTournament={(tournamentId) => {
           navigate({ name: "detail", tournamentId });
         }}
+        onRenameCompletedTournament={renameCompletedTournament}
         pointMethod={activeLeaderboardPointMethod}
       />
       {authModal}

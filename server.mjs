@@ -85,6 +85,16 @@ function normalizeTournamentLeague(value, title = "") {
   return String(title).toLowerCase().includes("lite") ? "lite" : "pro";
 }
 
+function cleanTournamentTitle(value) {
+  const title = String(value ?? "")
+    .replace(/^турнир\s*[«"]?/i, "")
+    .replace(/[»"]$/g, "")
+    .replace(/[🎾🏆]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return title || "";
+}
+
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
@@ -292,8 +302,8 @@ function sanitizeCompletedTournamentResult(result) {
       insightType: insight.insightType ?? insight.insight_type ?? "custom",
       metricLabel: insight.metricLabel ?? insight.metric_label ?? "",
       metricValue: insight.metricValue ?? insight.metric_value ?? "",
-      playerName: insight.playerName ?? insight.player_name ?? "",
-      relatedPlayer2: insight.relatedPlayer2 ?? insight.related_player_2 ?? "",
+      playerName: cleanImportPlayerName(insight.playerName ?? insight.player_name ?? ""),
+      relatedPlayer2: cleanImportPlayerName(insight.relatedPlayer2 ?? insight.related_player_2 ?? ""),
       sourceRef: insight.sourceRef ?? insight.source_ref ?? "",
       summary: insight.summary ?? "",
       title: insight.title ?? "",
@@ -307,18 +317,18 @@ function sanitizeCompletedTournamentResult(result) {
       scoreA: Number(match.scoreA ?? match.score_a),
       scoreB: Number(match.scoreB ?? match.score_b),
       sourceRef: match.sourceRef ?? match.source_ref ?? "",
-      teamAPlayer1: match.teamAPlayer1 ?? match.team_a_player_1 ?? "",
-      teamAPlayer2: match.teamAPlayer2 ?? match.team_a_player_2 ?? "",
-      teamBPlayer1: match.teamBPlayer1 ?? match.team_b_player_1 ?? "",
-      teamBPlayer2: match.teamBPlayer2 ?? match.team_b_player_2 ?? "",
-      winner: match.winner ?? "",
+      teamAPlayer1: cleanImportPlayerName(match.teamAPlayer1 ?? match.team_a_player_1 ?? ""),
+      teamAPlayer2: cleanImportPlayerName(match.teamAPlayer2 ?? match.team_a_player_2 ?? ""),
+      teamBPlayer1: cleanImportPlayerName(match.teamBPlayer1 ?? match.team_b_player_1 ?? ""),
+      teamBPlayer2: cleanImportPlayerName(match.teamBPlayer2 ?? match.team_b_player_2 ?? ""),
+      winner: cleanImportPlayerName(match.winner ?? ""),
     })),
     meta,
     participants: participants.map((participant) => ({
       lundaNick: participant.lundaNick ?? participant.lunda_nick ?? "",
       notes: participant.notes ?? "",
       participantId: participant.participantId ?? participant.participant_id ?? "",
-      playerName: participant.playerName ?? participant.player_name ?? "",
+      playerName: cleanImportPlayerName(participant.playerName ?? participant.player_name ?? ""),
       ratingAfter: participant.ratingAfter ?? participant.rating_after ?? "",
       ratingBefore: participant.ratingBefore ?? participant.rating_before ?? "",
       ratingChange: participant.ratingChange ?? participant.rating_change ?? "",
@@ -333,7 +343,7 @@ function sanitizeCompletedTournamentResult(result) {
       draws: Number(row.draws ?? 0),
       losses: Number(row.losses ?? 0),
       place: Number(row.place),
-      playerName: row.playerName ?? row.player_name ?? "",
+      playerName: cleanImportPlayerName(row.playerName ?? row.player_name ?? ""),
       pointsAgainst: Number(row.pointsAgainst ?? row.points_against ?? 0),
       pointsFor: Number(row.pointsFor ?? row.points_for ?? 0),
       ratingAfter: row.ratingAfter ?? row.rating_after ?? "",
@@ -341,14 +351,14 @@ function sanitizeCompletedTournamentResult(result) {
       ratingChange: row.ratingChange ?? row.rating_change ?? "",
       sourceRef: row.sourceRef ?? row.source_ref ?? "",
       teamName: row.teamName ?? row.team_name ?? "",
-      teamPlayer1: row.teamPlayer1 ?? row.team_player_1 ?? "",
-      teamPlayer2: row.teamPlayer2 ?? row.team_player_2 ?? "",
+      teamPlayer1: cleanImportPlayerName(row.teamPlayer1 ?? row.team_player_1 ?? ""),
+      teamPlayer2: cleanImportPlayerName(row.teamPlayer2 ?? row.team_player_2 ?? ""),
       tiebreakNote: row.tiebreakNote ?? row.tiebreak_note ?? "",
       wins: Number(row.wins ?? 0),
     })),
     status: result.status ?? "Боевой турнир",
     time: result.time ?? meta.start_time ?? "",
-    title: result.title ?? meta.tournament_title ?? "Завершенный турнир",
+    title: cleanTournamentTitle(result.title) || cleanTournamentTitle(meta.tournament_title) || "Завершенный турнир",
     updatedAt: result.updatedAt ?? null,
     validation: result.validation ?? [],
   };
@@ -738,7 +748,7 @@ function buildCompletedResultFromImport({ fileName, preview, tournament }) {
     image: tournament.image ?? "/assets/trophy.png",
     importedAt: new Date().toISOString(),
     insights,
-    league: normalizeTournamentLeague(meta.league || tournament.league, meta.tournament_title || tournament.title),
+    league: normalizeTournamentLeague(meta.league || tournament.league, tournament.title || meta.tournament_title),
     matches,
     meta: {
       ...meta,
@@ -760,7 +770,7 @@ function buildCompletedResultFromImport({ fileName, preview, tournament }) {
     standings,
     status: "Боевой турнир",
     time: meta.start_time || tournament.time || "",
-    title: meta.tournament_title || tournament.title,
+    title: cleanTournamentTitle(tournament.title) || cleanTournamentTitle(meta.tournament_title) || "Завершенный турнир",
     updatedAt: null,
     validation: preview.validation ?? [],
   };
@@ -1246,6 +1256,40 @@ async function handleApi(request, response, url) {
       results: store.completedTournamentResults
         .map(sanitizeCompletedTournamentResult)
         .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.importedAt).localeCompare(String(a.importedAt))),
+    });
+    return;
+  }
+
+  const completedResultTitleMatch = url.pathname.match(/^\/api\/admin\/completed-tournament-results\/([^/]+)$/);
+  if (request.method === "PUT" && completedResultTitleMatch) {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const resultIndex = store.completedTournamentResults.findIndex((result) => result.id === completedResultTitleMatch[1]);
+    if (resultIndex === -1) {
+      jsonResponse(response, 404, { message: "Турнир не найден." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const title = cleanTournamentTitle(body.title);
+    if (!title) {
+      jsonResponse(response, 400, { message: "Название турнира не может быть пустым." });
+      return;
+    }
+
+    store.completedTournamentResults[resultIndex] = {
+      ...store.completedTournamentResults[resultIndex],
+      title,
+      updatedAt: new Date().toISOString(),
+    };
+    writeStore(store);
+    jsonResponse(response, 200, {
+      result: sanitizeCompletedTournamentResult(store.completedTournamentResults[resultIndex]),
+      results: store.completedTournamentResults.map(sanitizeCompletedTournamentResult),
     });
     return;
   }
