@@ -2060,49 +2060,6 @@ main {
   align-items: start;
 }
 
-.editable-story-row label {
-  display: grid;
-  gap: 5px;
-}
-
-.editable-story-row label + label {
-  margin-top: 8px;
-}
-
-.editable-story-row label span {
-  color: var(--green);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.editable-story-row input,
-.editable-story-row textarea {
-  background: rgba(255, 254, 250, 0.78);
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--text);
-  font-family: inherit;
-  font-weight: 850;
-  padding: 8px 10px;
-  width: 100%;
-}
-
-.editable-story-row textarea {
-  color: #526054;
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1.35;
-  resize: vertical;
-}
-
-.editable-story-row input:focus,
-.editable-story-row textarea:focus {
-  border-color: rgba(29, 93, 42, 0.28);
-  outline: none;
-}
-
 .editable-story-row > button {
   align-items: center;
   background: var(--green-soft);
@@ -2116,6 +2073,43 @@ main {
   justify-content: center;
   line-height: 1;
   width: 28px;
+}
+
+.editable-story-text {
+  border-radius: 6px;
+  cursor: text;
+  display: block;
+}
+
+.editable-story-text:hover {
+  background: rgba(29, 93, 42, 0.06);
+}
+
+.inline-story-editor {
+  background: rgba(255, 254, 250, 0.92);
+  border: 1px solid rgba(29, 93, 42, 0.24);
+  border-radius: 8px;
+  color: var(--text);
+  display: block;
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.2;
+  margin: 5px 0;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.inline-story-editor.multiline {
+  color: #526054;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.inline-story-editor:focus {
+  outline: none;
 }
 
 .add-insight-button {

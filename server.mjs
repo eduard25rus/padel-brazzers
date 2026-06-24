@@ -560,6 +560,48 @@ function enrichImportStandingsWithMatchRecords(standings = [], matches = []) {
   });
 }
 
+function cleanImportPlayerName(value) {
+  return String(value ?? "")
+    .replace(/\s*\|\s*LOCKED IN\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeImportPreviewNames(preview, tournament) {
+  const rosterNameByKey = new Map((tournament?.roster ?? []).map((player) => [
+    normalizeImportPlayerName(player.name),
+    player.name,
+  ]));
+  const displayName = (name) => rosterNameByKey.get(normalizeImportPlayerName(name)) ?? cleanImportPlayerName(name);
+  const normalizeRowNames = (row, fields) => Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [key, fields.includes(key) ? displayName(value) : value]),
+  );
+
+  const standings = (preview.standings ?? []).map((row) => normalizeRowNames(row, ["player_name", "team_player_1", "team_player_2"]));
+  const participants = (preview.participants ?? []).map((row) => normalizeRowNames(row, ["player_name"]));
+  const matches = (preview.matches ?? []).map((row) => normalizeRowNames(row, [
+    "team_a_player_1",
+    "team_a_player_2",
+    "team_b_player_1",
+    "team_b_player_2",
+    "winner",
+  ]));
+  const insights = (preview.insights ?? []).map((row) => normalizeRowNames(row, ["player_name", "related_player_2"]));
+  const winner = displayName(preview.summary?.winner);
+
+  return {
+    ...preview,
+    insights,
+    matches,
+    participants,
+    standings,
+    summary: {
+      ...(preview.summary ?? {}),
+      winner,
+    },
+  };
+}
+
 function parseResultsWorkbook(fileBuffer) {
   const entries = readZipEntries(fileBuffer);
   const sharedStrings = parseSharedStrings(entries.get("xl/sharedStrings.xml") ?? "");
@@ -1506,7 +1548,7 @@ async function handleApi(request, response, url) {
     }
 
     try {
-      const preview = parseResultsWorkbook(Buffer.from(fileDataBase64, "base64"));
+      const preview = normalizeImportPreviewNames(parseResultsWorkbook(Buffer.from(fileDataBase64, "base64")), tournament);
       jsonResponse(response, 200, {
         preview: {
           ...preview,

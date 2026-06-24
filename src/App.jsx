@@ -926,14 +926,50 @@ function formatRatingChange(value) {
   return `${number > 0 ? "+" : ""}${number.toFixed(3)}`;
 }
 
-function formatInsightMetric(insight) {
-  const label = String(insight?.metric_label ?? insight?.metricLabel ?? "").trim();
-  const value = String(insight?.metric_value ?? insight?.metricValue ?? "").trim();
-  const fallback = String(insight?.insight_type ?? insight?.insightType ?? "Инсайт").trim();
-  if (label && value) {
-    return `${label}: ${value}`;
+function EditableInsightField({ as = "span", multiline = false, onChange, value }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(value ?? "");
+    }
+  }, [editing, value]);
+
+  const commit = () => {
+    onChange(draft);
+    setEditing(false);
+  };
+
+  if (editing) {
+    const Editor = multiline ? "textarea" : "input";
+    return (
+      <Editor
+        autoFocus
+        className={`inline-story-editor ${multiline ? "multiline" : ""}`}
+        rows={multiline ? 3 : undefined}
+        value={draft}
+        onBlur={commit}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (!multiline && event.key === "Enter") {
+            commit();
+          }
+          if (event.key === "Escape") {
+            setDraft(value ?? "");
+            setEditing(false);
+          }
+        }}
+      />
+    );
   }
-  return label || value || fallback;
+
+  const Tag = as;
+  return (
+    <Tag className="editable-story-text" title="Двойной клик, чтобы отредактировать" onDoubleClick={() => setEditing(true)}>
+      {value || "Двойной клик, чтобы добавить текст"}
+    </Tag>
+  );
 }
 
 function PairRatingBadge({ players, playerPool = americanoPlayers }) {
@@ -2577,8 +2613,8 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
             evidence: "Добавлено администратором в предпросмотре.",
             insight_order: nextOrder,
             insight_type: "custom",
-            metric_label: "Заметка",
-            metric_value: "Админ",
+            metric_label: "",
+            metric_value: "",
             player_name: "",
             related_player_2: "",
             source_ref: "",
@@ -2736,28 +2772,17 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
               <article className="story-row editable-story-row" key={`${insight.insight_order}-${index}`}>
                 <img src="/assets/trophy.png" alt="" />
                 <div>
-                  <label>
-                    <span>Зеленая строка</span>
-                    <input
-                      value={formatInsightMetric(insight)}
-                      onChange={(event) => updatePreviewInsight(index, { metric_label: event.target.value, metric_value: "" })}
-                    />
-                  </label>
-                  <label>
-                    <span>Заголовок</span>
-                    <input
-                      value={insight.title ?? ""}
-                      onChange={(event) => updatePreviewInsight(index, { title: event.target.value })}
-                    />
-                  </label>
-                  <label>
-                    <span>Описание</span>
-                    <textarea
-                      rows="3"
-                      value={insight.summary ?? ""}
-                      onChange={(event) => updatePreviewInsight(index, { summary: event.target.value })}
-                    />
-                  </label>
+                  <EditableInsightField
+                    as="strong"
+                    value={insight.title ?? ""}
+                    onChange={(value) => updatePreviewInsight(index, { title: value })}
+                  />
+                  <EditableInsightField
+                    as="p"
+                    multiline
+                    value={insight.summary ?? ""}
+                    onChange={(value) => updatePreviewInsight(index, { summary: value })}
+                  />
                 </div>
                 <button aria-label="Удалить сюжет" type="button" onClick={() => removePreviewInsight(index)}>×</button>
               </article>
@@ -3415,7 +3440,6 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
             <article className="story-row" key={`${insight.insightOrder}-${insight.title}`}>
               <img src="/assets/trophy.png" alt="" />
               <div>
-                <span>{formatInsightMetric(insight)}</span>
                 <strong>{insight.title}</strong>
                 <p>{insight.summary}</p>
               </div>
