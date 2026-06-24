@@ -2480,11 +2480,21 @@ function ForecastTournamentDetail({
   const forecastPlayerIds = new Set(currentForecastSlots.map((slot) => String(getPlayerKey(slot))));
   const expectedPlayerIds = sortedRoster.slice(0, 16).map((player) => String(getPlayerKey(player)));
   const isForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => forecastPlayerIds.has(playerId));
+  const hasLoadedCompleteSavedForecast = isForecastComplete
+    && forecastSaveTone === "success"
+    && forecastSaveMessage.startsWith("Загружен твой сохраненный прогноз");
   const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
   const canViewPredictionRegistry = canManageTournament || settings.predictionRegistryVisibility === "all";
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
 
   const selectedPlayer = sortedRoster.find((player) => getPlayerKey(player) === selectedPlayerId);
+  const rankingHint = selectedPlayer
+    ? `Выбран: ${selectedPlayer.name}. Нажми на место справа.`
+    : forecastLoading
+      ? "Загружаем твой сохраненный прогноз..."
+      : hasLoadedCompleteSavedForecast
+        ? ""
+        : `Расставлено ${filledSlots} из ${expectedPlayerIds.length}. Расставь всех игроков согласно твоему прогнозу.`;
 
   const loadAdminPredictionSummary = async () => {
     if (!canViewPredictionRegistry) {
@@ -2842,13 +2852,7 @@ function ForecastTournamentDetail({
             </div>
           ) : (
             <>
-              <div className="prediction-placement-hint">
-                {selectedPlayer
-                  ? `Выбран: ${selectedPlayer.name}. Нажми на место справа.`
-                  : forecastLoading
-                    ? "Загружаем твой сохраненный прогноз..."
-                    : `Расставлено ${filledSlots} из ${expectedPlayerIds.length}. Расставь всех игроков согласно твоему прогнозу.`}
-              </div>
+              {rankingHint && <div className="prediction-placement-hint">{rankingHint}</div>}
               <div className="prediction-slot-grid">
                 {forecastSlots.map((slot, index) => (
                   <button
