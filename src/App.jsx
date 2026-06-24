@@ -349,6 +349,10 @@ function getInitialScreenFromLocation() {
     return { name: "detail", tournamentId: parts[1] };
   }
 
+  if (parts[0] === "leaders") {
+    return { name: "leaders" };
+  }
+
   if (placeholderTitles[parts[0]]) {
     return { name: "placeholder", sectionKey: parts[0], sectionTitle: placeholderTitles[parts[0]] };
   }
@@ -375,6 +379,10 @@ function pathForScreen(screen) {
 
   if (screen.name === "placeholder") {
     return `/${encodeURIComponent(screen.sectionKey)}`;
+  }
+
+  if (screen.name === "leaders") {
+    return "/leaders";
   }
 
   return "/";
@@ -534,6 +542,128 @@ function getLeaderboardPoints(method, scale, place) {
 
 function formatPointsJson(points) {
   return JSON.stringify(points ?? defaultLeaderboardPoints, null, 2);
+}
+
+const playerNameAliases = {
+  "Kh": "Kh Ivan",
+  "Редько": "Редько Илья",
+  "Шевченко": "Шевченко Эдуард",
+  "Каменный": "Каменный Никита",
+  "Борис": "Борис Чигиринцев",
+  "Гудини": "Гудини Дмитрий",
+};
+
+function normalizeLeaderboardName(name) {
+  return playerNameAliases[name] ?? name;
+}
+
+function getCompletedTournamentSources(pointMethod) {
+  return [
+    {
+      id: "mexicano-brazzers-lite",
+      month: "2026-06",
+      title: "Mexicano Brazzers LITE",
+      type: "Личный",
+      rows: mexicanoPlayers.map((player) => ({
+        participants: [player.name],
+        place: player.place,
+        points: getLeaderboardPoints(pointMethod, "individual_12", player.place),
+      })),
+    },
+    {
+      id: "americano-brazzers-pro",
+      month: "2026-06",
+      title: "Americano Brazzers PRO",
+      type: "Личный",
+      rows: americanoPlayers.map((player) => ({
+        participants: [player.name],
+        place: player.place,
+        points: getLeaderboardPoints(pointMethod, "individual_12", player.place),
+      })),
+    },
+    {
+      id: "the-best-middle-pm",
+      month: "2026-06",
+      title: "THE BEST MIDDLE (PM)",
+      type: "Парный",
+      rows: standings.map((team) => ({
+        participants: team.team.split(" / ").map(normalizeLeaderboardName),
+        place: team.place,
+        points: getLeaderboardPoints(pointMethod, "team_8", team.place),
+      })),
+    },
+  ];
+}
+
+function getTournamentLeaders(pointMethod, period = "all") {
+  const rowsByName = new Map();
+  const tournaments = getCompletedTournamentSources(pointMethod).filter((tournament) => period === "all" || tournament.month === period);
+
+  for (const tournament of tournaments) {
+    for (const row of tournament.rows) {
+      for (const participant of row.participants) {
+        const name = normalizeLeaderboardName(participant);
+        const current = rowsByName.get(name) ?? {
+          avgPlace: 0,
+          lastTournament: tournament.title,
+          name,
+          podiums: 0,
+          points: 0,
+          placeSum: 0,
+          tournaments: 0,
+          wins: 0,
+        };
+
+        current.points += row.points;
+        current.placeSum += row.place;
+        current.tournaments += 1;
+        current.wins += row.place === 1 ? 1 : 0;
+        current.podiums += row.place <= 3 ? 1 : 0;
+        current.lastTournament = tournament.title;
+        current.avgPlace = current.placeSum / current.tournaments;
+        rowsByName.set(name, current);
+      }
+    }
+  }
+
+  return [...rowsByName.values()]
+    .sort((a, b) => b.points - a.points || b.wins - a.wins || a.avgPlace - b.avgPlace || a.name.localeCompare(b.name))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+function getForecastLeadersForPeriod(leaders, period = "all") {
+  return leaders
+    .map((leader) => {
+      if (period === "all") {
+        return {
+          ...leader,
+          periodNeedsReview: leader.needsReviewCount,
+          periodPredictions: leader.predictionCount,
+          periodReady: leader.readyCount,
+        };
+      }
+
+      const month = leader.months?.[period] ?? { needsReview: 0, predictions: 0 };
+      return {
+        ...leader,
+        periodNeedsReview: month.needsReview,
+        periodPredictions: month.predictions,
+        periodReady: Math.max(0, month.predictions - month.needsReview),
+      };
+    })
+    .filter((leader) => leader.periodPredictions > 0)
+    .sort((a, b) => b.periodPredictions - a.periodPredictions || b.periodReady - a.periodReady || String(b.lastPredictionAt).localeCompare(String(a.lastPredictionAt)))
+    .map((leader, index) => ({ ...leader, rank: index + 1 }));
+}
+
+function formatMonthLabel(monthKey) {
+  if (monthKey === "all") {
+    return "Все время";
+  }
+
+  const [year, month] = monthKey.split("-");
+  return new Intl.DateTimeFormat("ru-RU", { month: "long", timeZone: "Asia/Vladivostok", year: "numeric" })
+    .format(new Date(`${year}-${month}-01T00:00:00+10:00`));
 }
 
 function getTournamentScoringMethod(tournament, scoringMethods) {
@@ -2087,7 +2217,7 @@ function AdminCabinetScreen({ auth, forecastTournaments, leaderboardPointMethods
   );
 }
 
-function MainNav({ active = "home", auth = null, onOpenHome, onOpenPlaceholder, onOpenPredictions, label = "Club", action = null }) {
+function MainNav({ active = "home", auth = null, onOpenHome, onOpenLeaders, onOpenPlaceholder, onOpenPredictions, label = "Club", action = null }) {
   const goHome = (event) => {
     event.preventDefault();
     onOpenHome?.();
@@ -2108,7 +2238,7 @@ function MainNav({ active = "home", auth = null, onOpenHome, onOpenPlaceholder, 
         <button className={active === "tournaments" || active === "home" ? "active" : ""} type="button" onClick={onOpenHome}>
           Турниры
         </button>
-        <button className={active === "leaders" ? "active" : ""} type="button" onClick={() => openPlaceholder("leaders", "Лидеры")}>
+        <button className={active === "leaders" ? "active" : ""} type="button" onClick={() => (onOpenLeaders ? onOpenLeaders() : openPlaceholder("leaders", "Лидеры"))}>
           Лидеры
         </button>
         <button className={active === "predictions" ? "active" : ""} type="button" onClick={onOpenPredictions}>
@@ -3124,11 +3254,153 @@ function PlaceholderScreen({ active, auth, onOpenHome, onOpenPlaceholder, onOpen
   );
 }
 
+function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
+  const availableMonths = useMemo(() => {
+    const months = new Set(getCompletedTournamentSources(pointMethod).map((tournament) => tournament.month));
+    for (const leader of forecastLeaders) {
+      Object.keys(leader.months ?? {}).forEach((month) => {
+        if (month !== "unknown") {
+          months.add(month);
+        }
+      });
+    }
+
+    return ["all", ...[...months].sort((a, b) => b.localeCompare(a))];
+  }, [forecastLeaders, pointMethod]);
+  const [period, setPeriod] = useState("all");
+  const tournamentLeaders = useMemo(() => getTournamentLeaders(pointMethod, period), [pointMethod, period]);
+  const forecastRows = useMemo(() => getForecastLeadersForPeriod(forecastLeaders, period), [forecastLeaders, period]);
+  const tournamentWinner = tournamentLeaders[0];
+  const forecastWinner = forecastRows[0];
+  const totalTournamentPoints = tournamentLeaders.reduce((sum, leader) => sum + leader.points, 0);
+  const totalForecasts = forecastRows.reduce((sum, leader) => sum + leader.periodPredictions, 0);
+
+  return (
+    <main className="predictions-shell leaders-shell">
+      <MainNav
+        active="leaders"
+        auth={auth}
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
+      />
+
+      <section className="leaders-hero surface" id="top">
+        <div>
+          <span className="eyebrow">Лидеры клуба</span>
+          <h1>Турнирные очки и прогнозисты</h1>
+          <p>
+            В одном месте видно, кто набирает клубные очки на турнирах, кто чаще всего участвует в прогнозах,
+            и кто идет лидером месяца.
+          </p>
+        </div>
+        <div className="leaders-periods" aria-label="Фильтр периода">
+          {availableMonths.map((month) => (
+            <button className={period === month ? "active" : ""} type="button" onClick={() => setPeriod(month)} key={month}>
+              {formatMonthLabel(month)}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="leaders-summary-grid">
+        <article className="surface leaders-summary-card">
+          <span>Турниры</span>
+          <strong>{tournamentWinner?.name ?? "Пока нет"}</strong>
+          <p>{tournamentWinner ? `${tournamentWinner.points} очков · ${tournamentWinner.tournaments} турнира · ${tournamentWinner.wins} побед` : "Очки появятся после внесения результатов."}</p>
+          <div>
+            <b>{totalTournamentPoints}</b>
+            <small>очков в периоде</small>
+          </div>
+        </article>
+        <article className="surface leaders-summary-card">
+          <span>Прогнозисты</span>
+          <strong>{forecastWinner?.name ?? "Пока нет"}</strong>
+          <p>{forecastWinner ? `${forecastWinner.periodPredictions} прогнозов · ${forecastWinner.periodReady} готово · ${forecastWinner.periodNeedsReview} на корректировке` : "Когда участники сохранят прогнозы, они появятся здесь."}</p>
+          <div>
+            <b>{totalForecasts}</b>
+            <small>прогнозов в периоде</small>
+          </div>
+        </article>
+      </section>
+
+      <section className="leaders-board-grid">
+        <section className="surface leaders-board">
+          <div className="section-title">
+            <span>Клубные очки</span>
+            <h2>Лидеры турниров</h2>
+          </div>
+          <div className="leaders-table-head tournament">
+            <span>#</span>
+            <span>Игрок</span>
+            <span>Очки</span>
+            <span>Турн.</span>
+            <span>Поб.</span>
+            <span>Под.</span>
+            <span>Ср.</span>
+          </div>
+          <div className="leaders-table-list">
+            {tournamentLeaders.length ? tournamentLeaders.map((leader) => (
+              <article className="leaders-table-row tournament" key={leader.name}>
+                <b>{leader.rank}</b>
+                <div>
+                  <strong>{leader.name}</strong>
+                  <small>{leader.lastTournament}</small>
+                </div>
+                <span>{leader.points}</span>
+                <span>{leader.tournaments}</span>
+                <span>{leader.wins}</span>
+                <span>{leader.podiums}</span>
+                <span>{leader.avgPlace.toFixed(1)}</span>
+              </article>
+            )) : (
+              <p className="leaders-empty">В этом периоде еще нет сыгранных турниров.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="surface leaders-board">
+          <div className="section-title">
+            <span>Прогнозы</span>
+            <h2>Активность прогнозистов</h2>
+          </div>
+          <div className="leaders-table-head forecast">
+            <span>#</span>
+            <span>Участник</span>
+            <span>Прогн.</span>
+            <span>Готово</span>
+            <span>Корр.</span>
+          </div>
+          <div className="leaders-table-list">
+            {forecastRows.length ? forecastRows.map((leader) => (
+              <article className="leaders-table-row forecast" key={leader.userId}>
+                <b>{leader.rank}</b>
+                <div>
+                  <strong>{leader.name}</strong>
+                  <small>{leader.lundaNick}{leader.lastPredictionAt ? ` · ${formatVladivostokInstant(leader.lastPredictionAt)} VLAT` : ""}</small>
+                </div>
+                <span>{leader.periodPredictions}</span>
+                <span>{leader.periodReady}</span>
+                <span className={leader.periodNeedsReview > 0 ? "needs-review" : ""}>{leader.periodNeedsReview}</span>
+              </article>
+            )) : (
+              <p className="leaders-empty">В этом периоде прогнозов пока нет.</p>
+            )}
+          </div>
+        </section>
+      </section>
+    </main>
+  );
+}
+
 export function App() {
   const [screen, setScreen] = useState(() => getInitialScreenFromLocation());
   const [authState, setAuthState] = useState(emptyAuthState);
   const [authMode, setAuthMode] = useState(null);
   const [forecastTournaments, setForecastTournaments] = useState([]);
+  const [forecastLeaders, setForecastLeaders] = useState([]);
   const [leaderboardPointMethods, setLeaderboardPointMethods] = useState(fallbackLeaderboardPointMethods);
   const [scoringMethods, setScoringMethods] = useState(fallbackScoringMethods);
   const [settings, setSettings] = useState(defaultSettings);
@@ -3161,11 +3433,12 @@ export function App() {
   useEffect(() => {
     const loadServerAuthState = async () => {
       try {
-        const [payload, forecastPayload, scoringPayload, leaderboardPayload, settingsPayload] = await Promise.all([
+        const [payload, forecastPayload, scoringPayload, leaderboardPayload, forecastLeadersPayload, settingsPayload] = await Promise.all([
           apiRequest("/api/auth/state"),
           apiRequest("/api/forecast-tournaments"),
           apiRequest("/api/scoring-methods"),
           apiRequest("/api/leaderboard-point-methods"),
+          apiRequest("/api/forecast-leaderboard"),
           apiRequest("/api/settings"),
         ]);
         setAuthState({
@@ -3176,6 +3449,7 @@ export function App() {
           users: payload.users ?? [],
         });
         setForecastTournaments(forecastPayload.tournaments ?? []);
+        setForecastLeaders(forecastLeadersPayload.leaders ?? []);
         setLeaderboardPointMethods(leaderboardPayload.methods?.length ? leaderboardPayload.methods : fallbackLeaderboardPointMethods);
         setScoringMethods(scoringPayload.methods?.length ? scoringPayload.methods : fallbackScoringMethods);
         setSettings(settingsPayload.settings ?? defaultSettings);
@@ -3183,6 +3457,7 @@ export function App() {
         storeAuthToken("");
         setAuthState({ ...emptyAuthState, loading: false });
         setForecastTournaments(fallbackForecastTournaments);
+        setForecastLeaders([]);
         setLeaderboardPointMethods(fallbackLeaderboardPointMethods);
         setScoringMethods(fallbackScoringMethods);
         setSettings(defaultSettings);
@@ -3336,6 +3611,11 @@ export function App() {
   };
 
   const openPlaceholder = (sectionKey, sectionTitle) => {
+    if (sectionKey === "leaders") {
+      navigate({ name: "leaders" });
+      return;
+    }
+
     navigate({ name: "placeholder", sectionKey, sectionTitle });
   };
 
@@ -3560,6 +3840,22 @@ export function App() {
         <AmericanoDetail
           auth={auth}
           onBack={() => navigate({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
+          onOpenPredictions={openPredictions}
+          pointMethod={activeLeaderboardPointMethod}
+        />
+        {authModal}
+      </>
+    );
+  }
+
+  if (screen.name === "leaders") {
+    return (
+      <>
+        <LeadersScreen
+          auth={auth}
+          forecastLeaders={forecastLeaders}
+          onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           pointMethod={activeLeaderboardPointMethod}

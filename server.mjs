@@ -144,6 +144,63 @@ function getTournamentPredictionCount(tournamentId, forecastPredictions = []) {
   ).size;
 }
 
+function getVladivostokMonthKey(value) {
+  if (!value) {
+    return "unknown";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    timeZone: "Asia/Vladivostok",
+    year: "numeric",
+  }).formatToParts(new Date(value));
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  return year && month ? `${year}-${month}` : "unknown";
+}
+
+function getForecastLeaderboard(store) {
+  const tournamentById = new Map(store.forecastTournaments.map((tournament) => [tournament.id, tournament]));
+
+  return store.users
+    .filter((user) => user.status === "active")
+    .map((user) => {
+      const predictions = store.forecastPredictions.filter((prediction) => prediction.userId === user.id);
+      const months = {};
+      let needsReviewCount = 0;
+
+      for (const prediction of predictions) {
+        const tournament = tournamentById.get(prediction.tournamentId);
+        const details = tournament ? getPredictionDetails(prediction, tournament) : { needsReview: Boolean(prediction.needsReview) };
+        const monthKey = getVladivostokMonthKey(prediction.updatedAt ?? prediction.createdAt);
+        months[monthKey] = months[monthKey] ?? { needsReview: 0, predictions: 0 };
+        months[monthKey].predictions += 1;
+
+        if (details.needsReview) {
+          needsReviewCount += 1;
+          months[monthKey].needsReview += 1;
+        }
+      }
+
+      return {
+        lastPredictionAt: predictions
+          .map((prediction) => prediction.updatedAt ?? prediction.createdAt)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? null,
+        lundaNick: user.lundaNick,
+        months,
+        name: `${user.firstName} ${user.lastName}`.trim() || user.lundaNick,
+        needsReviewCount,
+        predictionCount: predictions.length,
+        readyCount: Math.max(0, predictions.length - needsReviewCount),
+        userId: user.id,
+      };
+    })
+    .filter((row) => row.predictionCount > 0)
+    .sort((a, b) => b.predictionCount - a.predictionCount || b.readyCount - a.readyCount || String(b.lastPredictionAt).localeCompare(String(a.lastPredictionAt)));
+}
+
 function sanitizeTournament(tournament, forecastPredictions = []) {
   const roster = Array.isArray(tournament.roster) ? tournament.roster : [];
 
@@ -656,6 +713,11 @@ async function handleApi(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/leaderboard-point-methods") {
     jsonResponse(response, 200, { methods: store.leaderboardPointMethods.map(sanitizeLeaderboardPointMethod) });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/forecast-leaderboard") {
+    jsonResponse(response, 200, { leaders: getForecastLeaderboard(store) });
     return;
   }
 
