@@ -302,6 +302,24 @@ const fallbackScoringMethods = [
   },
 ];
 
+const defaultLeaderboardPoints = {
+  individual_12: { 1: 100, 2: 85, 3: 70, 4: 60, 5: 55, 6: 45, 7: 40, 8: 30, 9: 25, 10: 20, 11: 10, 12: 5 },
+  individual_16: { 1: 110, 2: 95, 3: 80, 4: 70, 5: 65, 6: 60, 7: 55, 8: 50, 9: 45, 10: 40, 11: 35, 12: 30, 13: 20, 14: 15, 15: 10, 16: 5 },
+  team_6: { 1: 90, 2: 65, 3: 50, 4: 35, 5: 25, 6: 5 },
+  team_8: { 1: 100, 2: 75, 3: 65, 4: 50, 5: 45, 6: 30, 7: 20, 8: 5 },
+};
+
+const fallbackLeaderboardPointMethods = [
+  {
+    createdAt: new Date(0).toISOString(),
+    description: "Клубные очки за итоговые места: личные турниры на 12/16 игроков и парные турниры на 6/8 команд.",
+    id: "club-points-basic",
+    name: "Базовая клубная методика очков",
+    points: defaultLeaderboardPoints,
+    updatedAt: null,
+  },
+];
+
 const authTokenStorageKey = "padel-brazzers-auth-token";
 const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, notifications: [], users: [] };
 const defaultSettings = { predictionRegistryVisibility: "admin" };
@@ -510,6 +528,14 @@ function getScoringMethodDetails(method) {
   ];
 }
 
+function getLeaderboardPoints(method, scale, place) {
+  return Number(method?.points?.[scale]?.[String(place)] ?? method?.points?.[scale]?.[place] ?? 0);
+}
+
+function formatPointsJson(points) {
+  return JSON.stringify(points ?? defaultLeaderboardPoints, null, 2);
+}
+
 function getTournamentScoringMethod(tournament, scoringMethods) {
   return tournament.scoringMethod
     ?? scoringMethods.find((method) => method.id === tournament.scoringMethodId)
@@ -703,7 +729,7 @@ function LeaderCard({ eyebrow, name, meta, metric, image }) {
   );
 }
 
-function AmericanoStandingsTable() {
+function AmericanoStandingsTable({ pointMethod }) {
   return (
     <section className="surface standings-card americano-final-card" id="standings">
       <div className="section-title">
@@ -716,6 +742,7 @@ function AmericanoStandingsTable() {
         <span>Игры</span>
         <span>Очки</span>
         <span>+/-</span>
+        <span>Клуб</span>
       </div>
       <div className="standings-list">
         {americanoPlayers.map((item) => (
@@ -728,6 +755,7 @@ function AmericanoStandingsTable() {
             <span>{item.record}</span>
             <span>{item.points}</span>
             <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+            <strong className="club-points">+{getLeaderboardPoints(pointMethod, "individual_12", item.place)}</strong>
           </article>
         ))}
       </div>
@@ -736,7 +764,7 @@ function AmericanoStandingsTable() {
   );
 }
 
-function MexicanoStandingsTable() {
+function MexicanoStandingsTable({ pointMethod }) {
   return (
     <section className="surface standings-card americano-final-card" id="standings">
       <div className="section-title">
@@ -749,6 +777,7 @@ function MexicanoStandingsTable() {
         <span>Игры</span>
         <span>Очки</span>
         <span>+/-</span>
+        <span>Клуб</span>
       </div>
       <div className="standings-list">
         {mexicanoPlayers.map((item) => (
@@ -761,6 +790,7 @@ function MexicanoStandingsTable() {
             <span>{item.record}</span>
             <span>{item.points}</span>
             <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+            <strong className="club-points">+{getLeaderboardPoints(pointMethod, "individual_12", item.place)}</strong>
           </article>
         ))}
       </div>
@@ -769,7 +799,7 @@ function MexicanoStandingsTable() {
   );
 }
 
-function StandingsTable() {
+function StandingsTable({ pointMethod }) {
   return (
     <section className="surface standings-card" id="standings">
       <div className="section-title">
@@ -782,6 +812,7 @@ function StandingsTable() {
         <span>Игры</span>
         <span>Очки</span>
         <span>+/-</span>
+        <span>Клуб</span>
       </div>
       <div className="standings-list">
         {standings.map((item) => (
@@ -794,6 +825,7 @@ function StandingsTable() {
             <span>{item.record}</span>
             <span>{item.points}</span>
             <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
+            <strong className="club-points">+{getLeaderboardPoints(pointMethod, "team_8", item.place)} каждому</strong>
           </article>
         ))}
       </div>
@@ -1644,7 +1676,7 @@ function AdminMembersPanel({ users }) {
   );
 }
 
-function AdminScoringMethodsPanel({ onCreateScoringMethod, scoringMethods }) {
+function AdminScoringMethodsPanel({ leaderboardPointMethods, onCreateScoringMethod, onUpdateLeaderboardPointMethod, scoringMethods }) {
   const [form, setForm] = useState({
     description: "",
     exactPlace: "5",
@@ -1762,6 +1794,95 @@ function AdminScoringMethodsPanel({ onCreateScoringMethod, scoringMethods }) {
           <button disabled={submitting} type="submit">{submitting ? "Сохраняем..." : "Сохранить методику"}</button>
         </footer>
       </form>
+
+      <AdminLeaderboardPointMethodsPanel
+        methods={leaderboardPointMethods}
+        onUpdateMethod={onUpdateLeaderboardPointMethod}
+      />
+    </section>
+  );
+}
+
+function AdminLeaderboardPointMethodsPanel({ methods, onUpdateMethod }) {
+  const method = methods[0] ?? fallbackLeaderboardPointMethods[0];
+  const [form, setForm] = useState(() => ({
+    description: method.description ?? "",
+    name: method.name ?? "",
+    pointsJson: formatPointsJson(method.points),
+  }));
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setForm({
+      description: method.description ?? "",
+      name: method.name ?? "",
+      pointsJson: formatPointsJson(method.points),
+    });
+    setMessage("");
+  }, [method.id, method.updatedAt]);
+
+  const submitMethod = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    let points;
+    try {
+      points = JSON.parse(form.pointsJson);
+    } catch {
+      setSubmitting(false);
+      setMessage("JSON таблицы очков не читается. Проверь скобки, кавычки и запятые.");
+      return;
+    }
+
+    const result = await onUpdateMethod(method.id, {
+      description: form.description,
+      name: form.name,
+      points,
+    });
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+
+    setMessage("Клубная методика очков сохранена.");
+  };
+
+  return (
+    <section className="leaderboard-points-editor">
+      <div className="section-title">
+        <span>Клубный рейтинг</span>
+        <h2>Очки за итоговые места турниров</h2>
+      </div>
+
+      <form className="admin-tournament-form scoring-method-form" onSubmit={submitMethod}>
+        <div className="admin-form-grid">
+          <label>
+            <span>Название</span>
+            <input required value={form.name} onChange={(event) => { setForm((current) => ({ ...current, name: event.target.value })); setMessage(""); }} />
+          </label>
+          <label>
+            <span>Пулы</span>
+            <input readOnly value="12 личный: 545 · 6 команд: 540 · 16 личный: 785 · 8 команд: 780" />
+          </label>
+        </div>
+        <label>
+          <span>Описание</span>
+          <textarea value={form.description} onChange={(event) => { setForm((current) => ({ ...current, description: event.target.value })); setMessage(""); }} />
+        </label>
+        <label>
+          <span>Таблица очков JSON</span>
+          <textarea className="points-json-editor" required value={form.pointsJson} onChange={(event) => { setForm((current) => ({ ...current, pointsJson: event.target.value })); setMessage(""); }} />
+        </label>
+
+        {message && <strong className={message.includes("сохранена") ? "admin-form-success" : "prediction-error"}>{message}</strong>}
+
+        <footer>
+          <span>Для парных турниров значение начисляется каждому из двух игроков команды</span>
+          <button disabled={submitting} type="submit">{submitting ? "Сохраняем..." : "Сохранить клубные очки"}</button>
+        </footer>
+      </form>
     </section>
   );
 }
@@ -1843,7 +1964,7 @@ function AdminSectionShell({ children, eyebrow, onBack, title }) {
   );
 }
 
-function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, onUpdateSettings, scoringMethods, section, settings }) {
+function AdminCabinetScreen({ auth, forecastTournaments, leaderboardPointMethods, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, onUpdateLeaderboardPointMethod, onUpdateSettings, scoringMethods, section, settings }) {
   const activeSection = section ?? null;
   const pendingUsers = auth.users.filter((user) => user.status === "pending");
   const activeMembers = auth.users.filter((user) => user.status === "active");
@@ -1872,7 +1993,12 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
     if (activeSection === "scoring") {
       return (
         <AdminSectionShell eyebrow="Методики подсчета" onBack={() => onOpenSection(null)} title="Настройки очков для прогнозов">
-          <AdminScoringMethodsPanel onCreateScoringMethod={onCreateScoringMethod} scoringMethods={scoringMethods} />
+          <AdminScoringMethodsPanel
+            leaderboardPointMethods={leaderboardPointMethods}
+            onCreateScoringMethod={onCreateScoringMethod}
+            onUpdateLeaderboardPointMethod={onUpdateLeaderboardPointMethod}
+            scoringMethods={scoringMethods}
+          />
         </AdminSectionShell>
       );
     }
@@ -2708,7 +2834,7 @@ function HomeScreen({ auth, forecastTournaments, onOpenHome, onOpenPlaceholder, 
   );
 }
 
-function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) {
+function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
 
   return (
@@ -2751,7 +2877,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions })
           </div>
         </section>
 
-        <AmericanoStandingsTable />
+        <AmericanoStandingsTable pointMethod={pointMethod} />
       </section>
 
       <section className="leaders-row americano-highlights">
@@ -2797,7 +2923,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions })
   );
 }
 
-function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) {
+function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
 
   return (
@@ -2840,7 +2966,7 @@ function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) 
           </div>
         </section>
 
-        <MexicanoStandingsTable />
+        <MexicanoStandingsTable pointMethod={pointMethod} />
       </section>
 
       <section className="leaders-row americano-highlights">
@@ -2886,7 +3012,7 @@ function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) 
   );
 }
 
-function TournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) {
+function TournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
 
   return (
@@ -2929,7 +3055,7 @@ function TournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }
           </div>
         </section>
 
-        <StandingsTable />
+        <StandingsTable pointMethod={pointMethod} />
       </section>
 
       <section className="leaders-row">
@@ -3009,11 +3135,13 @@ export function App() {
   const [authState, setAuthState] = useState(emptyAuthState);
   const [authMode, setAuthMode] = useState(null);
   const [forecastTournaments, setForecastTournaments] = useState([]);
+  const [leaderboardPointMethods, setLeaderboardPointMethods] = useState(fallbackLeaderboardPointMethods);
   const [scoringMethods, setScoringMethods] = useState(fallbackScoringMethods);
   const [settings, setSettings] = useState(defaultSettings);
   const currentUser = authState.currentUser;
   const canOpenPredictions = currentUser?.status === "active";
   const canOpenAdmin = currentUser?.role === "admin" && currentUser?.status === "active";
+  const activeLeaderboardPointMethod = leaderboardPointMethods[0] ?? fallbackLeaderboardPointMethods[0];
 
   const navigate = (nextScreen, options = {}) => {
     setScreen(nextScreen);
@@ -3039,10 +3167,11 @@ export function App() {
   useEffect(() => {
     const loadServerAuthState = async () => {
       try {
-        const [payload, forecastPayload, scoringPayload, settingsPayload] = await Promise.all([
+        const [payload, forecastPayload, scoringPayload, leaderboardPayload, settingsPayload] = await Promise.all([
           apiRequest("/api/auth/state"),
           apiRequest("/api/forecast-tournaments"),
           apiRequest("/api/scoring-methods"),
+          apiRequest("/api/leaderboard-point-methods"),
           apiRequest("/api/settings"),
         ]);
         setAuthState({
@@ -3053,12 +3182,14 @@ export function App() {
           users: payload.users ?? [],
         });
         setForecastTournaments(forecastPayload.tournaments ?? []);
+        setLeaderboardPointMethods(leaderboardPayload.methods?.length ? leaderboardPayload.methods : fallbackLeaderboardPointMethods);
         setScoringMethods(scoringPayload.methods?.length ? scoringPayload.methods : fallbackScoringMethods);
         setSettings(settingsPayload.settings ?? defaultSettings);
       } catch {
         storeAuthToken("");
         setAuthState({ ...emptyAuthState, loading: false });
         setForecastTournaments(fallbackForecastTournaments);
+        setLeaderboardPointMethods(fallbackLeaderboardPointMethods);
         setScoringMethods(fallbackScoringMethods);
         setSettings(defaultSettings);
       }
@@ -3170,6 +3301,19 @@ export function App() {
         method: "POST",
       });
       setScoringMethods(result.methods?.length ? result.methods : fallbackScoringMethods);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const updateLeaderboardPointMethod = async (methodId, payload) => {
+    try {
+      const result = await apiRequest(`/api/admin/leaderboard-point-methods/${methodId}`, {
+        body: JSON.stringify(payload),
+        method: "PUT",
+      });
+      setLeaderboardPointMethods(result.methods?.length ? result.methods : fallbackLeaderboardPointMethods);
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -3314,12 +3458,14 @@ export function App() {
         <AdminCabinetScreen
           auth={auth}
           forecastTournaments={forecastTournaments}
+          leaderboardPointMethods={leaderboardPointMethods}
           onCreateScoringMethod={createScoringMethod}
           onCreateTournament={createForecastTournament}
           onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           onOpenSection={(section) => navigate({ name: "admin", ...(section ? { section } : {}) })}
+          onUpdateLeaderboardPointMethod={updateLeaderboardPointMethod}
           onUpdateSettings={updateSettings}
           scoringMethods={scoringMethods}
           section={screen.section}
@@ -3409,6 +3555,7 @@ export function App() {
             onBack={() => navigate({ name: "home" })}
             onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
+            pointMethod={activeLeaderboardPointMethod}
           />
           {authModal}
         </>
@@ -3422,6 +3569,7 @@ export function App() {
           onBack={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
+          pointMethod={activeLeaderboardPointMethod}
         />
         {authModal}
       </>

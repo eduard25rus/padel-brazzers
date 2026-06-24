@@ -43,16 +43,41 @@ const defaultSettings = {
   predictionRegistryVisibility: "admin",
 };
 
+const defaultLeaderboardPointMethod = {
+  createdAt: new Date(0).toISOString(),
+  description: "Клубные очки за итоговые места: личные турниры на 12/16 игроков и парные турниры на 6/8 команд.",
+  id: "club-points-basic",
+  name: "Базовая клубная методика очков",
+  points: {
+    individual_12: { 1: 100, 2: 85, 3: 70, 4: 60, 5: 55, 6: 45, 7: 40, 8: 30, 9: 25, 10: 20, 11: 10, 12: 5 },
+    individual_16: { 1: 110, 2: 95, 3: 80, 4: 70, 5: 65, 6: 60, 7: 55, 8: 50, 9: 45, 10: 40, 11: 35, 12: 30, 13: 20, 14: 15, 15: 10, 16: 5 },
+    team_6: { 1: 90, 2: 65, 3: 50, 4: 35, 5: 25, 6: 5 },
+    team_8: { 1: 100, 2: 75, 3: 65, 4: 50, 5: 45, 6: 30, 7: 20, 8: 5 },
+  },
+  updatedAt: null,
+};
+
 function sanitizeSettings(settings = {}) {
   return {
     predictionRegistryVisibility: settings.predictionRegistryVisibility === "all" ? "all" : "admin",
   };
 }
 
+function sanitizeLeaderboardPointMethod(method = defaultLeaderboardPointMethod) {
+  return {
+    createdAt: method.createdAt ?? new Date(0).toISOString(),
+    description: method.description ?? "",
+    id: method.id ?? defaultLeaderboardPointMethod.id,
+    name: method.name ?? defaultLeaderboardPointMethod.name,
+    points: method.points ?? defaultLeaderboardPointMethod.points,
+    updatedAt: method.updatedAt ?? null,
+  };
+}
+
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
-    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] }, null, 2));
+    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] }, null, 2));
   }
 }
 
@@ -64,10 +89,14 @@ function readStore() {
     const scoringMethods = Array.isArray(parsed.scoringMethods) && parsed.scoringMethods.length > 0
       ? parsed.scoringMethods
       : [defaultScoringMethod];
+    const leaderboardPointMethods = Array.isArray(parsed.leaderboardPointMethods) && parsed.leaderboardPointMethods.length > 0
+      ? parsed.leaderboardPointMethods
+      : [defaultLeaderboardPointMethod];
 
     return {
       forecastPredictions: Array.isArray(parsed.forecastPredictions) ? parsed.forecastPredictions : [],
       forecastTournaments: Array.isArray(parsed.forecastTournaments) ? parsed.forecastTournaments : [],
+      leaderboardPointMethods,
       notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
       scoringMethods,
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
@@ -75,7 +104,7 @@ function readStore() {
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
   } catch {
-    return { forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] };
+    return { forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] };
   }
 }
 
@@ -625,6 +654,11 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/leaderboard-point-methods") {
+    jsonResponse(response, 200, { methods: store.leaderboardPointMethods.map(sanitizeLeaderboardPointMethod) });
+    return;
+  }
+
   const ownPredictionMatch = url.pathname.match(/^\/api\/forecast-tournaments\/([^/]+)\/prediction$/);
   if ((request.method === "GET" || request.method === "PUT") && ownPredictionMatch) {
     const user = getAuthedUser(store, request);
@@ -956,6 +990,48 @@ async function handleApi(request, response, url) {
     jsonResponse(response, 201, {
       method: sanitizeScoringMethod(method),
       methods: store.scoringMethods.map(sanitizeScoringMethod),
+    });
+    return;
+  }
+
+  const leaderboardMethodMatch = url.pathname.match(/^\/api\/admin\/leaderboard-point-methods\/([^/]+)$/);
+  if (request.method === "PUT" && leaderboardMethodMatch) {
+    const admin = getAuthedUser(store, request);
+    if (!isActiveAdmin(admin)) {
+      jsonResponse(response, 403, { message: "Доступ только для админа." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const methodIndex = store.leaderboardPointMethods.findIndex((method) => method.id === leaderboardMethodMatch[1]);
+    if (methodIndex === -1) {
+      jsonResponse(response, 404, { message: "Методика очков не найдена." });
+      return;
+    }
+
+    const points = body.points && typeof body.points === "object" ? body.points : null;
+    const requiredKeys = ["individual_12", "individual_16", "team_6", "team_8"];
+    const hasAllKeys = points && requiredKeys.every((key) => points[key] && typeof points[key] === "object");
+    const allValuesValid = hasAllKeys && requiredKeys.every((key) => (
+      Object.values(points[key]).every((value) => Number.isInteger(Number(value)) && Number(value) >= 0 && Number(value) % 5 === 0)
+    ));
+
+    if (!String(body.name ?? "").trim() || !allValuesValid) {
+      jsonResponse(response, 400, { message: "Заполни название и таблицу очков: значения должны быть целыми, не ниже 0 и кратными пяти." });
+      return;
+    }
+
+    store.leaderboardPointMethods[methodIndex] = {
+      ...store.leaderboardPointMethods[methodIndex],
+      description: String(body.description ?? "").trim(),
+      name: String(body.name ?? "").trim(),
+      points,
+      updatedAt: new Date().toISOString(),
+    };
+    writeStore(store);
+    jsonResponse(response, 200, {
+      method: sanitizeLeaderboardPointMethod(store.leaderboardPointMethods[methodIndex]),
+      methods: store.leaderboardPointMethods.map(sanitizeLeaderboardPointMethod),
     });
     return;
   }
