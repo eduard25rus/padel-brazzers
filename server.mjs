@@ -885,6 +885,133 @@ function sanitizeForecastPrediction(prediction, tournament = null) {
   };
 }
 
+function getForecastScoringMethod(store, tournament) {
+  return tournament?.scoringMethod
+    ?? store.scoringMethods.find((method) => method.id === tournament?.scoringMethodId)
+    ?? store.scoringMethods[0]
+    ?? defaultScoringMethod;
+}
+
+function getCompletedResultForTournament(store, tournament) {
+  if (!tournament) {
+    return null;
+  }
+
+  return store.completedTournamentResults.find((result) => result.id === tournament.completedResultId)
+    ?? store.completedTournamentResults.find((result) => result.forecastTournamentId === tournament.id)
+    ?? null;
+}
+
+function scoreForecastPrediction({ prediction, result, scoringMethod, tournament }) {
+  const finalRows = sanitizeCompletedTournamentResult(result).standings;
+  const actualByName = new Map(finalRows.map((row) => [normalizeImportPlayerName(row.playerName), row]));
+  const actualTop3 = finalRows.slice(0, 3).map((row) => normalizeImportPlayerName(row.playerName));
+  const actualLast = finalRows.at(-1);
+  const details = getPredictionDetails(prediction, tournament);
+  const rows = details.effectivePlacements
+    .map((placement) => {
+      const predictedName = placement.playerName ?? "";
+      const actual = actualByName.get(normalizeImportPlayerName(predictedName));
+      const predictedPlace = Number(placement.place);
+      const actualPlace = Number(actual?.place ?? 0);
+      const diff = actualPlace ? Math.abs(predictedPlace - actualPlace) : null;
+      let points = 0;
+      let reason = "Нет в итоговой таблице";
+
+      if (diff === 0) {
+        points = Number(scoringMethod.exactPlace ?? 0);
+        reason = "Точное место";
+      } else if (diff === 1) {
+        points = Number(scoringMethod.onePositionError ?? 0);
+        reason = "Ошибка на 1 позицию";
+      } else if (diff === 2) {
+        points = Number(scoringMethod.twoPositionError ?? 0);
+        reason = "Ошибка на 2 позиции";
+      } else if (actual) {
+        reason = `Ошибка на ${diff} поз.`;
+      }
+
+      return {
+        actualPlace,
+        diff,
+        playerName: predictedName,
+        points,
+        predictedPlace,
+        reason,
+      };
+    })
+    .sort((a, b) => a.predictedPlace - b.predictedPlace);
+
+  const predictedTop3 = rows.slice(0, 3).map((row) => normalizeImportPlayerName(row.playerName));
+  const top3Exact = actualTop3.length === 3 && actualTop3.every((name, index) => name === predictedTop3[index]);
+  const top3AnyOrder = actualTop3.length === 3
+    && actualTop3.every((name) => predictedTop3.includes(name))
+    && !top3Exact;
+  const predictedLast = rows.find((row) => row.predictedPlace === finalRows.length);
+  const lastExact = actualLast && predictedLast && normalizeImportPlayerName(predictedLast.playerName) === normalizeImportPlayerName(actualLast.playerName);
+  const bonuses = [];
+
+  if (top3Exact) {
+    bonuses.push({ label: "Топ-3 точный", points: Number(scoringMethod.top3ExactBonus ?? 0) });
+  } else if (top3AnyOrder) {
+    bonuses.push({ label: "Топ-3 в любом порядке", points: Number(scoringMethod.top3AnyOrderBonus ?? 0) });
+  }
+
+  if (lastExact) {
+    bonuses.push({ label: "Последнее место", points: Number(scoringMethod.lastPlaceBonus ?? 0) });
+  }
+
+  const basePoints = rows.reduce((sum, row) => sum + row.points, 0);
+  const bonusPoints = bonuses.reduce((sum, bonus) => sum + bonus.points, 0);
+
+  return {
+    basePoints,
+    bonusPoints,
+    bonuses,
+    exactCount: rows.filter((row) => row.diff === 0).length,
+    oneOffCount: rows.filter((row) => row.diff === 1).length,
+    points: basePoints + bonusPoints,
+    rows,
+    twoOffCount: rows.filter((row) => row.diff === 2).length,
+  };
+}
+
+function getForecastResultsSummary(store, tournament, viewer) {
+  const result = getCompletedResultForTournament(store, tournament);
+  if (!result) {
+    return { completed: false };
+  }
+
+  const scoringMethod = sanitizeScoringMethod(getForecastScoringMethod(store, tournament));
+  const finalResult = sanitizeCompletedTournamentResult(result);
+  const predictions = store.forecastPredictions
+    .filter((prediction) => prediction.tournamentId === tournament.id)
+    .map((prediction) => {
+      const user = store.users.find((item) => item.id === prediction.userId);
+      const score = scoreForecastPrediction({ prediction, result, scoringMethod, tournament });
+      return {
+        lundaNick: user?.lundaNick ?? "",
+        name: user ? `${user.firstName} ${user.lastName}`.trim() || user.lundaNick : "Участник",
+        prediction: sanitizeForecastPrediction(prediction, tournament),
+        updatedAt: prediction.updatedAt,
+        userId: prediction.userId,
+        ...score,
+      };
+    })
+    .sort((a, b) => b.points - a.points || b.exactCount - a.exactCount || b.oneOffCount - a.oneOffCount || String(a.name).localeCompare(String(b.name)))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+
+  return {
+    completed: true,
+    finalStandings: finalResult.standings,
+    leaderboard: predictions,
+    resultId: finalResult.id,
+    scoringMethod,
+    tournamentId: tournament.id,
+    viewerUserId: viewer?.id ?? null,
+  };
+}
+
 function sanitizeNotification(notification) {
   return {
     createdAt: notification.createdAt,
@@ -1386,6 +1513,24 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  const forecastResultsSummaryMatch = url.pathname.match(/^\/api\/forecast-tournaments\/([^/]+)\/results-summary$/);
+  if (request.method === "GET" && forecastResultsSummaryMatch) {
+    const viewer = getAuthedUser(store, request);
+    if (viewer?.status !== "active") {
+      jsonResponse(response, 403, { message: "Итоги прогнозов доступны только подтвержденным участникам." });
+      return;
+    }
+
+    const tournament = store.forecastTournaments.find((item) => item.id === forecastResultsSummaryMatch[1]);
+    if (!tournament) {
+      jsonResponse(response, 404, { message: "Турнир не найден." });
+      return;
+    }
+
+    jsonResponse(response, 200, getForecastResultsSummary(store, tournament, viewer));
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/auth/register") {
     const body = await readJson(request);
     const email = normalizeEmail(body.email);
@@ -1498,24 +1643,31 @@ async function handleApi(request, response, url) {
       return;
     }
 
+    const resultsSummary = getForecastResultsSummary(store, tournament, viewer);
     const predictions = store.forecastPredictions
       .filter((prediction) => prediction.tournamentId === tournament.id)
       .map((prediction) => {
         const predictionUser = store.users.find((item) => item.id === prediction.userId);
         const details = getPredictionDetails(prediction, tournament);
+        const scored = resultsSummary.completed
+          ? resultsSummary.leaderboard.find((row) => row.userId === prediction.userId)
+          : null;
 
         return {
           email: isActiveAdmin(viewer) ? predictionUser?.email ?? "" : "",
           lundaNick: predictionUser?.lundaNick ?? "",
           name: predictionUser ? `${predictionUser.firstName} ${predictionUser.lastName}`.trim() || predictionUser.lundaNick : "Участник",
           needsReview: details.needsReview,
+          points: scored?.points ?? 0,
+          rank: scored?.rank ?? null,
           updatedAt: prediction.updatedAt,
           userId: prediction.userId,
         };
       })
-      .sort((a, b) => Number(b.needsReview) - Number(a.needsReview) || String(a.name).localeCompare(String(b.name)));
+      .sort((a, b) => (b.points - a.points) || Number(b.needsReview) - Number(a.needsReview) || String(a.name).localeCompare(String(b.name)));
 
     jsonResponse(response, 200, {
+      completed: resultsSummary.completed,
       needsReviewCount: predictions.filter((prediction) => prediction.needsReview).length,
       predictionCount: predictions.length,
       predictions,
