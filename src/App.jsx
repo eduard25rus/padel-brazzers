@@ -2509,7 +2509,7 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const previewStandings = preview?.standings?.slice(0, 8) ?? [];
+  const previewStandings = preview?.standings ?? [];
   const previewInsights = preview?.insights?.slice(0, 4) ?? [];
 
   const uploadPreview = async (event) => {
@@ -2600,25 +2600,52 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
             )}
           </article>
 
-          <article className="results-preview-table">
-            <span>Итоговая таблица</span>
-            {previewStandings.map((row) => (
-              <div key={`${row.place}-${row.player_name}`}>
-                <b>{row.place}</b>
-                <strong>{row.player_name}</strong>
-                <small>{row.wins}-0-{row.losses} · {row.points_for}-{row.points_against} · {Number(row.delta) > 0 ? `+${row.delta}` : row.delta}</small>
-              </div>
-            ))}
+          <article className="surface standings-card americano-final-card results-preview-standings">
+            <div className="section-title">
+              <span>Итоговая таблица</span>
+              <h2>{previewStandings.length} игроков после турнира</h2>
+            </div>
+            <div className="americano-standings-head">
+              <span>#</span>
+              <span>Игрок</span>
+              <span>Игры</span>
+              <span>Очки</span>
+              <span>+/-</span>
+              <span>Клуб</span>
+            </div>
+            <div className="standings-list">
+              {previewStandings.map((row) => (
+                <article className="americano-standing-row" key={`${row.place}-${row.player_name}`}>
+                  <b>{row.place}</b>
+                  <div className="standing-team">
+                    <span className="team-badge player-rating small">{Number(row.rating_after || row.rating_before || 0).toFixed(1)}</span>
+                    <strong>{row.player_name}</strong>
+                  </div>
+                  <span>{row.wins}-0-{row.losses}</span>
+                  <span>{row.points_for}-{row.points_against}</span>
+                  <em className={Number(row.delta) >= 0 ? "positive" : "negative"}>{Number(row.delta) > 0 ? `+${row.delta}` : row.delta}</em>
+                  <strong className="club-points">+{row.club_points}</strong>
+                </article>
+              ))}
+            </div>
+            <footer>Так таблица будет выглядеть в карточке прошедшего турнира</footer>
           </article>
 
-          <article className="results-preview-table insights">
-            <span>Инсайты</span>
+          <article className="surface stories-card results-preview-insights">
+            <div className="section-title">
+              <span>Инсайты</span>
+              <h2>Сюжеты турнира</h2>
+            </div>
             {previewInsights.map((insight) => (
-              <div key={`${insight.insight_order}-${insight.title}`}>
+              <article className="story-row" key={`${insight.insight_order}-${insight.title}`}>
+                <img src="/assets/trophy.png" alt="" />
+                <div>
+                  <span>{insight.metric_label ? `${insight.metric_label}: ${insight.metric_value}` : insight.insight_type}</span>
+                  <strong>{insight.title}</strong>
+                  <p>{insight.summary}</p>
+                </div>
                 <b>{insight.insight_order}</b>
-                <strong>{insight.title}</strong>
-                <small>{insight.metric_label ? `${insight.metric_label}: ${insight.metric_value} · ` : ""}{insight.summary}</small>
-              </div>
+              </article>
             ))}
           </article>
 
@@ -3184,60 +3211,67 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
         </section>
       </section>
 
-      <section className="leaders-row americano-highlights imported-insights">
-        {(result.insights ?? []).slice(0, 4).map((insight) => (
-          <LeaderCard
-            eyebrow={insight.title}
-            image="/assets/trophy.png"
-            key={`${insight.insightOrder}-${insight.title}`}
-            meta={insight.summary}
-            metric={{ label: insight.metricLabel || "Факт", value: insight.metricValue || insight.insightType }}
-            name={insight.playerName || insight.relatedPlayer2 || "Турнир"}
-          />
-        ))}
-      </section>
-
-      <section className="surface round-card americano-round-card imported-round-card" id="rounds">
-        <div className="round-head">
-          <div>
-            <span>Раунд {round}</span>
-            <h2>Матчи из Excel</h2>
+      <section className="lower-grid americano-lower-grid imported-lower-grid">
+        <section className="surface round-card americano-round-card imported-round-card" id="rounds">
+          <div className="round-head">
+            <div>
+              <span>Раунд {round}</span>
+              <h2>Матчи из Excel</h2>
+            </div>
+            <div className="round-picker americano-picker" aria-label="Выбор раунда">
+              {rounds.map((item) => (
+                <button className={round === item ? "active" : ""} type="button" onClick={() => setRound(item)} key={item}>
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="round-picker americano-picker" aria-label="Выбор раунда">
-            {rounds.map((item) => (
-              <button className={round === item ? "active" : ""} type="button" onClick={() => setRound(item)} key={item}>
-                {item}
-              </button>
+          <div className="match-list americano-match-list imported-match-list">
+            <div className="match-list-head americano-match-head">
+              <span>Корт</span>
+              <span>Пары</span>
+              <span>Счет</span>
+            </div>
+            {shownMatches.map((match) => (
+              <article className="match-row americano-match-row" key={match.matchId || `${match.round}-${match.court}`}>
+                <span>Корт {match.court}</span>
+                <div>
+                  <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
+                    <span className="americano-pair-name">
+                      <span>{match.teamAPlayer1}</span>
+                      <span>{match.teamAPlayer2}</span>
+                    </span>
+                  </p>
+                  <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
+                    <span className="americano-pair-name">
+                      <span>{match.teamBPlayer1}</span>
+                      <span>{match.teamBPlayer2}</span>
+                    </span>
+                  </p>
+                </div>
+                <strong>{match.scoreA}<small>:</small>{match.scoreB}</strong>
+              </article>
             ))}
           </div>
-        </div>
-        <div className="match-list americano-match-list imported-match-list">
-          <div className="match-list-head americano-match-head">
-            <span>Корт</span>
-            <span>Пары</span>
-            <span>Счет</span>
+        </section>
+
+        <section className="surface stories-card imported-insights">
+          <div className="section-title">
+            <span>Инсайты</span>
+            <h2>Сюжеты турнира</h2>
           </div>
-          {shownMatches.map((match) => (
-            <article className="match-row americano-match-row" key={match.matchId || `${match.round}-${match.court}`}>
-              <span>Корт {match.court}</span>
+          {(result.insights ?? []).slice(0, 4).map((insight) => (
+            <article className="story-row" key={`${insight.insightOrder}-${insight.title}`}>
+              <img src="/assets/trophy.png" alt="" />
               <div>
-                <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
-                  <span className="americano-pair-name">
-                    <span>{match.teamAPlayer1}</span>
-                    <span>{match.teamAPlayer2}</span>
-                  </span>
-                </p>
-                <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
-                  <span className="americano-pair-name">
-                    <span>{match.teamBPlayer1}</span>
-                    <span>{match.teamBPlayer2}</span>
-                  </span>
-                </p>
+                <span>{insight.metricLabel ? `${insight.metricLabel}: ${insight.metricValue}` : insight.insightType}</span>
+                <strong>{insight.title}</strong>
+                <p>{insight.summary}</p>
               </div>
-              <strong>{match.scoreA}<small>:</small>{match.scoreB}</strong>
+              <b>{insight.insightOrder}</b>
             </article>
           ))}
-        </div>
+        </section>
       </section>
     </main>
   );

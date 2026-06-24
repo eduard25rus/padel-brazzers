@@ -1914,13 +1914,12 @@ main {
 .results-preview-grid {
   border-top: 1px solid var(--line);
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
   padding-top: 14px;
 }
 
-.results-preview-summary,
-.results-preview-table {
+.results-preview-summary {
   background: rgba(255, 254, 250, 0.72);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1934,7 +1933,8 @@ main {
 }
 
 .results-preview-summary > span,
-.results-preview-table > span {
+.results-preview-standings .section-title span,
+.results-preview-insights .section-title span {
   color: var(--green);
   font-size: 11px;
   font-weight: 900;
@@ -1971,16 +1971,30 @@ main {
   text-transform: uppercase;
 }
 
-.results-preview-table div {
-  align-items: center;
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 32px minmax(0, 1fr);
-  padding-top: 8px;
+.results-preview-standings,
+.results-preview-insights {
+  box-shadow: none;
 }
 
-.results-preview-table div b {
+.results-preview-standings {
+  padding: 22px 22px 14px;
+}
+
+.results-preview-insights {
+  padding: 22px;
+}
+
+.results-preview-insights .story-row {
+  grid-template-columns: 58px minmax(0, 1fr) 28px;
+  min-height: 112px;
+}
+
+.results-preview-insights .story-row img {
+  height: 58px;
+  width: 58px;
+}
+
+.results-preview-insights .story-row > b {
   align-items: center;
   background: var(--green-soft);
   border-radius: 50%;
@@ -1990,18 +2004,6 @@ main {
   height: 28px;
   justify-content: center;
   width: 28px;
-}
-
-.results-preview-table div strong,
-.results-preview-table div small {
-  display: block;
-}
-
-.results-preview-table div small {
-  color: #526054;
-  font-size: 12px;
-  font-weight: 750;
-  grid-column: 2;
 }
 
 .results-preview-grid footer {
@@ -2776,7 +2778,11 @@ p {
 }
 
 .imported-round-card {
-  margin-top: 14px;
+  margin-top: 0;
+}
+
+.imported-insights {
+  padding: 22px;
 }
 
 .imported-match-list {
