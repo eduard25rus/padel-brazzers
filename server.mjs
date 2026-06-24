@@ -173,7 +173,7 @@ function getForecastLeaderboard(store) {
         const tournament = tournamentById.get(prediction.tournamentId);
         const details = tournament ? getPredictionDetails(prediction, tournament) : { needsReview: Boolean(prediction.needsReview) };
         const monthKey = getVladivostokMonthKey(prediction.updatedAt ?? prediction.createdAt);
-        months[monthKey] = months[monthKey] ?? { needsReview: 0, predictions: 0 };
+        months[monthKey] = months[monthKey] ?? { needsReview: 0, points: 0, predictions: 0 };
         months[monthKey].predictions += 1;
 
         if (details.needsReview) {
@@ -183,6 +183,7 @@ function getForecastLeaderboard(store) {
       }
 
       return {
+        forecastPoints: 0,
         lastPredictionAt: predictions
           .map((prediction) => prediction.updatedAt ?? prediction.createdAt)
           .filter(Boolean)

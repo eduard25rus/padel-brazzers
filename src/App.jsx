@@ -626,6 +626,7 @@ function getForecastLeadersForPeriod(leaders, period = "all") {
       if (period === "all") {
         return {
           ...leader,
+          periodPoints: leader.forecastPoints ?? 0,
           periodNeedsReview: leader.needsReviewCount,
           periodPredictions: leader.predictionCount,
           periodReady: leader.readyCount,
@@ -635,13 +636,14 @@ function getForecastLeadersForPeriod(leaders, period = "all") {
       const month = leader.months?.[period] ?? { needsReview: 0, predictions: 0 };
       return {
         ...leader,
+        periodPoints: month.points ?? 0,
         periodNeedsReview: month.needsReview,
         periodPredictions: month.predictions,
         periodReady: Math.max(0, month.predictions - month.needsReview),
       };
     })
     .filter((leader) => leader.periodPredictions > 0)
-    .sort((a, b) => b.periodPredictions - a.periodPredictions || b.periodReady - a.periodReady || String(b.lastPredictionAt).localeCompare(String(a.lastPredictionAt)))
+    .sort((a, b) => b.periodPoints - a.periodPoints || b.periodPredictions - a.periodPredictions || b.periodReady - a.periodReady || String(b.lastPredictionAt).localeCompare(String(a.lastPredictionAt)))
     .map((leader, index) => ({ ...leader, rank: index + 1 }));
 }
 
@@ -3261,8 +3263,6 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
   const forecastRows = useMemo(() => getForecastLeadersForPeriod(forecastLeaders, period), [forecastLeaders, period]);
   const tournamentWinner = tournamentLeaders[0];
   const forecastWinner = forecastRows[0];
-  const totalTournamentPoints = tournamentLeaders.reduce((sum, leader) => sum + leader.points, 0);
-  const totalForecasts = forecastRows.reduce((sum, leader) => sum + leader.periodPredictions, 0);
 
   return (
     <main className="predictions-shell leaders-shell">
@@ -3300,8 +3300,8 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
           <strong>{tournamentWinner?.name ?? "Пока нет"}</strong>
           <p>{tournamentWinner ? `${tournamentWinner.points} очков · ${tournamentWinner.tournaments} турнира · ${tournamentWinner.wins} побед` : "Очки появятся после внесения результатов."}</p>
           <div>
-            <b>{totalTournamentPoints}</b>
-            <small>очков в периоде</small>
+            <b>{tournamentWinner?.points ?? 0}</b>
+            <small>очков у лидера</small>
           </div>
         </article>
         <article className="surface leaders-summary-card">
@@ -3309,8 +3309,8 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
           <strong>{forecastWinner?.name ?? "Пока нет"}</strong>
           <p>{forecastWinner ? `${forecastWinner.periodPredictions} прогнозов · ${forecastWinner.periodReady} готово · ${forecastWinner.periodNeedsReview} на корректировке` : "Когда участники сохранят прогнозы, они появятся здесь."}</p>
           <div>
-            <b>{totalForecasts}</b>
-            <small>прогнозов в периоде</small>
+            <b>{forecastWinner?.periodPoints ?? 0}</b>
+            <small>очков у лидера</small>
           </div>
         </article>
       </section>
@@ -3358,6 +3358,7 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
           <div className="leaders-table-head forecast">
             <span>#</span>
             <span>Участник</span>
+            <span>Очки</span>
             <span>Прогн.</span>
             <span>Готово</span>
             <span>Корр.</span>
@@ -3370,6 +3371,7 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
                   <strong>{leader.name}</strong>
                   <small>{leader.lundaNick}{leader.lastPredictionAt ? ` · ${formatVladivostokInstant(leader.lastPredictionAt)} VLAT` : ""}</small>
                 </div>
+                <span>{leader.periodPoints}</span>
                 <span>{leader.periodPredictions}</span>
                 <span>{leader.periodReady}</span>
                 <span className={leader.periodNeedsReview > 0 ? "needs-review" : ""}>{leader.periodNeedsReview}</span>

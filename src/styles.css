@@ -2750,7 +2750,7 @@ p {
 
 .leaders-table-head.forecast,
 .leaders-table-row.forecast {
-  grid-template-columns: 30px minmax(180px, 1fr) 68px 58px 54px;
+  grid-template-columns: 30px minmax(180px, 1fr) 58px 68px 58px 54px;
 }
 
 .leaders-table-head {
