@@ -581,17 +581,6 @@ function getCompletedTournamentSources(pointMethod) {
         points: getLeaderboardPoints(pointMethod, "individual_12", player.place),
       })),
     },
-    {
-      id: "the-best-middle-pm",
-      month: "2026-06",
-      title: "THE BEST MIDDLE (PM)",
-      type: "Парный",
-      rows: standings.map((team) => ({
-        participants: team.team.split(" / ").map(normalizeLeaderboardName),
-        place: team.place,
-        points: getLeaderboardPoints(pointMethod, "team_8", team.place),
-      })),
-    },
   ];
 }
 
