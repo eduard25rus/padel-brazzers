@@ -2240,7 +2240,6 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
 function ForecastTournamentDetail({
   auth,
   forecastTournaments,
-  onBack,
   onDeleteTournament,
   onLoadForecastPrediction,
   onLoadForecastPredictionSummary,
@@ -2456,12 +2455,7 @@ function ForecastTournamentDetail({
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
-        action={(
-          <div className="prediction-top-actions">
-            <button className="back-link" type="button" onClick={onBack}>Все прогнозы</button>
-            <AuthControls {...auth} />
-          </div>
-        )}
+        action={<AuthControls {...auth} />}
       />
 
       <section className="prediction-detail-grid" id="top">
@@ -3498,7 +3492,6 @@ export function App() {
         <ForecastTournamentDetail
           auth={auth}
           forecastTournaments={forecastTournaments}
-          onBack={() => navigate({ name: "predictions" })}
           onDeleteTournament={deleteForecastTournament}
           onLoadForecastPrediction={loadForecastPrediction}
           onLoadForecastPredictionSummary={loadForecastPredictionSummary}
