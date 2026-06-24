@@ -345,6 +345,10 @@ function getInitialScreenFromLocation() {
     return adminSections.has(parts[1]) ? { name: "admin", section: parts[1] } : { name: "admin" };
   }
 
+  if (parts[0] === "cabinet") {
+    return { name: "cabinet", section: parts[1] === "tournaments" ? "tournaments" : "forecasts" };
+  }
+
   if (parts[0] === "tournaments" && parts[1]) {
     return { name: "detail", tournamentId: parts[1] };
   }
@@ -371,6 +375,10 @@ function pathForScreen(screen) {
 
   if (screen.name === "admin") {
     return screen.section ? `/admin/${encodeURIComponent(screen.section)}` : "/admin";
+  }
+
+  if (screen.name === "cabinet") {
+    return screen.section ? `/cabinet/${encodeURIComponent(screen.section)}` : "/cabinet";
   }
 
   if (screen.name === "detail") {
@@ -655,6 +663,48 @@ function formatMonthLabel(monthKey) {
   const [year, month] = monthKey.split("-");
   return new Intl.DateTimeFormat("ru-RU", { month: "long", timeZone: "Asia/Vladivostok", year: "numeric" })
     .format(new Date(`${year}-${month}-01T00:00:00+10:00`));
+}
+
+function getUserNameCandidates(user) {
+  return [
+    getUserDisplayName(user),
+    user?.lundaNick,
+    user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "",
+  ]
+    .filter(Boolean)
+    .map((name) => normalizeLeaderboardName(String(name)).toLowerCase());
+}
+
+function getMyTournamentStats(user, pointMethod) {
+  const candidates = new Set(getUserNameCandidates(user));
+  const rows = [];
+
+  for (const tournament of getCompletedTournamentSources(pointMethod)) {
+    for (const row of tournament.rows) {
+      const isMine = row.participants.some((participant) => candidates.has(normalizeLeaderboardName(participant).toLowerCase()));
+      if (!isMine) {
+        continue;
+      }
+
+      rows.push({
+        id: `${tournament.id}-${row.place}`,
+        place: row.place,
+        points: row.points,
+        title: tournament.title,
+        type: tournament.type,
+      });
+    }
+  }
+
+  const placeSum = rows.reduce((sum, row) => sum + row.place, 0);
+  return {
+    avgPlace: rows.length ? placeSum / rows.length : 0,
+    points: rows.reduce((sum, row) => sum + row.points, 0),
+    podiums: rows.filter((row) => row.place <= 3).length,
+    rows,
+    tournaments: rows.length,
+    wins: rows.filter((row) => row.place === 1).length,
+  };
 }
 
 function getTournamentScoringMethod(tournament, scoringMethods) {
@@ -1345,7 +1395,7 @@ function MexicanoDescriptionPanel({ onClose }) {
   );
 }
 
-function AuthControls({ currentUser, notifications = [], onLogin, onLogout, onOpenAdmin, onOpenForecastTournament, onReadNotification, onRegister }) {
+function AuthControls({ currentUser, notifications = [], onLogin, onLogout, onOpenAdmin, onOpenCabinet, onOpenForecastTournament, onReadNotification, onRegister }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   if (currentUser) {
@@ -1365,7 +1415,8 @@ function AuthControls({ currentUser, notifications = [], onLogin, onLogout, onOp
             Уведомления {unreadNotifications.length || ""}
           </button>
         )}
-        {canOpenAdmin && <button type="button" onClick={onOpenAdmin}>Кабинет</button>}
+        {!isPending && <button type="button" onClick={onOpenCabinet}>Кабинет</button>}
+        {canOpenAdmin && <button type="button" onClick={onOpenAdmin}>Админ</button>}
         <button type="button" onClick={onLogout}>Выйти</button>
         {notificationsOpen && (
           <div className="auth-notification-popover">
@@ -3386,6 +3437,129 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
   );
 }
 
+function MemberCabinetScreen({ auth, cabinet, loading, onOpenForecastTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, pointMethod, section }) {
+  const activeSection = section ?? "forecasts";
+  const myTournamentStats = useMemo(() => getMyTournamentStats(auth.currentUser, pointMethod), [auth.currentUser, pointMethod]);
+  const forecastPoints = cabinet?.forecastPoints ?? 0;
+  const predictionCount = cabinet?.predictionCount ?? 0;
+  const readyPredictionCount = cabinet?.readyPredictionCount ?? 0;
+  const needsReviewCount = cabinet?.needsReviewCount ?? 0;
+
+  return (
+    <main className="predictions-shell member-cabinet-shell">
+      <MainNav
+        active="cabinet"
+        auth={auth}
+        label="Club"
+        onOpenHome={onOpenHome}
+        onOpenPlaceholder={onOpenPlaceholder}
+        onOpenPredictions={onOpenPredictions}
+        action={<AuthControls {...auth} />}
+      />
+
+      <section className="member-cabinet-hero surface" id="top">
+        <div>
+          <span className="eyebrow">Личный кабинет</span>
+          <h1>{getUserDisplayName(auth.currentUser)}</h1>
+          <p>Здесь собирается личная статистика по прогнозам и турнирам. Очки прогнозов появятся после внесения итоговых таблиц и расчета тура.</p>
+        </div>
+        <div className="member-cabinet-stats">
+          <div><strong>{forecastPoints}</strong><span>очков прогнозиста</span></div>
+          <div><strong>{predictionCount}</strong><span>прогнозов</span></div>
+          <div><strong>{myTournamentStats.points}</strong><span>турнирных очков</span></div>
+        </div>
+      </section>
+
+      <section className="member-cabinet-tabs">
+        <button className={activeSection === "forecasts" ? "active" : ""} type="button" onClick={() => onOpenSection("forecasts")}>Мои прогнозы</button>
+        <button className={activeSection === "tournaments" ? "active" : ""} type="button" onClick={() => onOpenSection("tournaments")}>Мои турниры</button>
+      </section>
+
+      {activeSection === "forecasts" ? (
+        <section className="surface member-cabinet-panel">
+          <div className="section-title">
+            <span>Мои прогнозы</span>
+            <h2>{loading ? "Загружаем прогнозы" : `${predictionCount} прогнозов · ${readyPredictionCount} готово · ${needsReviewCount} на корректировке`}</h2>
+          </div>
+          {loading ? (
+            <p className="leaders-empty">Проверяем сохраненные прогнозы.</p>
+          ) : cabinet?.predictions?.length ? (
+            <div className="member-forecast-list">
+              {cabinet.predictions.map((item) => (
+                <article className="member-forecast-card" key={item.prediction.id}>
+                  <header>
+                    <div>
+                      <span>{item.prediction.needsReview ? "Нужна корректировка" : "Сохранен"}</span>
+                      <strong>{item.tournament?.title ?? "Турнир удален"}</strong>
+                      <small>{item.prediction.updatedAt ? `${formatVladivostokInstant(item.prediction.updatedAt)} VLAT` : "Без даты"}</small>
+                    </div>
+                    <b>{item.forecastPoints ?? 0} очков</b>
+                  </header>
+                  <div className="member-forecast-compare">
+                    <section>
+                      <span>Мой прогноз</span>
+                      <ol>
+                        {(item.prediction.effectivePlacements?.length ? item.prediction.effectivePlacements : item.prediction.placements).slice(0, 8).map((placement) => (
+                          <li className={placement.autoAssigned ? "pending" : ""} key={`${item.prediction.id}-${placement.place}`}>
+                            <b>{placement.place}</b>
+                            <strong>{placement.playerName}</strong>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                    <section>
+                      <span>Итог и очки</span>
+                      <div className="forecast-result-placeholder">
+                        <b>0</b>
+                        <p>После закрытия турнира здесь появится итоговая таблица, подсветка точных попаданий и разбор начисления очков.</p>
+                        <div className="forecast-hit-legend">
+                          <i className="exact">точно</i>
+                          <i className="close">±2 места</i>
+                          <i className="miss">мимо</i>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                  {item.tournament && <button type="button" onClick={() => onOpenForecastTournament(item.tournament.id)}>Открыть прогноз</button>}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="leaders-empty">Ты еще не сохранял прогнозы. Открой раздел прогнозов и собери свой топ.</p>
+          )}
+        </section>
+      ) : (
+        <section className="surface member-cabinet-panel">
+          <div className="section-title">
+            <span>Мои турниры</span>
+            <h2>{myTournamentStats.tournaments} турниров · {myTournamentStats.points} очков · {myTournamentStats.wins} побед</h2>
+          </div>
+          <div className="member-tournament-summary">
+            <div><strong>{myTournamentStats.podiums}</strong><span>подиумов</span></div>
+            <div><strong>{myTournamentStats.avgPlace ? myTournamentStats.avgPlace.toFixed(1) : "—"}</strong><span>среднее место</span></div>
+            <div><strong>{myTournamentStats.points}</strong><span>клубных очков</span></div>
+          </div>
+          {myTournamentStats.rows.length ? (
+            <div className="member-tournament-list">
+              {myTournamentStats.rows.map((row) => (
+                <article key={row.id}>
+                  <div>
+                    <strong>{row.title}</strong>
+                    <small>{row.type} · {row.place}-е место</small>
+                  </div>
+                  <b>+{row.points}</b>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="leaders-empty">Пока не нашли тебя в итоговых таблицах двух текущих турниров. Если имя в Lunda отличается от имени в таблице, позже добавим привязку игрока к аккаунту.</p>
+          )}
+        </section>
+      )}
+    </main>
+  );
+}
+
 export function App() {
   const [screen, setScreen] = useState(() => getInitialScreenFromLocation());
   const [authState, setAuthState] = useState(emptyAuthState);
@@ -3393,6 +3567,8 @@ export function App() {
   const [forecastTournaments, setForecastTournaments] = useState([]);
   const [forecastLeaders, setForecastLeaders] = useState([]);
   const [leaderboardPointMethods, setLeaderboardPointMethods] = useState(fallbackLeaderboardPointMethods);
+  const [memberCabinet, setMemberCabinet] = useState(null);
+  const [memberCabinetLoading, setMemberCabinetLoading] = useState(false);
   const [scoringMethods, setScoringMethods] = useState(fallbackScoringMethods);
   const [settings, setSettings] = useState(defaultSettings);
   const currentUser = authState.currentUser;
@@ -3457,6 +3633,12 @@ export function App() {
 
     loadServerAuthState();
   }, []);
+
+  useEffect(() => {
+    if (screen.name === "cabinet") {
+      loadMemberCabinet();
+    }
+  }, [screen.name, currentUser?.id]);
 
   const applyAuthPayload = (payload) => {
     if (payload.token !== undefined) {
@@ -3537,6 +3719,23 @@ export function App() {
     }
   };
 
+  const loadMemberCabinet = async () => {
+    if (!currentUser?.id || currentUser.status !== "active") {
+      setMemberCabinet(null);
+      return;
+    }
+
+    setMemberCabinetLoading(true);
+    try {
+      const result = await apiRequest("/api/me/cabinet");
+      setMemberCabinet(result);
+    } catch {
+      setMemberCabinet(null);
+    } finally {
+      setMemberCabinetLoading(false);
+    }
+  };
+
   const saveForecastPrediction = async (tournamentId, payload) => {
     try {
       const result = await apiRequest(`/api/forecast-tournaments/${tournamentId}/prediction`, {
@@ -3548,6 +3747,9 @@ export function App() {
           ? { ...tournament, predictionCount: result.predictionCount ?? tournament.predictionCount ?? 0 }
           : tournament
       )));
+      if (screen.name === "cabinet") {
+        loadMemberCabinet();
+      }
       return { ok: true, prediction: result.prediction, predictionCount: result.predictionCount ?? 0 };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -3614,6 +3816,10 @@ export function App() {
     navigate({ name: "admin" });
   };
 
+  const openMemberCabinet = (section = "forecasts") => {
+    navigate({ name: "cabinet", section });
+  };
+
   const registerUser = async (payload) => {
     try {
       const result = await apiRequest("/api/auth/register", {
@@ -3651,6 +3857,7 @@ export function App() {
 
     storeAuthToken("");
     setAuthState((state) => ({ ...state, currentUser: null, notifications: [], users: [] }));
+    setMemberCabinet(null);
     navigate({ name: "home" }, { replace: true });
   };
 
@@ -3675,6 +3882,7 @@ export function App() {
     users: authState.users,
     onApproveUser: approveUser,
     onOpenAdmin: openAdminCabinet,
+    onOpenCabinet: () => openMemberCabinet("forecasts"),
     onOpenForecastTournament: (tournamentId) => navigate({ name: "forecast-detail", tournamentId }),
     onLogin: () => setAuthMode("login"),
     onLogout: logoutUser,
@@ -3804,6 +4012,40 @@ export function App() {
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           onOpenTournament={(tournamentId) => navigate({ name: "forecast-detail", tournamentId })}
+        />
+        {authModal}
+      </>
+    );
+  }
+
+  if (screen.name === "cabinet") {
+    if (!canOpenPredictions) {
+      return (
+        <>
+          <LockedPredictionsScreen
+            auth={auth}
+            onOpenHome={() => navigate({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
+            onOpenPredictions={openPredictions}
+          />
+          {authModal}
+        </>
+      );
+    }
+
+    return (
+      <>
+        <MemberCabinetScreen
+          auth={auth}
+          cabinet={memberCabinet}
+          loading={memberCabinetLoading}
+          onOpenForecastTournament={(tournamentId) => navigate({ name: "forecast-detail", tournamentId })}
+          onOpenHome={() => navigate({ name: "home" })}
+          onOpenPlaceholder={openPlaceholder}
+          onOpenPredictions={openPredictions}
+          onOpenSection={(section) => navigate({ name: "cabinet", section })}
+          pointMethod={activeLeaderboardPointMethod}
+          section={screen.section}
         />
         {authModal}
       </>

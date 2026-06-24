@@ -202,6 +202,30 @@ function getForecastLeaderboard(store) {
     .sort((a, b) => b.predictionCount - a.predictionCount || b.readyCount - a.readyCount || String(b.lastPredictionAt).localeCompare(String(a.lastPredictionAt)));
 }
 
+function getUserCabinet(store, user) {
+  const predictions = store.forecastPredictions
+    .filter((prediction) => prediction.userId === user.id)
+    .map((prediction) => {
+      const tournament = store.forecastTournaments.find((item) => item.id === prediction.tournamentId);
+      return {
+        forecastPoints: 0,
+        prediction: sanitizeForecastPrediction(prediction, tournament),
+        tournament: tournament ? sanitizeTournament(tournament, store.forecastPredictions) : null,
+      };
+    })
+    .sort((a, b) => String(b.prediction?.updatedAt).localeCompare(String(a.prediction?.updatedAt)));
+  const needsReviewCount = predictions.filter((item) => item.prediction?.needsReview).length;
+
+  return {
+    forecastPoints: 0,
+    needsReviewCount,
+    predictionCount: predictions.length,
+    predictions,
+    readyPredictionCount: Math.max(0, predictions.length - needsReviewCount),
+    tournamentPoints: 0,
+  };
+}
+
 function sanitizeTournament(tournament, forecastPredictions = []) {
   const roster = Array.isArray(tournament.roster) ? tournament.roster : [];
 
@@ -719,6 +743,17 @@ async function handleApi(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/forecast-leaderboard") {
     jsonResponse(response, 200, { leaders: getForecastLeaderboard(store) });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/me/cabinet") {
+    const user = getAuthedUser(store, request);
+    if (user?.status !== "active") {
+      jsonResponse(response, 403, { message: "Кабинет доступен только подтвержденным участникам." });
+      return;
+    }
+
+    jsonResponse(response, 200, getUserCabinet(store, user));
     return;
   }
 
