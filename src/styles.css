@@ -41,6 +41,10 @@
     overflow-x: auto;
   }
 
+  .leaders-board-head {
+    flex-direction: column;
+  }
+
   .leaders-table-head.tournament,
   .leaders-table-row.tournament {
     min-width: 650px;
@@ -2744,6 +2748,36 @@ p {
 
 .leaders-board {
   padding: 22px;
+}
+
+.leaders-board-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.leaders-league-switch {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.leaders-league-switch button {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--green);
+  cursor: pointer;
+  font-weight: 900;
+  min-width: 62px;
+  padding: 9px 11px;
+}
+
+.leaders-league-switch button.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fffefa;
 }
 
 .leaders-table-head,

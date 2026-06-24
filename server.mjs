@@ -24,6 +24,7 @@ const mimeTypes = {
 };
 
 const allowedClubs = new Set(["Padel Pro Club", 'Падел-клуб "Небо"']);
+const allowedTournamentLeagues = new Set(["pro", "lite"]);
 
 const defaultScoringMethod = {
   createdAt: new Date(0).toISOString(),
@@ -72,6 +73,15 @@ function sanitizeLeaderboardPointMethod(method = defaultLeaderboardPointMethod) 
     points: method.points ?? defaultLeaderboardPointMethod.points,
     updatedAt: method.updatedAt ?? null,
   };
+}
+
+function normalizeTournamentLeague(value, title = "") {
+  const rawValue = String(value ?? "").trim().toLowerCase();
+  if (allowedTournamentLeagues.has(rawValue)) {
+    return rawValue;
+  }
+
+  return String(title).toLowerCase().includes("lite") ? "lite" : "pro";
 }
 
 function ensureStore() {
@@ -237,6 +247,7 @@ function sanitizeTournament(tournament, forecastPredictions = []) {
     format: tournament.format ?? "",
     id: tournament.id,
     image: tournament.image ?? "/assets/hero-court.png",
+    league: normalizeTournamentLeague(tournament.league, tournament.title),
     players: tournament.players ?? `${roster.length} игроков`,
     predictionCount: getTournamentPredictionCount(tournament.id, forecastPredictions),
     pointsToWin: tournament.pointsToWin ?? "",
@@ -644,6 +655,7 @@ function buildForecastTournamentFromBody(body, store, existingTournament = null)
   const time = String(body.time ?? existingTournament?.time ?? "").trim();
   const club = String(body.club ?? existingTournament?.club ?? "Padel Pro Club").trim();
   const format = String(body.format ?? existingTournament?.format ?? "").trim();
+  const league = normalizeTournamentLeague(body.league ?? existingTournament?.league, title);
   const conditions = String(body.conditions ?? existingTournament?.conditions ?? "").trim();
   const rawPointsToWin = body.pointsToWin ?? existingTournament?.pointsToWin;
   const pointsToWin = format === "Americano" ? Number(rawPointsToWin) : null;
@@ -683,6 +695,7 @@ function buildForecastTournamentFromBody(body, store, existingTournament = null)
       format,
       id: existingTournament?.id ?? `forecast-${Date.now()}-${randomUUID().slice(0, 8)}`,
       image: existingTournament?.image ?? "/assets/hero-court.png",
+      league,
       players: `${roster.length} игроков`,
       pointsToWin,
       predictionCloseAt,

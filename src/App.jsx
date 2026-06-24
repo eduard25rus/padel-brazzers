@@ -246,6 +246,7 @@ const tournamentRegistry = [
     dateOrder: "2026-06-21",
     club: "Padel Pro Club",
     format: "Mexicano",
+    league: "lite",
     teams: "12 игроков",
     rounds: "11 раундов",
     matches: "33 матча",
@@ -261,6 +262,7 @@ const tournamentRegistry = [
     dateOrder: "2026-06-17",
     club: "Padel Pro Club",
     format: "Americano",
+    league: "pro",
     teams: "12 игроков",
     rounds: "11 раундов",
     matches: "33 матча",
@@ -323,6 +325,10 @@ const fallbackLeaderboardPointMethods = [
 const authTokenStorageKey = "padel-brazzers-auth-token";
 const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, notifications: [], users: [] };
 const defaultSettings = { predictionRegistryVisibility: "admin" };
+const tournamentLeagueOptions = [
+  { label: "PRO", name: "PRO-турнир", value: "pro" },
+  { label: "LITE", name: "LITE-турнир", value: "lite" },
+];
 const placeholderTitles = {
   community: "Сообщество",
   leaders: "Лидеры",
@@ -548,6 +554,19 @@ function getLeaderboardPoints(method, scale, place) {
   return Number(method?.points?.[scale]?.[String(place)] ?? method?.points?.[scale]?.[place] ?? 0);
 }
 
+function normalizeTournamentLeague(value, title = "") {
+  const rawValue = String(value ?? "").trim().toLowerCase();
+  if (rawValue === "pro" || rawValue === "lite") {
+    return rawValue;
+  }
+
+  return String(title).toLowerCase().includes("lite") ? "lite" : "pro";
+}
+
+function getTournamentLeagueLabel(league) {
+  return tournamentLeagueOptions.find((option) => option.value === league)?.label ?? "PRO";
+}
+
 function formatPointsJson(points) {
   return JSON.stringify(points ?? defaultLeaderboardPoints, null, 2);
 }
@@ -569,6 +588,7 @@ function getCompletedTournamentSources(pointMethod) {
   return [
     {
       id: "mexicano-brazzers-lite",
+      league: "lite",
       month: "2026-06",
       title: "Mexicano Brazzers LITE",
       type: "Личный",
@@ -580,6 +600,7 @@ function getCompletedTournamentSources(pointMethod) {
     },
     {
       id: "americano-brazzers-pro",
+      league: "pro",
       month: "2026-06",
       title: "Americano Brazzers PRO",
       type: "Личный",
@@ -592,9 +613,12 @@ function getCompletedTournamentSources(pointMethod) {
   ];
 }
 
-function getTournamentLeaders(pointMethod, period = "all") {
+function getTournamentLeaders(pointMethod, period = "all", league = "pro") {
   const rowsByName = new Map();
-  const tournaments = getCompletedTournamentSources(pointMethod).filter((tournament) => period === "all" || tournament.month === period);
+  const tournaments = getCompletedTournamentSources(pointMethod).filter((tournament) => (
+    (period === "all" || tournament.month === period)
+    && normalizeTournamentLeague(tournament.league, tournament.title) === league
+  ));
 
   for (const tournament of tournaments) {
     for (const row of tournament.rows) {
@@ -1625,6 +1649,7 @@ function makeTournamentFormState(scoringMethods, tournament = null) {
     conditions: "",
     date: "",
     format: "Americano",
+    league: "pro",
     pointsToWin: "11",
     scoringMethodId: scoringMethods[0]?.id ?? "",
     time: "",
@@ -1634,6 +1659,7 @@ function makeTournamentFormState(scoringMethods, tournament = null) {
       conditions: tournament.conditions ?? "",
       date: tournament.date ?? "",
       format: tournament.format ?? "Americano",
+      league: normalizeTournamentLeague(tournament.league, tournament.title),
       pointsToWin: tournament.pointsToWin ? String(tournament.pointsToWin) : "11",
       scoringMethodId: tournament.scoringMethodId || tournament.scoringMethod?.id || scoringMethods[0]?.id || "",
       time: tournament.time ?? "",
@@ -1743,6 +1769,14 @@ function AdminTournamentForm({
               <option>Mexicano</option>
               <option>Round Robin</option>
               <option>King of the Court</option>
+            </select>
+          </label>
+          <label>
+            <span>Лига</span>
+            <select value={form.league} onChange={(event) => updateForm("league", event.target.value)}>
+              {tournamentLeagueOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.name}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -2864,7 +2898,7 @@ function ForecastTournamentDetail({
   );
 }
 
-function HomeScreen({ auth, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament }) {
+function HomeScreen({ auth, forecastLeaders, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament, pointMethod }) {
   const tournaments = tournamentRegistry;
   const openForecastTournaments = forecastTournaments
     .filter((tournament) => {
@@ -2873,6 +2907,9 @@ function HomeScreen({ auth, forecastTournaments, onOpenHome, onOpenPlaceholder, 
     })
     .sort((a, b) => (getVladivostokDeadlineMs(a.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER) - (getVladivostokDeadlineMs(b.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER));
   const nearestForecast = openForecastTournaments[0];
+  const proLeader = getTournamentLeaders(pointMethod, "all", "pro")[0];
+  const liteLeader = getTournamentLeaders(pointMethod, "all", "lite")[0];
+  const forecastLeader = getForecastLeadersForPeriod(forecastLeaders, "all")[0];
 
   return (
     <main className="home-shell">
@@ -2955,18 +2992,25 @@ function HomeScreen({ auth, forecastTournaments, onOpenHome, onOpenPlaceholder, 
               <h2>Кто сейчас задает темп</h2>
             </div>
             <LeaderCard
-              eyebrow="За все время"
+              eyebrow="Лучший PRO"
               image="/assets/forehand.png"
-              meta="152 матча · 79% побед"
-              metric={{ label: "Рейтинг", value: "3.13" }}
-              name="Редько Илья"
+              meta={proLeader ? `${proLeader.points} очков · ${proLeader.tournaments} турн. · ${proLeader.wins} побед` : "PRO-очки появятся после турнира"}
+              metric={{ label: "Очки", value: proLeader?.points ?? 0 }}
+              name={proLeader?.name ?? "Пока нет"}
             />
             <LeaderCard
-              eyebrow="За месяц"
+              eyebrow="Лучший LITE"
               image="/assets/handshake.png"
-              meta="24 матча · 87% побед"
-              metric={{ label: "Рост", value: "+0.234" }}
-              name="Ткачев Тимур"
+              meta={liteLeader ? `${liteLeader.points} очков · ${liteLeader.tournaments} турн. · ${liteLeader.wins} побед` : "LITE-очки появятся после турнира"}
+              metric={{ label: "Очки", value: liteLeader?.points ?? 0 }}
+              name={liteLeader?.name ?? "Пока нет"}
+            />
+            <LeaderCard
+              eyebrow="Лучший прогнозист"
+              image="/assets/trophy.png"
+              meta={forecastLeader ? `${forecastLeader.periodPredictions} прогнозов · ${forecastLeader.periodReady} готово` : "Прогнозы появятся после ставок"}
+              metric={{ label: "Очки", value: forecastLeader?.periodPoints ?? 0 }}
+              name={forecastLeader?.name ?? "Пока нет"}
             />
           </section>
 
@@ -3310,7 +3354,9 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
     return ["all", ...[...months].sort((a, b) => b.localeCompare(a))];
   }, [forecastLeaders, pointMethod]);
   const [period, setPeriod] = useState("all");
-  const tournamentLeaders = useMemo(() => getTournamentLeaders(pointMethod, period), [pointMethod, period]);
+  const [tournamentLeague, setTournamentLeague] = useState("pro");
+  const tournamentLeagueLabel = getTournamentLeagueLabel(tournamentLeague);
+  const tournamentLeaders = useMemo(() => getTournamentLeaders(pointMethod, period, tournamentLeague), [pointMethod, period, tournamentLeague]);
   const forecastRows = useMemo(() => getForecastLeadersForPeriod(forecastLeaders, period), [forecastLeaders, period]);
   const tournamentWinner = tournamentLeaders[0];
   const forecastWinner = forecastRows[0];
@@ -3347,7 +3393,7 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
 
       <section className="leaders-summary-grid">
         <article className="surface leaders-summary-card">
-          <span>Турниры</span>
+          <span>Турниры {tournamentLeagueLabel}</span>
           <strong>{tournamentWinner?.name ?? "Пока нет"}</strong>
           <p>{tournamentWinner ? `${tournamentWinner.points} очков · ${tournamentWinner.tournaments} турнира · ${tournamentWinner.wins} побед` : "Очки появятся после внесения результатов."}</p>
           <div>
@@ -3368,9 +3414,23 @@ function LeadersScreen({ auth, forecastLeaders, onOpenHome, onOpenPlaceholder, o
 
       <section className="leaders-board-grid">
         <section className="surface leaders-board">
-          <div className="section-title">
-            <span>Клубные очки</span>
-            <h2>Лидеры турниров</h2>
+          <div className="leaders-board-head">
+            <div className="section-title">
+              <span>Клубные очки</span>
+              <h2>Лидеры турниров {tournamentLeagueLabel}</h2>
+            </div>
+            <div className="leaders-league-switch" aria-label="Фильтр лиги турниров">
+              {tournamentLeagueOptions.map((option) => (
+                <button
+                  className={tournamentLeague === option.value ? "active" : ""}
+                  type="button"
+                  onClick={() => setTournamentLeague(option.value)}
+                  key={option.value}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="leaders-table-head tournament">
             <span>#</span>
@@ -4118,6 +4178,7 @@ export function App() {
     <>
       <HomeScreen
         auth={auth}
+        forecastLeaders={forecastLeaders}
         forecastTournaments={forecastTournaments}
         onOpenHome={() => navigate({ name: "home" })}
         onOpenPlaceholder={openPlaceholder}
@@ -4125,6 +4186,7 @@ export function App() {
         onOpenTournament={(tournamentId) => {
           navigate({ name: "detail", tournamentId });
         }}
+        pointMethod={activeLeaderboardPointMethod}
       />
       {authModal}
     </>
