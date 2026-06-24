@@ -305,6 +305,62 @@ const fallbackScoringMethods = [
 const authTokenStorageKey = "padel-brazzers-auth-token";
 const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, notifications: [], users: [] };
 const defaultSettings = { predictionRegistryVisibility: "admin" };
+const placeholderTitles = {
+  community: "Сообщество",
+  leaders: "Лидеры",
+};
+const adminSections = new Set(["approvals", "tournament", "scoring", "members", "settings"]);
+
+function getInitialScreenFromLocation() {
+  if (typeof window === "undefined") {
+    return { name: "home" };
+  }
+
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const parts = path.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
+
+  if (parts[0] === "predictions") {
+    return parts[1] ? { name: "forecast-detail", tournamentId: parts[1] } : { name: "predictions" };
+  }
+
+  if (parts[0] === "admin") {
+    return adminSections.has(parts[1]) ? { name: "admin", section: parts[1] } : { name: "admin" };
+  }
+
+  if (parts[0] === "tournaments" && parts[1]) {
+    return { name: "detail", tournamentId: parts[1] };
+  }
+
+  if (placeholderTitles[parts[0]]) {
+    return { name: "placeholder", sectionKey: parts[0], sectionTitle: placeholderTitles[parts[0]] };
+  }
+
+  return { name: "home" };
+}
+
+function pathForScreen(screen) {
+  if (screen.name === "predictions") {
+    return "/predictions";
+  }
+
+  if (screen.name === "forecast-detail") {
+    return `/predictions/${encodeURIComponent(screen.tournamentId)}`;
+  }
+
+  if (screen.name === "admin") {
+    return screen.section ? `/admin/${encodeURIComponent(screen.section)}` : "/admin";
+  }
+
+  if (screen.name === "detail") {
+    return `/tournaments/${encodeURIComponent(screen.tournamentId)}`;
+  }
+
+  if (screen.name === "placeholder") {
+    return `/${encodeURIComponent(screen.sectionKey)}`;
+  }
+
+  return "/";
+}
 
 function getStoredAuthToken() {
   if (typeof window === "undefined") {
@@ -394,6 +450,41 @@ function formatVladivostokInstant(value) {
     timeZone: "Asia/Vladivostok",
     year: "numeric",
   }).format(new Date(value)).replace(",", "");
+}
+
+function getVladivostokDeadlineMs(value) {
+  if (!value || !value.includes("T")) {
+    return null;
+  }
+
+  return new Date(`${value}:00+10:00`).getTime();
+}
+
+function formatForecastTimeLeft(value) {
+  const deadline = getVladivostokDeadlineMs(value);
+  if (!deadline) {
+    return "дедлайн скоро появится";
+  }
+
+  const diff = deadline - Date.now();
+  if (diff <= 0) {
+    return "прием закрыт";
+  }
+
+  const totalMinutes = Math.ceil(diff / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days} д. ${hours} ч.`;
+  }
+
+  if (hours > 0) {
+    return `${hours} ч. ${minutes} мин.`;
+  }
+
+  return `${minutes} мин.`;
 }
 
 function describeScoringMethod(method) {
@@ -1752,15 +1843,15 @@ function AdminSectionShell({ children, eyebrow, onBack, title }) {
   );
 }
 
-function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onUpdateSettings, scoringMethods, settings }) {
-  const [activeSection, setActiveSection] = useState(null);
+function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, onCreateTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, onUpdateSettings, scoringMethods, section, settings }) {
+  const activeSection = section ?? null;
   const pendingUsers = auth.users.filter((user) => user.status === "pending");
   const activeMembers = auth.users.filter((user) => user.status === "active");
 
   const renderActiveSection = () => {
     if (activeSection === "approvals") {
       return (
-        <AdminSectionShell eyebrow="Акцепт заявок" onBack={() => setActiveSection(null)} title="Проверка новых регистраций">
+        <AdminSectionShell eyebrow="Акцепт заявок" onBack={() => onOpenSection(null)} title="Проверка новых регистраций">
           <AdminApprovalPanel users={auth.users} onApproveUser={auth.onApproveUser} />
         </AdminSectionShell>
       );
@@ -1768,7 +1859,7 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
 
     if (activeSection === "tournament") {
       return (
-        <AdminSectionShell eyebrow="Прогнозы" onBack={() => setActiveSection(null)} title="Добавить турнир для прогнозов">
+        <AdminSectionShell eyebrow="Прогнозы" onBack={() => onOpenSection(null)} title="Добавить турнир для прогнозов">
           <AdminTournamentForm
             forecastTournaments={forecastTournaments}
             onSubmitTournament={onCreateTournament}
@@ -1780,7 +1871,7 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
 
     if (activeSection === "scoring") {
       return (
-        <AdminSectionShell eyebrow="Методики подсчета" onBack={() => setActiveSection(null)} title="Настройки очков для прогнозов">
+        <AdminSectionShell eyebrow="Методики подсчета" onBack={() => onOpenSection(null)} title="Настройки очков для прогнозов">
           <AdminScoringMethodsPanel onCreateScoringMethod={onCreateScoringMethod} scoringMethods={scoringMethods} />
         </AdminSectionShell>
       );
@@ -1788,7 +1879,7 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
 
     if (activeSection === "members") {
       return (
-        <AdminSectionShell eyebrow="Члены клуба" onBack={() => setActiveSection(null)} title="Все зарегистрированные участники">
+        <AdminSectionShell eyebrow="Члены клуба" onBack={() => onOpenSection(null)} title="Все зарегистрированные участники">
           <AdminMembersPanel users={auth.users} />
         </AdminSectionShell>
       );
@@ -1796,7 +1887,7 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
 
     if (activeSection === "settings") {
       return (
-        <AdminSectionShell eyebrow="Настройки CRM" onBack={() => setActiveSection(null)} title="Права видимости на сайте">
+        <AdminSectionShell eyebrow="Настройки CRM" onBack={() => onOpenSection(null)} title="Права видимости на сайте">
           <AdminPredictionSettingsPanel onUpdateSettings={onUpdateSettings} settings={settings} />
         </AdminSectionShell>
       );
@@ -1835,31 +1926,31 @@ function AdminCabinetScreen({ auth, forecastTournaments, onCreateScoringMethod, 
 
       {activeSection ? renderActiveSection() : (
         <section className="admin-menu-grid">
-          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("approvals")}>
+          <button className="admin-menu-card surface" type="button" onClick={() => onOpenSection("approvals")}>
             <span>Акцепт заявок</span>
             <strong>{pendingUsers.length ? `${pendingUsers.length} ожидают проверки` : "Новых заявок нет"}</strong>
             <p>Открыть заявки, проверить данные участника и принять регистрацию.</p>
           </button>
 
-          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("tournament")}>
+          <button className="admin-menu-card surface" type="button" onClick={() => onOpenSection("tournament")}>
             <span>Прогнозы</span>
             <strong>Добавить турнир</strong>
             <p>Дата, формат, условия, состав игроков и рейтинги для нового прогноза.</p>
           </button>
 
-          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("scoring")}>
+          <button className="admin-menu-card surface" type="button" onClick={() => onOpenSection("scoring")}>
             <span>Методики</span>
             <strong>{scoringMethods.length} сохранено</strong>
             <p>Настрой правила начисления очков и выбирай их при создании турнира.</p>
           </button>
 
-          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("members")}>
+          <button className="admin-menu-card surface" type="button" onClick={() => onOpenSection("members")}>
             <span>Члены клуба</span>
             <strong>{activeMembers.length} активных из {auth.users.length}</strong>
             <p>Полный список зарегистрированных аккаунтов со статусами и контактами.</p>
           </button>
 
-          <button className="admin-menu-card surface" type="button" onClick={() => setActiveSection("settings")}>
+          <button className="admin-menu-card surface" type="button" onClick={() => onOpenSection("settings")}>
             <span>Настройки</span>
             <strong>{settings.predictionRegistryVisibility === "all" ? "Реестр открыт" : "Только админ"}</strong>
             <p>Выбрать, кто может раскрывать список участников, уже сделавших прогноз.</p>
@@ -2481,8 +2572,15 @@ function ForecastTournamentDetail({
   );
 }
 
-function HomeScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament }) {
+function HomeScreen({ auth, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament }) {
   const tournaments = tournamentRegistry;
+  const openForecastTournaments = forecastTournaments
+    .filter((tournament) => {
+      const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
+      return !deadline || deadline > Date.now();
+    })
+    .sort((a, b) => (getVladivostokDeadlineMs(a.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER) - (getVladivostokDeadlineMs(b.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER));
+  const nearestForecast = openForecastTournaments[0];
 
   return (
     <main className="home-shell">
@@ -2583,13 +2681,26 @@ function HomeScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions, on
           <section className="surface side-panel prediction-teaser-panel" id="community">
             <div className="section-title">
               <span>Прогнозы</span>
-              <h2>Соберите свой топ до старта</h2>
+              <h2>{openForecastTournaments.length ? "Доступные турниры для прогнозов" : "Соберите свой топ до старта"}</h2>
             </div>
-            <p>
-              Участник входит в кабинет, ранжирует состав будущего турнира и после
-              финала видит, сколько точных мест угадал.
-            </p>
-            <button type="button" onClick={onOpenPredictions}>Открыть прогнозы</button>
+            {nearestForecast ? (
+              <div className="prediction-teaser-live">
+                <strong>{openForecastTournaments.length}</strong>
+                <span>{openForecastTournaments.length === 1 ? "турнир открыт" : "турниров открыто"}</span>
+                <p>
+                  Ближайший: {nearestForecast.title}. До закрытия приема прогнозов осталось {formatForecastTimeLeft(nearestForecast.predictionCloseAt)}.
+                </p>
+                <button type="button" onClick={() => onOpenPredictions(nearestForecast.id)}>Перейти к прогнозу</button>
+              </div>
+            ) : (
+              <>
+                <p>
+                  Участник входит в кабинет, ранжирует состав будущего турнира и после
+                  финала видит, сколько точных мест угадал.
+                </p>
+                <button type="button" onClick={() => onOpenPredictions()}>Открыть прогнозы</button>
+              </>
+            )}
           </section>
         </aside>
       </section>
@@ -2609,12 +2720,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions })
         onOpenHome={onBack}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
-        action={(
-          <div className="prediction-top-actions">
-            <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
-            <AuthControls {...auth} />
-          </div>
-        )}
+        action={<AuthControls {...auth} />}
       />
 
       <section className="page-grid americano-page-grid" id="top">
@@ -2703,12 +2809,7 @@ function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }) 
         onOpenHome={onBack}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
-        action={(
-          <div className="prediction-top-actions">
-            <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
-            <AuthControls {...auth} />
-          </div>
-        )}
+        action={<AuthControls {...auth} />}
       />
 
       <section className="page-grid americano-page-grid" id="top">
@@ -2797,12 +2898,7 @@ function TournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions }
         onOpenHome={onBack}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
-        action={(
-          <div className="prediction-top-actions">
-            <button className="back-link" type="button" onClick={onBack}>Все турниры</button>
-            <AuthControls {...auth} />
-          </div>
-        )}
+        action={<AuthControls {...auth} />}
       />
 
       <section className="page-grid" id="top">
@@ -2909,7 +3005,7 @@ function PlaceholderScreen({ active, auth, onOpenHome, onOpenPlaceholder, onOpen
 }
 
 export function App() {
-  const [screen, setScreen] = useState({ name: "home" });
+  const [screen, setScreen] = useState(() => getInitialScreenFromLocation());
   const [authState, setAuthState] = useState(emptyAuthState);
   const [authMode, setAuthMode] = useState(null);
   const [forecastTournaments, setForecastTournaments] = useState([]);
@@ -2918,6 +3014,27 @@ export function App() {
   const currentUser = authState.currentUser;
   const canOpenPredictions = currentUser?.status === "active";
   const canOpenAdmin = currentUser?.role === "admin" && currentUser?.status === "active";
+
+  const navigate = (nextScreen, options = {}) => {
+    setScreen(nextScreen);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextPath = pathForScreen(nextScreen);
+    if (window.location.pathname !== nextPath) {
+      window.history[options.replace ? "replaceState" : "pushState"]({}, "", nextPath);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setScreen(getInitialScreenFromLocation());
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     const loadServerAuthState = async () => {
@@ -3004,7 +3121,7 @@ export function App() {
         method: "DELETE",
       });
       setForecastTournaments(result.tournaments ?? []);
-      setScreen({ name: "predictions" });
+      navigate({ name: "predictions" }, { replace: true });
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -3072,19 +3189,20 @@ export function App() {
     }
   };
 
-  const openPredictions = () => {
-    setScreen({ name: "predictions" });
+  const openPredictions = (tournamentId = null) => {
+    const targetTournamentId = typeof tournamentId === "string" ? tournamentId : null;
+    navigate(targetTournamentId ? { name: "forecast-detail", tournamentId: targetTournamentId } : { name: "predictions" });
     if (!currentUser) {
       setAuthMode("login");
     }
   };
 
   const openPlaceholder = (sectionKey, sectionTitle) => {
-    setScreen({ name: "placeholder", sectionKey, sectionTitle });
+    navigate({ name: "placeholder", sectionKey, sectionTitle });
   };
 
   const openAdminCabinet = () => {
-    setScreen({ name: "admin" });
+    navigate({ name: "admin" });
   };
 
   const registerUser = async (payload) => {
@@ -3094,7 +3212,7 @@ export function App() {
         method: "POST",
       });
       applyAuthPayload(result);
-      setScreen({ name: "predictions" });
+      navigate({ name: "predictions" }, { replace: true });
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -3108,7 +3226,7 @@ export function App() {
         method: "POST",
       });
       applyAuthPayload(result);
-      setScreen({ name: "predictions" });
+      navigate({ name: "predictions" }, { replace: true });
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -3124,7 +3242,7 @@ export function App() {
 
     storeAuthToken("");
     setAuthState((state) => ({ ...state, currentUser: null, notifications: [], users: [] }));
-    setScreen({ name: "home" });
+    navigate({ name: "home" }, { replace: true });
   };
 
   const approveUser = async (userId) => {
@@ -3148,7 +3266,7 @@ export function App() {
     users: authState.users,
     onApproveUser: approveUser,
     onOpenAdmin: openAdminCabinet,
-    onOpenForecastTournament: (tournamentId) => setScreen({ name: "forecast-detail", tournamentId }),
+    onOpenForecastTournament: (tournamentId) => navigate({ name: "forecast-detail", tournamentId }),
     onLogin: () => setAuthMode("login"),
     onLogout: logoutUser,
     onReadNotification: readNotification,
@@ -3182,7 +3300,7 @@ export function App() {
         <>
           <LockedPredictionsScreen
             auth={auth}
-            onOpenHome={() => setScreen({ name: "home" })}
+            onOpenHome={() => navigate({ name: "home" })}
             onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
           />
@@ -3198,11 +3316,13 @@ export function App() {
           forecastTournaments={forecastTournaments}
           onCreateScoringMethod={createScoringMethod}
           onCreateTournament={createForecastTournament}
-          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
+          onOpenSection={(section) => navigate({ name: "admin", ...(section ? { section } : {}) })}
           onUpdateSettings={updateSettings}
           scoringMethods={scoringMethods}
+          section={screen.section}
           settings={settings}
         />
         {authModal}
@@ -3218,7 +3338,7 @@ export function App() {
         <>
           <LockedPredictionsScreen
             auth={auth}
-            onOpenHome={() => setScreen({ name: "home" })}
+            onOpenHome={() => navigate({ name: "home" })}
             onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
           />
@@ -3232,11 +3352,11 @@ export function App() {
         <ForecastTournamentDetail
           auth={auth}
           forecastTournaments={forecastTournaments}
-          onBack={() => setScreen({ name: "predictions" })}
+          onBack={() => navigate({ name: "predictions" })}
           onDeleteTournament={deleteForecastTournament}
           onLoadForecastPrediction={loadForecastPrediction}
           onLoadForecastPredictionSummary={loadForecastPredictionSummary}
-          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           onSaveForecastPrediction={saveForecastPrediction}
@@ -3256,7 +3376,7 @@ export function App() {
         <>
           <LockedPredictionsScreen
             auth={auth}
-            onOpenHome={() => setScreen({ name: "home" })}
+            onOpenHome={() => navigate({ name: "home" })}
             onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
           />
@@ -3270,10 +3390,10 @@ export function App() {
         <ForecastRegistryScreen
           auth={auth}
           forecastTournaments={forecastTournaments}
-          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
-          onOpenTournament={(tournamentId) => setScreen({ name: "forecast-detail", tournamentId })}
+          onOpenTournament={(tournamentId) => navigate({ name: "forecast-detail", tournamentId })}
         />
         {authModal}
       </>
@@ -3286,7 +3406,7 @@ export function App() {
         <>
           <MexicanoDetail
             auth={auth}
-            onBack={() => setScreen({ name: "home" })}
+            onBack={() => navigate({ name: "home" })}
             onOpenPlaceholder={openPlaceholder}
             onOpenPredictions={openPredictions}
           />
@@ -3299,7 +3419,7 @@ export function App() {
       <>
         <AmericanoDetail
           auth={auth}
-          onBack={() => setScreen({ name: "home" })}
+          onBack={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
         />
@@ -3314,7 +3434,7 @@ export function App() {
         <PlaceholderScreen
           active={screen.sectionKey}
           auth={auth}
-          onOpenHome={() => setScreen({ name: "home" })}
+          onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           title={screen.sectionTitle}
@@ -3328,11 +3448,12 @@ export function App() {
     <>
       <HomeScreen
         auth={auth}
-        onOpenHome={() => setScreen({ name: "home" })}
+        forecastTournaments={forecastTournaments}
+        onOpenHome={() => navigate({ name: "home" })}
         onOpenPlaceholder={openPlaceholder}
         onOpenPredictions={openPredictions}
         onOpenTournament={(tournamentId) => {
-          setScreen({ name: "detail", tournamentId });
+          navigate({ name: "detail", tournamentId });
         }}
       />
       {authModal}

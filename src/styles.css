@@ -759,6 +759,29 @@ main {
   margin-bottom: 18px;
 }
 
+.prediction-teaser-live {
+  display: grid;
+  gap: 8px;
+}
+
+.prediction-teaser-live strong {
+  color: #1b241d;
+  font-size: 46px;
+  line-height: 0.95;
+}
+
+.prediction-teaser-live span {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.prediction-teaser-live p {
+  margin: 6px 0 10px;
+}
+
 .prediction-teaser-panel button,
 .prediction-login-form button,
 .prediction-card-head button,
