@@ -899,6 +899,17 @@ function getPairRating(players, playerPool = americanoPlayers) {
   }, 0);
 }
 
+function formatTournamentRecord(wins, losses, draws = 0) {
+  const winCount = Number(wins ?? 0);
+  const drawCount = Number(draws ?? 0);
+  const lossCount = Number(losses ?? 0);
+  return drawCount > 0 ? `${winCount}–${drawCount}–${lossCount}` : `${winCount}–${lossCount}`;
+}
+
+function formatScorePair(pointsFor, pointsAgainst) {
+  return `${Number(pointsFor ?? 0)}–${Number(pointsAgainst ?? 0)}`;
+}
+
 function PairRatingBadge({ players, playerPool = americanoPlayers }) {
   return <span className="pair-rating-badge">{getPairRating(players, playerPool).toFixed(1)}</span>;
 }
@@ -2621,8 +2632,8 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
                     <span className="team-badge player-rating small">{Number(row.rating_after || row.rating_before || 0).toFixed(1)}</span>
                     <strong>{row.player_name}</strong>
                   </div>
-                  <span>{row.wins}-0-{row.losses}</span>
-                  <span>{row.points_for}-{row.points_against}</span>
+                  <span>{formatTournamentRecord(row.wins, row.losses, row.draws)}</span>
+                  <span>{formatScorePair(row.points_for, row.points_against)}</span>
                   <em className={Number(row.delta) >= 0 ? "positive" : "negative"}>{Number(row.delta) > 0 ? `+${row.delta}` : row.delta}</em>
                   <strong className="club-points">+{row.club_points}</strong>
                 </article>
@@ -3200,8 +3211,8 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
                   <span className="team-badge player-rating small">{Number(item.ratingAfter || item.ratingBefore || 0).toFixed(1)}</span>
                   <strong>{item.playerName}</strong>
                 </div>
-                <span>{item.wins}-0-{item.losses}</span>
-                <span>{item.pointsFor}-{item.pointsAgainst}</span>
+                <span>{formatTournamentRecord(item.wins, item.losses, item.draws)}</span>
+                <span>{formatScorePair(item.pointsFor, item.pointsAgainst)}</span>
                 <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
                 <strong className="club-points">+{item.clubPoints}</strong>
               </article>
