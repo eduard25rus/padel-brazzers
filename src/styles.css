@@ -218,6 +218,7 @@ main {
   display: flex;
   gap: 10px;
   padding: 7px;
+  position: relative;
 }
 
 .auth-user-card > span {
@@ -255,6 +256,57 @@ main {
   color: var(--muted);
   font-size: 11px;
   margin-top: 2px;
+}
+
+.auth-notification-popover {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(24, 36, 26, 0.16);
+  display: grid;
+  gap: 10px;
+  min-width: min(360px, calc(100vw - 32px));
+  padding: 10px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+}
+
+.auth-notification-popover article {
+  background: rgba(29, 93, 42, 0.07);
+  border: 1px solid rgba(29, 93, 42, 0.13);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+}
+
+.auth-notification-popover article.read {
+  background: rgba(255, 254, 250, 0.7);
+}
+
+.auth-notification-popover article > span {
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-notification-popover p {
+  color: #526054;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.auth-notification-popover article > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
 }
 
 .back-link {
@@ -1742,6 +1794,22 @@ main {
 
 .prediction-slot.filled:active {
   cursor: grabbing;
+}
+
+.prediction-slot.invalid {
+  background: rgba(219, 63, 74, 0.08);
+  border-color: rgba(219, 63, 74, 0.4);
+  border-style: solid;
+  cursor: pointer;
+}
+
+.prediction-slot.invalid > span {
+  background: var(--loss);
+}
+
+.prediction-slot.invalid strong,
+.prediction-slot.invalid b {
+  color: var(--loss);
 }
 
 .prediction-slot > span {

@@ -303,7 +303,7 @@ const fallbackScoringMethods = [
 ];
 
 const authTokenStorageKey = "padel-brazzers-auth-token";
-const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, users: [] };
+const emptyAuthState = { currentUser: null, hasUsers: false, loading: true, notifications: [], users: [] };
 
 function getStoredAuthToken() {
   if (typeof window === "undefined") {
@@ -438,6 +438,18 @@ function buildForecastSlotsFromPrediction(prediction, roster) {
     const player = rosterById.get(String(placement.playerId));
     if (slotIndex >= 0 && slotIndex < nextSlots.length && player) {
       nextSlots[slotIndex] = player;
+    }
+  });
+
+  (prediction.invalidPlacements ?? []).forEach((placement) => {
+    const slotIndex = Number(placement.place) - 1;
+    if (slotIndex >= 0 && slotIndex < nextSlots.length) {
+      nextSlots[slotIndex] = {
+        id: placement.playerId,
+        invalid: true,
+        name: placement.playerName,
+        rating: placement.rating,
+      };
     }
   });
 
@@ -1088,10 +1100,13 @@ function MexicanoDescriptionPanel({ onClose }) {
   );
 }
 
-function AuthControls({ currentUser, onLogin, onLogout, onOpenAdmin, onRegister }) {
+function AuthControls({ currentUser, notifications = [], onLogin, onLogout, onOpenAdmin, onOpenForecastTournament, onReadNotification, onRegister }) {
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
   if (currentUser) {
     const isPending = currentUser.status === "pending";
     const canOpenAdmin = currentUser.role === "admin" && currentUser.status === "active";
+    const unreadNotifications = notifications.filter((notification) => !notification.readAt);
 
     return (
       <div className="auth-user-card">
@@ -1100,8 +1115,43 @@ function AuthControls({ currentUser, onLogin, onLogout, onOpenAdmin, onRegister 
           <strong>{getUserDisplayName(currentUser)}</strong>
           <small>{isPending ? "Ожидает подтверждения" : currentUser.role === "admin" ? "Админ" : "Участник"}</small>
         </div>
+        {notifications.length > 0 && (
+          <button type="button" onClick={() => setNotificationsOpen((value) => !value)}>
+            Уведомления {unreadNotifications.length || ""}
+          </button>
+        )}
         {canOpenAdmin && <button type="button" onClick={onOpenAdmin}>Кабинет</button>}
         <button type="button" onClick={onLogout}>Выйти</button>
+        {notificationsOpen && (
+          <div className="auth-notification-popover">
+            {notifications.map((notification) => (
+              <article className={notification.readAt ? "read" : ""} key={notification.id}>
+                <span>{notification.readAt ? "Прочитано" : "Новое"}</span>
+                <strong>{notification.title}</strong>
+                <p>{notification.message}</p>
+                <div>
+                  {notification.tournamentId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onReadNotification?.(notification.id);
+                        onOpenForecastTournament?.(notification.tournamentId);
+                        setNotificationsOpen(false);
+                      }}
+                    >
+                      Открыть прогноз
+                    </button>
+                  )}
+                  {!notification.readAt && (
+                    <button type="button" onClick={() => onReadNotification?.(notification.id)}>
+                      Прочитано
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -1921,8 +1971,9 @@ function ForecastTournamentDetail({
   const [adminEditing, setAdminEditing] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const filledSlots = forecastSlots.filter(Boolean).length;
-  const forecastPlayerIds = new Set(forecastSlots.filter(Boolean).map((slot) => String(getPlayerKey(slot))));
+  const currentForecastSlots = forecastSlots.filter((slot) => slot && !slot.invalid);
+  const filledSlots = currentForecastSlots.length;
+  const forecastPlayerIds = new Set(currentForecastSlots.map((slot) => String(getPlayerKey(slot))));
   const expectedPlayerIds = sortedRoster.slice(0, 16).map((player) => String(getPlayerKey(player)));
   const isForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => forecastPlayerIds.has(playerId));
   const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
@@ -1961,6 +2012,12 @@ function ForecastTournamentDetail({
       }
 
       setForecastSlots(buildForecastSlotsFromPrediction(result.prediction, sortedRoster));
+      if (result.prediction?.needsReview) {
+        setForecastSaveMessage("Состав турнира изменился. Красным отмечены игроки, которых уже нет в составе; поставь новых игроков из списка слева.");
+        setForecastSaveTone("error");
+        return;
+      }
+
       setForecastSaveMessage(result.prediction ? `Загружен твой сохраненный прогноз от ${formatVladivostokInstant(result.prediction.updatedAt)} VLAT.` : "");
       setForecastSaveTone("success");
     };
@@ -2024,7 +2081,7 @@ function ForecastTournamentDetail({
     setForecastSaveMessage("");
     setForecastSaveTone("success");
     const placements = forecastSlots
-      .map((slot, index) => (slot ? { place: index + 1, playerId: String(getPlayerKey(slot)) } : null))
+      .map((slot, index) => (slot && !slot.invalid ? { place: index + 1, playerId: String(getPlayerKey(slot)) } : null))
       .filter(Boolean);
     const result = await onSaveForecastPrediction(tournament.id, { placements });
     setForecastSaving(false);
@@ -2185,7 +2242,7 @@ function ForecastTournamentDetail({
               {sortedRoster.map((player, index) => {
                 const playerId = getPlayerKey(player);
                 const isSelected = selectedPlayerId === playerId;
-                const isPlaced = forecastSlots.some((slot) => slot && getPlayerKey(slot) === playerId);
+                const isPlaced = forecastSlots.some((slot) => slot && !slot.invalid && getPlayerKey(slot) === playerId);
 
                 return (
                 <button
@@ -2237,8 +2294,8 @@ function ForecastTournamentDetail({
               <div className="prediction-slot-grid">
                 {forecastSlots.map((slot, index) => (
                   <button
-                    className={`prediction-slot ${slot ? "filled" : ""}`}
-                    draggable={Boolean(slot)}
+                    className={`prediction-slot ${slot ? "filled" : ""} ${slot?.invalid ? "invalid" : ""}`}
+                    draggable={Boolean(slot && !slot.invalid)}
                     key={`slot-${index}`}
                     type="button"
                     onClick={() => {
@@ -2253,7 +2310,7 @@ function ForecastTournamentDetail({
                     }}
                     onDragOver={(event) => event.preventDefault()}
                     onDragStart={(event) => {
-                      if (!slot) {
+                      if (!slot || slot.invalid) {
                         return;
                       }
 
@@ -2267,7 +2324,7 @@ function ForecastTournamentDetail({
                     {slot ? (
                       <div>
                         <strong>{slot.name}</strong>
-                        <b>{Number(slot.rating).toFixed(2)}</b>
+                        {slot.invalid ? <b>Выбыл из состава</b> : <b>{Number(slot.rating).toFixed(2)}</b>}
                       </div>
                     ) : (
                       <em>Место свободно</em>
@@ -2732,6 +2789,7 @@ export function App() {
           currentUser: payload.user ?? null,
           hasUsers: payload.hasUsers,
           loading: false,
+          notifications: payload.notifications ?? [],
           users: payload.users ?? [],
         });
         setForecastTournaments(forecastPayload.tournaments ?? []);
@@ -2756,6 +2814,7 @@ export function App() {
       currentUser: payload.user ?? null,
       hasUsers: payload.hasUsers ?? true,
       loading: false,
+      notifications: payload.notifications ?? [],
       users: payload.users ?? [],
     });
   };
@@ -2894,7 +2953,7 @@ export function App() {
     }
 
     storeAuthToken("");
-    setAuthState((state) => ({ ...state, currentUser: null, users: [] }));
+    setAuthState((state) => ({ ...state, currentUser: null, notifications: [], users: [] }));
     setScreen({ name: "home" });
   };
 
@@ -2903,14 +2962,26 @@ export function App() {
     await refreshAuthState();
   };
 
+  const readNotification = async (notificationId) => {
+    try {
+      const payload = await apiRequest(`/api/notifications/${notificationId}/read`, { method: "POST" });
+      applyAuthPayload(payload);
+    } catch {
+      // Notification read state is best-effort; the action target can still open.
+    }
+  };
+
   const auth = {
     currentUser,
     hasUsers: authState.hasUsers,
+    notifications: authState.notifications,
     users: authState.users,
     onApproveUser: approveUser,
     onOpenAdmin: openAdminCabinet,
+    onOpenForecastTournament: (tournamentId) => setScreen({ name: "forecast-detail", tournamentId }),
     onLogin: () => setAuthMode("login"),
     onLogout: logoutUser,
+    onReadNotification: readNotification,
     onRegister: () => setAuthMode("register"),
   };
 

@@ -39,7 +39,7 @@ const defaultScoringMethod = {
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
-    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] }, null, 2));
+    writeFileSync(storePath, JSON.stringify({ forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] }, null, 2));
   }
 }
 
@@ -55,12 +55,13 @@ function readStore() {
     return {
       forecastPredictions: Array.isArray(parsed.forecastPredictions) ? parsed.forecastPredictions : [],
       forecastTournaments: Array.isArray(parsed.forecastTournaments) ? parsed.forecastTournaments : [],
+      notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
       scoringMethods,
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
   } catch {
-    return { forecastPredictions: [], forecastTournaments: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] };
+    return { forecastPredictions: [], forecastTournaments: [], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], users: [] };
   }
 }
 
@@ -111,6 +112,8 @@ function sanitizeTournament(tournament, forecastPredictions = []) {
     scoringMethod: tournament.scoringMethod ?? null,
     scoringMethodId: tournament.scoringMethodId ?? "",
     status: tournament.status ?? "Прием прогнозов",
+    rosterChangedAt: tournament.rosterChangedAt ?? null,
+    rosterChangeRevision: tournament.rosterChangeRevision ?? 0,
     time: tournament.time ?? "",
     timezone: tournament.timezone ?? "Asia/Vladivostok",
     title: tournament.title ?? "Будущий турнир",
@@ -134,18 +137,106 @@ function sanitizeScoringMethod(method) {
   };
 }
 
-function sanitizeForecastPrediction(prediction) {
-  if (!prediction) {
+function getPlayerKey(player) {
+  return String(player?.id ?? player?.name ?? "");
+}
+
+function snapshotPlayer(player) {
+  if (!player) {
     return null;
   }
 
   return {
+    id: getPlayerKey(player),
+    name: player.name ?? "",
+    rating: Number(player.rating),
+  };
+}
+
+function getPredictionDetails(prediction, tournament) {
+  const roster = Array.isArray(tournament?.roster) ? tournament.roster : [];
+  const rosterById = new Map(roster.map((player) => [getPlayerKey(player), player]));
+  const placements = Array.isArray(prediction?.placements) ? prediction.placements : [];
+  const invalidPlacements = placements
+    .filter((placement) => !rosterById.has(String(placement.playerId)))
+    .map((placement) => ({
+      place: placement.place,
+      playerId: placement.playerId,
+      playerName: placement.playerName ?? placement.name ?? "Выбывший игрок",
+      rating: placement.rating ?? null,
+    }));
+  const currentPlacements = placements.filter((placement) => rosterById.has(String(placement.playerId)));
+  const placedCurrentIds = new Set(currentPlacements.map((placement) => String(placement.playerId)));
+  const missingPlayers = roster
+    .filter((player) => !placedCurrentIds.has(getPlayerKey(player)))
+    .sort((a, b) => Number(b.rating) - Number(a.rating) || String(a.name).localeCompare(String(b.name)));
+  const freePlaces = [
+    ...invalidPlacements.map((placement) => Number(placement.place)),
+    ...Array.from({ length: 16 }, (_, index) => index + 1).filter((place) => !placements.some((placement) => Number(placement.place) === place)),
+  ]
+    .filter((place, index, places) => Number.isInteger(place) && place >= 1 && place <= 16 && places.indexOf(place) === index)
+    .sort((a, b) => a - b);
+  const replacementPlacements = missingPlayers.slice(0, freePlaces.length).map((player, index) => ({
+    place: freePlaces[index],
+    playerId: getPlayerKey(player),
+    playerName: player.name,
+    rating: Number(player.rating),
+    autoAssigned: true,
+  }));
+  const effectivePlacements = [
+    ...currentPlacements.map((placement) => ({
+      place: Number(placement.place),
+      playerId: String(placement.playerId),
+      playerName: placement.playerName ?? rosterById.get(String(placement.playerId))?.name ?? "",
+      rating: Number(placement.rating ?? rosterById.get(String(placement.playerId))?.rating),
+    })),
+    ...replacementPlacements,
+  ].sort((a, b) => a.place - b.place);
+
+  return {
+    effectivePlacements,
+    invalidPlacements,
+    missingPlayers: missingPlayers.map(snapshotPlayer),
+    needsReview: invalidPlacements.length > 0 || missingPlayers.length > 0 || Boolean(prediction?.needsReview),
+  };
+}
+
+function sanitizeForecastPrediction(prediction, tournament = null) {
+  if (!prediction) {
+    return null;
+  }
+
+  const details = tournament ? getPredictionDetails(prediction, tournament) : {
+    effectivePlacements: Array.isArray(prediction.effectivePlacements) ? prediction.effectivePlacements : [],
+    invalidPlacements: [],
+    missingPlayers: [],
+    needsReview: Boolean(prediction.needsReview),
+  };
+
+  return {
     createdAt: prediction.createdAt,
+    effectivePlacements: details.effectivePlacements,
     id: prediction.id,
     placements: Array.isArray(prediction.placements) ? prediction.placements : [],
+    invalidPlacements: details.invalidPlacements,
+    missingPlayers: details.missingPlayers,
+    needsReview: details.needsReview,
+    rosterChangeRevision: prediction.rosterChangeRevision ?? null,
     tournamentId: prediction.tournamentId,
     updatedAt: prediction.updatedAt,
     userId: prediction.userId,
+  };
+}
+
+function sanitizeNotification(notification) {
+  return {
+    createdAt: notification.createdAt,
+    id: notification.id,
+    message: notification.message,
+    readAt: notification.readAt ?? null,
+    title: notification.title,
+    tournamentId: notification.tournamentId ?? null,
+    type: notification.type ?? "info",
   };
 }
 
@@ -203,6 +294,11 @@ function authPayload(store, user = null, token) {
   return {
     ...(token !== undefined ? { token } : {}),
     hasUsers: store.users.length > 0,
+    notifications: user ? store.notifications
+      .filter((notification) => notification.userId === user.id)
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 12)
+      .map(sanitizeNotification) : [],
     user: sanitizeUser(user),
     users: isActiveAdmin(user) ? store.users.map(sanitizeUser) : [],
   };
@@ -233,7 +329,13 @@ function normalizePredictionPlacements(body, tournament) {
         return null;
       }
 
-      return { place, playerId };
+      const player = roster.find((item) => getPlayerKey(item) === playerId);
+      return {
+        place,
+        playerId,
+        playerName: player?.name ?? "",
+        rating: Number(player?.rating),
+      };
     })
     .filter(Boolean)
     .sort((a, b) => a.place - b.place);
@@ -254,6 +356,82 @@ function normalizePredictionPlacements(body, tournament) {
   }
 
   return { placements };
+}
+
+function describePlayers(players) {
+  return players.map((player) => player.name).filter(Boolean).join(", ");
+}
+
+function applyTournamentRosterChange(store, previousTournament, nextTournament) {
+  const previousRoster = Array.isArray(previousTournament.roster) ? previousTournament.roster : [];
+  const nextRoster = Array.isArray(nextTournament.roster) ? nextTournament.roster : [];
+  const previousById = new Map(previousRoster.map((player) => [getPlayerKey(player), player]));
+  const nextById = new Map(nextRoster.map((player) => [getPlayerKey(player), player]));
+  const removedPlayers = previousRoster.filter((player) => !nextById.has(getPlayerKey(player)));
+  const addedPlayers = nextRoster.filter((player) => !previousById.has(getPlayerKey(player)));
+
+  if (removedPlayers.length === 0 && addedPlayers.length === 0) {
+    return nextTournament;
+  }
+
+  const now = new Date().toISOString();
+  const rosterChangeRevision = Number(previousTournament.rosterChangeRevision ?? 0) + 1;
+  const changedTournament = {
+    ...nextTournament,
+    rosterChangedAt: now,
+    rosterChangeRevision,
+  };
+  const affectedPredictions = store.forecastPredictions.filter((prediction) => prediction.tournamentId === previousTournament.id);
+
+  store.forecastPredictions = store.forecastPredictions.map((prediction) => {
+    if (prediction.tournamentId !== previousTournament.id) {
+      return prediction;
+    }
+
+    return {
+      ...prediction,
+      needsReview: true,
+      placements: (Array.isArray(prediction.placements) ? prediction.placements : []).map((placement) => {
+        const snapshot = previousById.get(String(placement.playerId));
+        return {
+          ...placement,
+          playerName: placement.playerName ?? snapshot?.name ?? "",
+          rating: Number(placement.rating ?? snapshot?.rating),
+        };
+      }),
+      rosterChangeRevision,
+      rosterChangedAt: now,
+    };
+  });
+
+  for (const prediction of affectedPredictions) {
+    const alreadyNotified = store.notifications.some((notification) => (
+      notification.userId === prediction.userId
+      && notification.tournamentId === previousTournament.id
+      && notification.rosterChangeRevision === rosterChangeRevision
+      && notification.type === "forecast-roster-changed"
+    ));
+
+    if (alreadyNotified) {
+      continue;
+    }
+
+    const removedText = removedPlayers.length ? `Выбыли: ${describePlayers(removedPlayers)}. ` : "";
+    const addedText = addedPlayers.length ? `Добавлены: ${describePlayers(addedPlayers)}. ` : "";
+    store.notifications.push({
+      createdAt: now,
+      id: `notification-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      message: `${removedText}${addedText}Открой прогноз и скорректируй расстановку до старта турнира.`,
+      readAt: null,
+      rosterChangeRevision,
+      title: `Изменился состав: ${previousTournament.title}`,
+      tournamentId: previousTournament.id,
+      type: "forecast-roster-changed",
+      userId: prediction.userId,
+    });
+  }
+
+  return changedTournament;
 }
 
 function buildForecastTournamentFromBody(body, store, existingTournament = null) {
@@ -369,7 +547,7 @@ async function handleApi(request, response, url) {
     ));
 
     if (request.method === "GET") {
-      jsonResponse(response, 200, { prediction: sanitizeForecastPrediction(existingPrediction) });
+      jsonResponse(response, 200, { prediction: sanitizeForecastPrediction(existingPrediction, tournament) });
       return;
     }
 
@@ -405,7 +583,7 @@ async function handleApi(request, response, url) {
 
     writeStore(store);
     jsonResponse(response, 200, {
-      prediction: sanitizeForecastPrediction(prediction),
+      prediction: sanitizeForecastPrediction(prediction, tournament),
       predictionCount: getTournamentPredictionCount(tournament.id, store.forecastPredictions),
     });
     return;
@@ -487,6 +665,26 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  const notificationReadMatch = url.pathname.match(/^\/api\/notifications\/([^/]+)\/read$/);
+  if (request.method === "POST" && notificationReadMatch) {
+    const user = getAuthedUser(store, request);
+    if (!user) {
+      jsonResponse(response, 401, { message: "Нужно войти в аккаунт." });
+      return;
+    }
+
+    const notification = store.notifications.find((item) => item.id === notificationReadMatch[1] && item.userId === user.id);
+    if (!notification) {
+      jsonResponse(response, 404, { message: "Уведомление не найдено." });
+      return;
+    }
+
+    notification.readAt = notification.readAt ?? new Date().toISOString();
+    writeStore(store);
+    jsonResponse(response, 200, authPayload(store, user));
+    return;
+  }
+
   const approveMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/approve$/);
   if (request.method === "POST" && approveMatch) {
     const admin = getAuthedUser(store, request);
@@ -565,10 +763,14 @@ async function handleApi(request, response, url) {
       return;
     }
 
-    store.forecastTournaments[tournamentIndex] = result.tournament;
+    store.forecastTournaments[tournamentIndex] = applyTournamentRosterChange(
+      store,
+      store.forecastTournaments[tournamentIndex],
+      result.tournament,
+    );
     writeStore(store);
     jsonResponse(response, 200, {
-      tournament: sanitizeTournament(result.tournament, store.forecastPredictions),
+      tournament: sanitizeTournament(store.forecastTournaments[tournamentIndex], store.forecastPredictions),
       tournaments: store.forecastTournaments.map((item) => sanitizeTournament(item, store.forecastPredictions)),
     });
     return;
