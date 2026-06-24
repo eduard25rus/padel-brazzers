@@ -4370,7 +4370,6 @@ function LeadersScreen({ auth, completedTournamentResults, forecastLeaders, onOp
                 <b>{leader.rank}</b>
                 <div>
                   <strong>{leader.name}</strong>
-                  <small>{leader.lastTournament}</small>
                 </div>
                 <span>{leader.points}</span>
                 <span>{leader.tournaments}</span>
@@ -4403,7 +4402,6 @@ function LeadersScreen({ auth, completedTournamentResults, forecastLeaders, onOp
                 <b>{leader.rank}</b>
                 <div>
                   <strong>{leader.name}</strong>
-                  <small>{leader.lundaNick}{leader.lastPredictionAt ? ` · ${formatVladivostokInstant(leader.lastPredictionAt)} VLAT` : ""}</small>
                 </div>
                 <span>{leader.periodPoints}</span>
                 <span>{leader.periodPredictions}</span>
