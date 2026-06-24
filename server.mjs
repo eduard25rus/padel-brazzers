@@ -9,6 +9,9 @@ const distDir = join(rootDir, "dist");
 const dataDir = process.env.DATA_DIR ?? process.env.RAILWAY_VOLUME_MOUNT_PATH ?? join(rootDir, "data");
 const storePath = join(dataDir, "auth-store.json");
 const port = Number(process.env.PORT ?? 4173);
+const resendApiKey = process.env.RESEND_API_KEY ?? "";
+const mailFrom = process.env.MAIL_FROM ?? "";
+const publicSiteUrl = String(process.env.PUBLIC_SITE_URL ?? "").replace(/\/+$/, "");
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -73,6 +76,15 @@ function writeStore(store) {
 function jsonResponse(response, status, payload) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function sanitizeUser(user) {
@@ -362,6 +374,62 @@ function describePlayers(players) {
   return players.map((player) => player.name).filter(Boolean).join(", ");
 }
 
+async function sendEmail({ html, subject, text, to }) {
+  if (!resendApiKey || !mailFrom || !to) {
+    return { skipped: true };
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    body: JSON.stringify({
+      from: mailFrom,
+      html,
+      subject,
+      text,
+      to: [to],
+    }),
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Resend email failed");
+  }
+
+  return payload;
+}
+
+async function sendRosterChangeEmail({ addedPlayers, removedPlayers, tournament, user }) {
+  const forecastUrl = publicSiteUrl || "";
+  const removedText = removedPlayers.length ? `Выбыли: ${describePlayers(removedPlayers)}.` : "";
+  const addedText = addedPlayers.length ? `Добавлены: ${describePlayers(addedPlayers)}.` : "";
+  const subject = `Изменился состав турнира: ${tournament.title}`;
+  const text = [
+    `Привет, ${user.firstName || user.lundaNick}!`,
+    `В турнире "${tournament.title}" изменился состав.`,
+    removedText,
+    addedText,
+    "Открой прогноз на сайте и скорректируй расстановку до старта турнира.",
+    forecastUrl ? `Сайт: ${forecastUrl}` : "",
+  ].filter(Boolean).join("\n\n");
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #1b241d; line-height: 1.5;">
+      <h2 style="margin: 0 0 12px; color: #1d5d2a;">Изменился состав турнира</h2>
+      <p>Привет, ${escapeHtml(user.firstName || user.lundaNick)}!</p>
+      <p>В турнире <strong>${escapeHtml(tournament.title)}</strong> изменился состав.</p>
+      ${removedText ? `<p><strong>${escapeHtml(removedText)}</strong></p>` : ""}
+      ${addedText ? `<p><strong>${escapeHtml(addedText)}</strong></p>` : ""}
+      <p>Открой прогноз на сайте и скорректируй расстановку до старта турнира.</p>
+      ${forecastUrl ? `<p><a href="${escapeHtml(forecastUrl)}" style="display: inline-block; background: #1d5d2a; color: #fffefa; padding: 10px 14px; border-radius: 8px; text-decoration: none; font-weight: 700;">Открыть Padel Brazzers</a></p>` : ""}
+    </div>
+  `;
+
+  return sendEmail({ html, subject, text, to: user.email });
+}
+
 function applyTournamentRosterChange(store, previousTournament, nextTournament) {
   const previousRoster = Array.isArray(previousTournament.roster) ? previousTournament.roster : [];
   const nextRoster = Array.isArray(nextTournament.roster) ? nextTournament.roster : [];
@@ -429,6 +497,18 @@ function applyTournamentRosterChange(store, previousTournament, nextTournament) 
       type: "forecast-roster-changed",
       userId: prediction.userId,
     });
+
+    const user = store.users.find((item) => item.id === prediction.userId);
+    if (user?.email) {
+      sendRosterChangeEmail({
+        addedPlayers,
+        removedPlayers,
+        tournament: previousTournament,
+        user,
+      }).catch((error) => {
+        console.warn(`Failed to send roster change email to ${user.email}:`, error.message);
+      });
+    }
   }
 
   return changedTournament;
