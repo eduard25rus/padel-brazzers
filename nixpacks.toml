@@ -5,4 +5,4 @@ cmds = ["pnpm install --frozen-lockfile"]
 cmds = ["pnpm build"]
 
 [start]
-cmd = "node server.mjs"
+cmd = "exec node server.mjs"
