@@ -846,6 +846,7 @@ function snapshotPlayer(player) {
 
 function getPredictionDetails(prediction, tournament) {
   const roster = Array.isArray(tournament?.roster) ? tournament.roster : [];
+  const placeCount = roster.length;
   const rosterById = new Map(roster.map((player) => [getPlayerKey(player), player]));
   const placements = Array.isArray(prediction?.placements) ? prediction.placements : [];
   const invalidPlacements = placements
@@ -863,9 +864,9 @@ function getPredictionDetails(prediction, tournament) {
     .sort((a, b) => Number(b.rating) - Number(a.rating) || String(a.name).localeCompare(String(b.name)));
   const freePlaces = [
     ...invalidPlacements.map((placement) => Number(placement.place)),
-    ...Array.from({ length: 16 }, (_, index) => index + 1).filter((place) => !placements.some((placement) => Number(placement.place) === place)),
+    ...Array.from({ length: placeCount }, (_, index) => index + 1).filter((place) => !placements.some((placement) => Number(placement.place) === place)),
   ]
-    .filter((place, index, places) => Number.isInteger(place) && place >= 1 && place <= 16 && places.indexOf(place) === index)
+    .filter((place, index, places) => Number.isInteger(place) && place >= 1 && place <= placeCount && places.indexOf(place) === index)
     .sort((a, b) => a - b);
   const replacementPlacements = missingPlayers.slice(0, freePlaces.length).map((player, index) => ({
     place: freePlaces[index],
@@ -1152,8 +1153,9 @@ function parseVladivostokDateTime(value) {
 
 function normalizePredictionPlacements(body, tournament) {
   const roster = Array.isArray(tournament.roster) ? tournament.roster : [];
+  const placeCount = roster.length;
   const rosterIds = new Set(roster.map((player) => String(player.id ?? player.name)));
-  const requiredIds = roster.slice(0, 16).map((player) => String(player.id ?? player.name));
+  const requiredIds = roster.map((player) => String(player.id ?? player.name));
   const sourcePlacements = Array.isArray(body.placements) ? body.placements : [];
   const placements = sourcePlacements
     .map((placement, index) => {
@@ -1163,7 +1165,7 @@ function normalizePredictionPlacements(body, tournament) {
 
       const place = Number(placement.place ?? index + 1);
       const playerId = String(placement.playerId ?? "").trim();
-      if (!Number.isInteger(place) || place < 1 || place > 16 || !playerId || !rosterIds.has(playerId)) {
+      if (!Number.isInteger(place) || place < 1 || place > placeCount || !playerId || !rosterIds.has(playerId)) {
         return null;
       }
 

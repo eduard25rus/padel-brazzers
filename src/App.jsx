@@ -808,7 +808,7 @@ function getTournamentScoringMethod(tournament, scoringMethods) {
 }
 
 function buildForecastSlotsFromPrediction(prediction, roster) {
-  const nextSlots = Array.from({ length: 16 }, () => null);
+  const nextSlots = Array.from({ length: roster.length }, () => null);
   const rosterById = new Map(roster.map((player) => [String(player.id ?? player.name), player]));
 
   if (!prediction?.placements?.length) {
@@ -3128,7 +3128,7 @@ function ForecastTournamentDetail({
     () => [...tournament.roster].sort((a, b) => Number(b.rating) - Number(a.rating) || a.name.localeCompare(b.name)),
     [tournament.roster],
   );
-  const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: 16 }, () => null));
+  const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: sortedRoster.length }, () => null));
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastSaving, setForecastSaving] = useState(false);
@@ -3145,7 +3145,7 @@ function ForecastTournamentDetail({
   const currentForecastSlots = forecastSlots.filter((slot) => slot && !slot.invalid);
   const filledSlots = currentForecastSlots.length;
   const forecastPlayerIds = new Set(currentForecastSlots.map((slot) => String(getPlayerKey(slot))));
-  const expectedPlayerIds = sortedRoster.slice(0, 16).map((player) => String(getPlayerKey(player)));
+  const expectedPlayerIds = sortedRoster.map((player) => String(getPlayerKey(player)));
   const isForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => forecastPlayerIds.has(playerId));
   const hasLoadedCompleteSavedForecast = isForecastComplete
     && forecastSaveTone === "success"
@@ -3180,14 +3180,14 @@ function ForecastTournamentDetail({
   };
 
   useEffect(() => {
-    setForecastSlots(Array.from({ length: 16 }, () => null));
+    setForecastSlots(Array.from({ length: sortedRoster.length }, () => null));
     setSelectedPlayerId(null);
     setForecastSaveMessage("");
     setForecastSaveTone("success");
     setAdminEditing(false);
     setAdminMessage("");
     setForecastResultsSummary(null);
-  }, [tournament.id, auth.currentUser?.id]);
+  }, [tournament.id, auth.currentUser?.id, sortedRoster.length]);
 
   useEffect(() => {
     let ignore = false;
@@ -3561,7 +3561,7 @@ function ForecastTournamentDetail({
           <div className="prediction-card-head">
             <div className="section-title">
               <span>Мой прогноз</span>
-              <h2>16 мест турнира</h2>
+              <h2>{expectedPlayerIds.length} мест турнира</h2>
             </div>
             <button disabled={!isForecastComplete || forecastLoading || forecastSaving} type="button" onClick={saveForecast}>
               {forecastSaving ? "Сохраняем..." : "Сохранить прогноз"}
@@ -3571,7 +3571,7 @@ function ForecastTournamentDetail({
           {tournament.roster.length === 0 ? (
             <div className="prediction-empty-list tall">
               <strong>Расстановка откроется после публикации состава</strong>
-              <p>Здесь будет 16 мест турнира для прогноза.</p>
+              <p>Здесь будет {expectedPlayerIds.length || "нужное количество"} мест турнира для прогноза.</p>
             </div>
           ) : (
             <>
