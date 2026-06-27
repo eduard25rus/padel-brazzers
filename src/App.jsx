@@ -1719,8 +1719,15 @@ function AuthControls({ adminMode = false, currentUser, notifications = [], onLo
           <small>{isPending ? "Ожидает подтверждения" : currentUser.role === "admin" ? "Админ" : "Участник"}</small>
         </div>
         {notifications.length > 0 && (
-          <button type="button" onClick={() => setNotificationsOpen((value) => !value)}>
-            Уведомления {unreadNotifications.length || ""}
+          <button
+            aria-label={`Уведомления${unreadNotifications.length ? `: ${unreadNotifications.length} новых` : ""}`}
+            className="profile-icon-button"
+            title="Уведомления"
+            type="button"
+            onClick={() => setNotificationsOpen((value) => !value)}
+          >
+            <span aria-hidden="true">🔔</span>
+            {unreadNotifications.length > 0 && <b>{unreadNotifications.length}</b>}
           </button>
         )}
         {canOpenAdmin && (
@@ -1736,7 +1743,9 @@ function AuthControls({ adminMode = false, currentUser, notifications = [], onLo
         )}
         {!isPending && <button type="button" onClick={onOpenCabinet}>Кабинет</button>}
         {canOpenAdmin && <button type="button" onClick={onOpenAdmin}>Админ</button>}
-        <button type="button" onClick={onLogout}>Выйти</button>
+        <button aria-label="Выйти" className="profile-icon-button logout" title="Выйти" type="button" onClick={onLogout}>
+          <span aria-hidden="true">↪</span>
+        </button>
         {notificationsOpen && (
           <div className="auth-notification-popover">
             {notifications.map((notification) => (

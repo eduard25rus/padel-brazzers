@@ -256,7 +256,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   padding: 7px;
   position: relative;
 }
@@ -296,6 +296,40 @@ main {
   color: var(--muted);
   font-size: 11px;
   margin-top: 2px;
+}
+
+.auth-user-card .profile-icon-button {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 42px;
+  font-size: 17px;
+  height: 42px;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+  width: 42px;
+}
+
+.profile-icon-button b {
+  align-items: center;
+  background: var(--loss);
+  border-radius: 999px;
+  color: #fffefa;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 950;
+  height: 17px;
+  justify-content: center;
+  min-width: 17px;
+  padding: 0 4px;
+  position: absolute;
+  right: -5px;
+  top: -5px;
+}
+
+.profile-icon-button.logout span {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .auth-user-card .admin-mode-toggle {
