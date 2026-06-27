@@ -3652,26 +3652,30 @@ function ForecastTournamentDetail({
                     <strong>{slot?.name ?? "Место свободно"}</strong>
                     {slot?.invalid ? <small>Выбыл из состава</small> : <small>{slot ? Number(slot.rating).toFixed(2) : "—"}</small>}
                   </div>
-                  <button
-                    aria-label={`Перетащить место ${index + 1}`}
-                    className="prediction-mobile-handle"
-                    disabled={!canEditMobileForecast || !slot || slot.invalid}
-                    type="button"
-                    onPointerCancel={() => setMobileDragIndex(null)}
-                    onPointerDown={(event) => {
-                      if (!canEditMobileForecast || !slot || slot.invalid) {
-                        return;
-                      }
+                  {canEditMobileForecast && (
+                    <button
+                      aria-label={`Перетащить место ${index + 1}`}
+                      className="prediction-mobile-handle"
+                      disabled={!slot || slot.invalid}
+                      type="button"
+                      onPointerCancel={() => setMobileDragIndex(null)}
+                      onPointerDown={(event) => {
+                        if (!slot || slot.invalid) {
+                          return;
+                        }
 
-                      event.preventDefault();
-                      event.currentTarget.setPointerCapture?.(event.pointerId);
-                      setMobileDragIndex(index);
-                    }}
-                    onPointerMove={handleMobilePointerMove}
-                    onPointerUp={() => setMobileDragIndex(null)}
-                  >
-                    ⋮⋮
-                  </button>
+                        event.preventDefault();
+                        event.currentTarget.setPointerCapture?.(event.pointerId);
+                        setMobileDragIndex(index);
+                      }}
+                      onPointerMove={handleMobilePointerMove}
+                      onPointerUp={() => setMobileDragIndex(null)}
+                    >
+                      <i />
+                      <i />
+                      <i />
+                    </button>
+                  )}
                 </article>
               ))}
             </div>

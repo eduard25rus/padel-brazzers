@@ -2587,7 +2587,7 @@ main {
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 34px minmax(0, 1fr) 42px;
+  grid-template-columns: 34px minmax(0, 1fr) 46px;
   min-height: 62px;
   padding: 9px 10px;
   transition:
@@ -2604,6 +2604,7 @@ main {
 
 .prediction-mobile-row.locked {
   background: rgba(255, 254, 250, 0.58);
+  grid-template-columns: 34px minmax(0, 1fr);
 }
 
 .prediction-mobile-row.invalid {
@@ -2655,19 +2656,25 @@ main {
 
 .prediction-mobile-handle {
   align-items: center;
-  background: #fffefa;
-  border: 1px solid var(--line);
+  background: rgba(29, 93, 42, 0.08);
+  border: 1px solid rgba(29, 93, 42, 0.24);
   border-radius: 8px;
-  color: var(--muted);
   cursor: grab;
-  display: inline-flex;
-  font-size: 20px;
-  font-weight: 950;
-  height: 42px;
+  display: grid;
+  gap: 4px;
+  height: 44px;
   justify-content: center;
-  letter-spacing: -3px;
+  padding: 10px;
   touch-action: none;
-  width: 42px;
+  width: 46px;
+}
+
+.prediction-mobile-handle i {
+  background: var(--green);
+  border-radius: 999px;
+  display: block;
+  height: 3px;
+  width: 20px;
 }
 
 .prediction-mobile-handle:active {
@@ -4561,9 +4568,13 @@ p {
   }
 
   .prediction-mobile-row {
-    grid-template-columns: 32px minmax(0, 1fr) 40px;
+    grid-template-columns: 32px minmax(0, 1fr) 42px;
     min-height: 58px;
     padding: 8px;
+  }
+
+  .prediction-mobile-row.locked {
+    grid-template-columns: 32px minmax(0, 1fr);
   }
 
   .prediction-mobile-player strong {
@@ -4572,7 +4583,7 @@ p {
 
   .prediction-mobile-handle {
     height: 40px;
-    width: 40px;
+    width: 42px;
   }
 
   .tournament-row {
