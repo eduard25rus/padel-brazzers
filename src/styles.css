@@ -2602,6 +2602,10 @@ main {
   transform: scale(0.99);
 }
 
+.prediction-mobile-row.locked {
+  background: rgba(255, 254, 250, 0.58);
+}
+
 .prediction-mobile-row.invalid {
   background: rgba(219, 63, 74, 0.08);
   border-color: rgba(219, 63, 74, 0.36);

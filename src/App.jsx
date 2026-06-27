@@ -3130,6 +3130,7 @@ function ForecastTournamentDetail({
   );
   const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: sortedRoster.length }, () => null));
   const [mobileDragIndex, setMobileDragIndex] = useState(null);
+  const [mobileEditing, setMobileEditing] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastSaving, setForecastSaving] = useState(false);
@@ -3173,6 +3174,14 @@ function ForecastTournamentDetail({
   const hasLoadedCompleteSavedForecast = isForecastComplete
     && forecastSaveTone === "success"
     && forecastSaveMessage.startsWith("Загружен твой сохраненный прогноз");
+  const hasSavedCompleteForecast = isForecastComplete
+    && forecastSaveTone === "success"
+    && (
+      forecastSaveMessage.startsWith("Загружен твой сохраненный прогноз")
+      || forecastSaveMessage.startsWith("Прогноз сохранен на сервере")
+    );
+  const isMobileSavedLocked = hasSavedCompleteForecast && !mobileEditing;
+  const canEditMobileForecast = !isMobileSavedLocked;
   const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
   const canViewPredictionRegistry = canManageTournament || settings.predictionRegistryVisibility === "all";
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
@@ -3204,6 +3213,7 @@ function ForecastTournamentDetail({
 
   useEffect(() => {
     setForecastSlots(Array.from({ length: sortedRoster.length }, () => null));
+    setMobileEditing(false);
     setSelectedPlayerId(null);
     setForecastSaveMessage("");
     setForecastSaveTone("success");
@@ -3331,6 +3341,10 @@ function ForecastTournamentDetail({
   };
 
   const reorderForecastSlots = (fromIndex, toIndex) => {
+    if (!canEditMobileForecast) {
+      return;
+    }
+
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= mobileForecastSlots.length || toIndex >= mobileForecastSlots.length) {
       return;
     }
@@ -3345,7 +3359,7 @@ function ForecastTournamentDetail({
   };
 
   const handleMobilePointerMove = (event) => {
-    if (mobileDragIndex === null) {
+    if (!canEditMobileForecast || mobileDragIndex === null) {
       return;
     }
 
@@ -3380,6 +3394,8 @@ function ForecastTournamentDetail({
       return;
     }
 
+    setForecastSlots(slots);
+    setMobileEditing(false);
     setForecastSaveMessage(`Прогноз сохранен на сервере: ${formatVladivostokInstant(result.prediction.updatedAt)} VLAT.`);
     setForecastSaveTone("success");
     loadAdminPredictionSummary();
@@ -3572,11 +3588,21 @@ function ForecastTournamentDetail({
             <span>Мой прогноз</span>
             <h2>{expectedPlayerIds.length} мест турнира</h2>
           </div>
-          <button disabled={!isMobileForecastComplete || forecastLoading || forecastSaving} type="button" onClick={() => saveForecast(mobileForecastSlots)}>
-            {forecastSaving ? "Сохраняем..." : "Сохранить прогноз"}
-          </button>
+          {isMobileSavedLocked ? (
+            <button type="button" onClick={() => setMobileEditing(true)}>
+              Редактировать
+            </button>
+          ) : (
+            <button disabled={!isMobileForecastComplete || forecastLoading || forecastSaving} type="button" onClick={() => saveForecast(mobileForecastSlots)}>
+              {forecastSaving ? "Сохраняем..." : "Сохранить прогноз"}
+            </button>
+          )}
         </div>
-        {forecastSaveMessage && <strong className={`prediction-save-message ${forecastSaveTone}`}>{forecastSaveMessage}</strong>}
+        {isMobileSavedLocked ? (
+          <strong className="prediction-save-message success">Ваш прогноз сохранен.</strong>
+        ) : forecastSaveMessage && !forecastSaveMessage.startsWith("Загружен твой сохраненный прогноз") ? (
+          <strong className={`prediction-save-message ${forecastSaveTone}`}>{forecastSaveMessage}</strong>
+        ) : null}
         {tournament.roster.length === 0 ? (
           <div className="prediction-empty-list tall">
             <strong>Расстановка откроется после публикации состава</strong>
@@ -3585,7 +3611,9 @@ function ForecastTournamentDetail({
         ) : (
           <>
             <div className="prediction-placement-hint">
-              Перетаскивай игроков за ручку справа. При первом открытии порядок уже выставлен по рейтингу.
+              {isMobileSavedLocked
+                ? "Чтобы изменить порядок, нажми «Редактировать»."
+                : "Перетаскивай игроков за ручку справа. При первом открытии порядок уже выставлен по рейтингу."}
             </div>
             <div
               className="prediction-mobile-list"
@@ -3595,14 +3623,14 @@ function ForecastTournamentDetail({
             >
               {mobileForecastSlots.map((slot, index) => (
                 <article
-                  className={`prediction-mobile-row ${slot?.invalid ? "invalid" : ""} ${mobileDragIndex === index ? "dragging" : ""}`}
+                  className={`prediction-mobile-row ${slot?.invalid ? "invalid" : ""} ${mobileDragIndex === index ? "dragging" : ""} ${!canEditMobileForecast ? "locked" : ""}`}
                   data-mobile-forecast-index={index}
-                  draggable={Boolean(slot && !slot.invalid)}
+                  draggable={Boolean(canEditMobileForecast && slot && !slot.invalid)}
                   key={`${slot?.id ?? slot?.name ?? "empty"}-${index}`}
                   onDragEnd={() => setMobileDragIndex(null)}
                   onDragOver={(event) => event.preventDefault()}
                   onDragStart={(event) => {
-                    if (!slot || slot.invalid) {
+                    if (!canEditMobileForecast || !slot || slot.invalid) {
                       return;
                     }
 
@@ -3627,11 +3655,11 @@ function ForecastTournamentDetail({
                   <button
                     aria-label={`Перетащить место ${index + 1}`}
                     className="prediction-mobile-handle"
-                    disabled={!slot || slot.invalid}
+                    disabled={!canEditMobileForecast || !slot || slot.invalid}
                     type="button"
                     onPointerCancel={() => setMobileDragIndex(null)}
                     onPointerDown={(event) => {
-                      if (!slot || slot.invalid) {
+                      if (!canEditMobileForecast || !slot || slot.invalid) {
                         return;
                       }
 
