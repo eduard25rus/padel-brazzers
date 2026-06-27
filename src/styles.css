@@ -622,8 +622,17 @@ main {
   margin-top: 14px;
 }
 
+.home-main-stack {
+  display: grid;
+  gap: 14px;
+}
+
 .registry-card {
   padding: 24px;
+}
+
+.planned-registry-card {
+  border-color: rgba(29, 93, 42, 0.18);
 }
 
 .registry-head {
@@ -704,6 +713,11 @@ main {
 
 .tournament-row.featured {
   border-bottom-color: rgba(29, 93, 42, 0.16);
+}
+
+.tournament-row.planned {
+  background: rgba(29, 93, 42, 0.035);
+  border-bottom-color: rgba(29, 93, 42, 0.14);
 }
 
 .tournament-row img {
@@ -1647,6 +1661,16 @@ main {
   transform: translateY(-1px);
 }
 
+.prediction-roster-player.readonly {
+  cursor: default;
+}
+
+.prediction-roster-player.readonly:hover {
+  background: rgba(255, 254, 250, 0.58);
+  border-color: var(--line);
+  transform: none;
+}
+
 .prediction-roster-player.placed {
   opacity: 0.55;
 }
@@ -1888,6 +1912,16 @@ main {
   color: #748075;
   cursor: not-allowed;
   transform: none;
+}
+
+.tournament-user-actions {
+  border-top: 0;
+  margin-top: 10px;
+  padding-top: 0;
+}
+
+.tournament-overview-workspace {
+  grid-template-columns: 1fr;
 }
 
 .forecast-edit-panel {

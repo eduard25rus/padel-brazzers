@@ -360,6 +360,10 @@ function getInitialScreenFromLocation() {
   }
 
   if (parts[0] === "tournaments" && parts[1]) {
+    if (parts[2] === "results") {
+      return { name: "forecast-results-import", tournamentId: parts[1] };
+    }
+
     return { name: "detail", tournamentId: parts[1] };
   }
 
@@ -384,7 +388,7 @@ function pathForScreen(screen) {
   }
 
   if (screen.name === "forecast-results-import") {
-    return `/predictions/${encodeURIComponent(screen.tournamentId)}/results`;
+    return `/tournaments/${encodeURIComponent(screen.tournamentId)}/results`;
   }
 
   if (screen.name === "admin") {
@@ -1972,7 +1976,7 @@ function AdminTournamentForm({
   scoringMethods,
   submitLabel = "Опубликовать турнир",
   submittingLabel = "Публикуем...",
-  successMessage = "Турнир опубликован в прогнозах.",
+  successMessage = "Турнир опубликован в планируемых и доступен для прогнозов.",
 }) {
   const [form, setForm] = useState(() => makeTournamentFormState(scoringMethods, initialTournament));
   const [players, setPlayers] = useState(() => makeTournamentPlayers(initialTournament));
@@ -2032,8 +2036,8 @@ function AdminTournamentForm({
   return (
     <section className="surface admin-tournament-panel">
       <div className="section-title">
-        <span>Прогнозы</span>
-        <h2>Новый турнир для участников</h2>
+        <span>Турниры</span>
+        <h2>{initialTournament ? "Редактирование турнира" : "Новый планируемый турнир"}</h2>
       </div>
 
       <form className="admin-tournament-form" onSubmit={submitTournament}>
@@ -2126,7 +2130,7 @@ function AdminTournamentForm({
         {message && <strong className={message.includes("опубликован") || message.includes("обновлен") ? "admin-form-success" : "prediction-error"}>{message}</strong>}
 
         <footer>
-          <span>{forecastTournaments.length} турниров в реестре прогнозов</span>
+          <span>{forecastTournaments.length} турниров в планируемом реестре</span>
           <button disabled={submitting} type="submit">{submitting ? submittingLabel : submitLabel}</button>
         </footer>
       </form>
@@ -2466,7 +2470,7 @@ function AdminCabinetScreen({ auth, forecastTournaments, leaderboardPointMethods
 
     if (activeSection === "tournament") {
       return (
-        <AdminSectionShell eyebrow="Прогнозы" onBack={() => onOpenSection(null)} title="Добавить турнир для прогнозов">
+        <AdminSectionShell eyebrow="Турниры" onBack={() => onOpenSection(null)} title="Добавить планируемый турнир">
           <AdminTournamentForm
             forecastTournaments={forecastTournaments}
             onSubmitTournament={onCreateTournament}
@@ -2525,14 +2529,14 @@ function AdminCabinetScreen({ auth, forecastTournaments, leaderboardPointMethods
           <span className="eyebrow">Личный кабинет админа</span>
           <h1>Управление клубом</h1>
           <p>
-            Выбирай нужный раздел: принять новые регистрации, добавить турнир для
-            прогнозов или посмотреть полный список членов клуба.
+            Выбирай нужный раздел: принять новые регистрации, добавить планируемый
+            турнир или посмотреть полный список членов клуба.
           </p>
         </div>
         <div className="admin-cabinet-stats">
           <div><strong>{pendingUsers.length}</strong><span>ожидают принятия</span></div>
           <div><strong>{activeMembers.length}</strong><span>принятых участников</span></div>
-          <div><strong>{forecastTournaments.length}</strong><span>турниров для прогнозов</span></div>
+          <div><strong>{forecastTournaments.length}</strong><span>планируемых турниров</span></div>
         </div>
       </section>
 
@@ -2545,9 +2549,9 @@ function AdminCabinetScreen({ auth, forecastTournaments, leaderboardPointMethods
           </button>
 
           <button className="admin-menu-card surface" type="button" onClick={() => onOpenSection("tournament")}>
-            <span>Прогнозы</span>
+            <span>Турниры</span>
             <strong>Добавить турнир</strong>
-            <p>Дата, формат, условия, состав игроков и рейтинги для нового прогноза.</p>
+            <p>Дата, формат, условия, состав игроков, рейтинги и настройки прогноза.</p>
           </button>
 
           <button className="admin-menu-card surface" type="button" onClick={() => onOpenSection("scoring")}>
@@ -2957,13 +2961,14 @@ function ForecastResultsImportScreen({
   onOpenHome,
   onOpenPlaceholder,
   onOpenPredictions,
+  onOpenTournament,
   onPreviewResultsImport,
   tournament,
 }) {
   return (
     <main className="predictions-shell">
       <MainNav
-        active="predictions"
+        active="tournaments"
         auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
@@ -2978,8 +2983,8 @@ function ForecastResultsImportScreen({
           <h1>Выставить результаты турнира</h1>
         </div>
         <p>{tournament.title} · {formatVladivostokDate(tournament.date)} · {tournament.club}</p>
-        <button type="button" onClick={() => onOpenPredictions(tournament.id)}>
-          Вернуться к прогнозу
+        <button type="button" onClick={() => onOpenTournament(tournament.id)}>
+          Вернуться к турниру
         </button>
       </section>
 
@@ -3122,7 +3127,9 @@ function ForecastTournamentDetail({
   scoringMethods,
   settings,
   tournament,
+  viewMode = "prediction",
 }) {
+  const isTournamentView = viewMode === "tournament";
   const getPlayerKey = (player) => player.id ?? player.name;
   const sortedRoster = useMemo(
     () => [...tournament.roster].sort((a, b) => Number(b.rating) - Number(a.rating) || a.name.localeCompare(b.name)),
@@ -3430,7 +3437,7 @@ function ForecastTournamentDetail({
   return (
     <main className="predictions-shell">
       <MainNav
-        active="predictions"
+        active={isTournamentView ? "tournaments" : "predictions"}
         auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
@@ -3493,16 +3500,23 @@ function ForecastTournamentDetail({
               </div>
             </div>
           )}
-          {canManageTournament && (
+          {canManageTournament && isTournamentView && (
             <div className="prediction-admin-actions">
               <button type="button" onClick={() => { setAdminEditing((value) => !value); setAdminMessage(""); }}>
-                {adminEditing ? "Закрыть редактор" : "Редактировать"}
+                {adminEditing ? "Закрыть редактор" : "Редактировать турнир"}
               </button>
               <button type="button" onClick={() => onOpenResultsImport(tournament.id)}>
-                Выставить результаты
+                {hasCompletedResults ? "Обновить результаты" : "Добавить результаты"}
               </button>
               <button className="danger" disabled={deleting} type="button" onClick={deleteTournament}>
                 {deleting ? "Удаляем..." : "Удалить"}
+              </button>
+            </div>
+          )}
+          {isTournamentView && !hasCompletedResults && (
+            <div className="prediction-admin-actions tournament-user-actions">
+              <button type="button" onClick={() => onOpenPredictions(tournament.id)}>
+                {isPredictionClosed ? "Открыть страницу прогноза" : "Сделать прогноз"}
               </button>
             </div>
           )}
@@ -3561,7 +3575,32 @@ function ForecastTournamentDetail({
         </section>
       )}
 
-      {hasCompletedResults ? (
+      {isTournamentView ? (
+        <section className="prediction-workspace tournament-overview-workspace">
+          <section className="surface prediction-roster-card" id="roster">
+            <div className="section-title">
+              <span>Стартовый состав</span>
+              <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Состав пока не опубликован"}</h2>
+            </div>
+            {tournament.roster.length === 0 ? (
+              <div className="prediction-empty-list">
+                <strong>Состав пока не опубликован</strong>
+                <p>Когда админ добавит участников, здесь появятся игроки турнира.</p>
+              </div>
+            ) : (
+              <div className="prediction-roster-grid tournament-overview-roster">
+                {sortedRoster.map((player, index) => (
+                  <article className="prediction-roster-player readonly" key={getPlayerKey(player)}>
+                    <span>{index + 1}</span>
+                    <strong>{player.name}</strong>
+                    <b className="prediction-rating">{Number(player.rating).toFixed(2)}</b>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </section>
+      ) : hasCompletedResults ? (
         forecastResultsLoading ? (
           <section className="surface prediction-empty-list tall">
             <strong>Считаем итоги прогнозов</strong>
@@ -3983,7 +4022,11 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
     ...completedTournamentResults.map(completedResultToRegistryItem),
     ...tournamentRegistry,
   ].sort((a, b) => String(b.dateOrder).localeCompare(String(a.dateOrder)));
+  const plannedTournaments = forecastTournaments
+    .filter((tournament) => !tournament.completedResultId)
+    .sort((a, b) => String(`${a.date ?? ""} ${a.time ?? ""}`).localeCompare(String(`${b.date ?? ""} ${b.time ?? ""}`)));
   const openForecastTournaments = forecastTournaments
+    .filter((tournament) => !tournament.completedResultId)
     .filter((tournament) => {
       const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
       return !deadline || deadline > Date.now();
@@ -4029,55 +4072,107 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
       </section>
 
       <section className="home-layout" id="registry">
-        <section className="surface registry-card">
-          <div className="registry-head">
-            <div>
-              <span>Реестр турниров</span>
-              <h2>Прошедшие турниры по дате</h2>
-            </div>
-          </div>
-
-          <div className="tournament-list">
-            {tournaments.length === 0 && (
-              <div className="empty-registry">
-                <span>Архив</span>
-                <strong>Турниров пока нет</strong>
-                <p>Здесь появятся боевые турниры, когда мы загрузим реальные данные.</p>
+        <div className="home-main-stack">
+          <section className="surface registry-card planned-registry-card">
+            <div className="registry-head">
+              <div>
+                <span>Планируемые турниры</span>
+                <h2>Будущие турниры</h2>
               </div>
-            )}
-            {tournaments.map((tournament) => (
-              <article
-                className={`tournament-row ${tournament.featured ? "featured" : ""}`}
-                onClick={() => onOpenTournament(tournament.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    onOpenTournament(tournament.id);
-                  }
-                }}
-                role="button"
-                tabIndex="0"
-                key={tournament.id}
-              >
-                <img src={tournament.image} alt="" />
-                <div className="tournament-copy">
-                  <span>{tournament.date} · {tournament.club}</span>
-                  <EditableTournamentTitle
-                    canEdit={auth.currentUser?.role === "admin" && tournament.imported}
-                    onRename={onRenameCompletedTournament}
-                    title={tournament.title}
-                    tournamentId={tournament.id}
-                  />
-                  <p>{tournament.format} · {tournament.teams} · {tournament.rounds} · {tournament.matches}</p>
+            </div>
+
+            <div className="tournament-list">
+              {plannedTournaments.length === 0 && (
+                <div className="empty-registry">
+                  <span>Скоро</span>
+                  <strong>Планируемых турниров пока нет</strong>
+                  <p>Когда админ добавит будущий турнир, он появится здесь и автоматически откроется для прогнозов.</p>
                 </div>
-                <div className="tournament-result">
-                  <span>{tournament.status}</span>
-                  <strong>{tournament.winner}</strong>
-                  <small>Открыть</small>
+              )}
+              {plannedTournaments.map((tournament) => {
+                const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
+                const isOpen = !deadline || deadline > Date.now();
+
+                return (
+                  <article
+                    className="tournament-row planned"
+                    onClick={() => onOpenTournament(tournament.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        onOpenTournament(tournament.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex="0"
+                    key={tournament.id}
+                  >
+                    <img src={tournament.image} alt="" />
+                    <div className="tournament-copy">
+                      <span>{formatVladivostokDate(tournament.date)} · {tournament.time} VLAT · {tournament.club}</span>
+                      <strong>{tournament.title}</strong>
+                      <p>{tournament.format} · {tournament.players} · {tournamentLeagueOptions.find((option) => option.value === normalizeTournamentLeague(tournament.league, tournament.title))?.label ?? "PRO"}</p>
+                    </div>
+                    <div className="tournament-result">
+                      <span>{isOpen ? "Прогнозы открыты" : "Прием закрыт"}</span>
+                      <strong>{isOpen ? "Сделать прогноз" : "Открыть турнир"}</strong>
+                      <small>{isOpen && tournament.predictionCloseAt ? formatForecastTimeLeft(tournament.predictionCloseAt) : "Открыть"}</small>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="surface registry-card">
+            <div className="registry-head">
+              <div>
+                <span>Реестр турниров</span>
+                <h2>Прошедшие турниры по дате</h2>
+              </div>
+            </div>
+
+            <div className="tournament-list">
+              {tournaments.length === 0 && (
+                <div className="empty-registry">
+                  <span>Архив</span>
+                  <strong>Турниров пока нет</strong>
+                  <p>Здесь появятся боевые турниры, когда мы загрузим реальные данные.</p>
                 </div>
-              </article>
-            ))}
-          </div>
-        </section>
+              )}
+              {tournaments.map((tournament) => (
+                <article
+                  className={`tournament-row ${tournament.featured ? "featured" : ""}`}
+                  onClick={() => onOpenTournament(tournament.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      onOpenTournament(tournament.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex="0"
+                  key={tournament.id}
+                >
+                  <img src={tournament.image} alt="" />
+                  <div className="tournament-copy">
+                    <span>{tournament.date} · {tournament.club}</span>
+                    <EditableTournamentTitle
+                      canEdit={auth.currentUser?.role === "admin" && tournament.imported}
+                      onRename={onRenameCompletedTournament}
+                      title={tournament.title}
+                      tournamentId={tournament.id}
+                    />
+                    <p>{tournament.format} · {tournament.teams} · {tournament.rounds} · {tournament.matches}</p>
+                  </div>
+                  <div className="tournament-result">
+                    <span>{tournament.status}</span>
+                    <strong>{tournament.winner}</strong>
+                    <small>Открыть</small>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
 
         <aside className="home-side">
           <section className="surface side-panel" id="leaders">
@@ -4850,7 +4945,7 @@ export function App() {
         method: "DELETE",
       });
       setForecastTournaments(result.tournaments ?? []);
-      navigate({ name: "predictions" }, { replace: true });
+      navigate({ name: "home" }, { replace: true });
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -5189,6 +5284,7 @@ export function App() {
           scoringMethods={scoringMethods}
           settings={settings}
           tournament={tournament}
+          viewMode="prediction"
         />
         {authModal}
       </>
@@ -5220,6 +5316,7 @@ export function App() {
           onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
+          onOpenTournament={(tournamentId) => navigate({ name: "detail", tournamentId })}
           onPreviewResultsImport={previewTournamentResultsImport}
           tournament={tournament}
         />
@@ -5294,6 +5391,34 @@ export function App() {
   }
 
   if (screen.name === "detail") {
+    const plannedTournament = forecastTournaments.find((item) => item.id === screen.tournamentId && !item.completedResultId);
+    if (plannedTournament) {
+      return (
+        <>
+          <ForecastTournamentDetail
+            auth={auth}
+            forecastTournaments={forecastTournaments}
+            onConfirmResultsImport={confirmTournamentResultsImport}
+            onDeleteTournament={deleteForecastTournament}
+            onLoadForecastPrediction={loadForecastPrediction}
+            onLoadForecastPredictionSummary={loadForecastPredictionSummary}
+            onLoadForecastResultsSummary={loadForecastResultsSummary}
+            onOpenHome={() => navigate({ name: "home" })}
+            onOpenPlaceholder={openPlaceholder}
+            onOpenPredictions={openPredictions}
+            onOpenResultsImport={(tournamentId) => navigate({ name: "forecast-results-import", tournamentId })}
+            onSaveForecastPrediction={saveForecastPrediction}
+            onUpdateTournament={updateForecastTournament}
+            scoringMethods={scoringMethods}
+            settings={settings}
+            tournament={plannedTournament}
+            viewMode="tournament"
+          />
+          {authModal}
+        </>
+      );
+    }
+
     const importedResult = completedTournamentResults.find((result) => result.id === screen.tournamentId);
     if (importedResult) {
       return (
