@@ -3171,6 +3171,28 @@ function ForecastTournamentDetail({
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
   const isPredictionClosed = Boolean(getVladivostokDeadlineMs(tournament.predictionCloseAt) && getVladivostokDeadlineMs(tournament.predictionCloseAt) <= Date.now());
   const hasCompletedResults = Boolean(tournament.completedResultId);
+  const ratingValues = sortedRoster
+    .map((player) => Number(player.rating))
+    .filter((rating) => Number.isFinite(rating));
+  const topRatedPlayer = sortedRoster[0] ?? null;
+  const minRating = ratingValues.length ? Math.min(...ratingValues) : 0;
+  const maxRating = ratingValues.length ? Math.max(...ratingValues) : 0;
+  const averageRating = ratingValues.length
+    ? ratingValues.reduce((sum, rating) => sum + rating, 0) / ratingValues.length
+    : 0;
+  const ratingSpread = ratingValues.length ? maxRating - minRating : 0;
+  const seedBoardColumns = useMemo(() => {
+    const splitIndex = Math.ceil(sortedRoster.length / 2);
+    return [sortedRoster.slice(0, splitIndex), sortedRoster.slice(splitIndex)];
+  }, [sortedRoster]);
+  const getRatingProgress = (rating) => {
+    const numericRating = Number(rating);
+    if (!Number.isFinite(numericRating) || maxRating <= minRating) {
+      return 100;
+    }
+
+    return Math.round(36 + ((numericRating - minRating) / (maxRating - minRating)) * 64);
+  };
 
   const selectedPlayer = sortedRoster.find((player) => getPlayerKey(player) === selectedPlayerId);
   const rankingHint = selectedPlayer
@@ -3504,13 +3526,6 @@ function ForecastTournamentDetail({
               </button>
             </div>
           )}
-          {isTournamentView && !hasCompletedResults && (
-            <div className="prediction-admin-actions tournament-user-actions">
-              <button type="button" onClick={() => onOpenPredictions(tournament.id)}>
-                {isPredictionClosed ? "Открыть страницу прогноза" : "Сделать прогноз"}
-              </button>
-            </div>
-          )}
           {adminMessage && <strong className="prediction-error">{adminMessage}</strong>}
           <div className={`prediction-count-card ${canViewPredictionRegistry ? "can-open" : ""}`}>
             <button
@@ -3567,30 +3582,90 @@ function ForecastTournamentDetail({
       )}
 
       {isTournamentView ? (
-        <section className="prediction-workspace tournament-overview-workspace">
-          <section className="surface prediction-roster-card" id="roster">
-            <div className="section-title">
-              <span>Стартовый состав</span>
-              <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Состав пока не опубликован"}</h2>
-            </div>
-            {tournament.roster.length === 0 ? (
-              <div className="prediction-empty-list">
-                <strong>Состав пока не опубликован</strong>
-                <p>Когда админ добавит участников, здесь появятся игроки турнира.</p>
+        <>
+          {tournament.roster.length > 0 && (
+            <section className="surface roster-rating-strip">
+              <article>
+                <span>Сильнейший игрок</span>
+                <strong>{topRatedPlayer?.name ?? "—"}</strong>
+                <b>{topRatedPlayer ? Number(topRatedPlayer.rating).toFixed(2) : "—"}</b>
+              </article>
+              <article>
+                <span>Средний рейтинг</span>
+                <strong>{averageRating.toFixed(2)}</strong>
+                <b>{tournament.roster.length} игроков</b>
+              </article>
+              <article>
+                <span>Разброс рейтинга</span>
+                <strong>{ratingSpread.toFixed(2)}</strong>
+                <b>{maxRating.toFixed(2)} - {minRating.toFixed(2)}</b>
+              </article>
+            </section>
+          )}
+
+          <section className={`tournament-seed-layout ${hasCompletedResults ? "single" : ""}`}>
+            <section className="surface prediction-roster-card tournament-seed-card" id="roster">
+              <div className="section-title seed-board-title">
+                <span>Состав турнира (Seed Board)</span>
+                <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Состав пока не опубликован"}</h2>
               </div>
-            ) : (
-              <div className="prediction-roster-grid tournament-overview-roster">
-                {sortedRoster.map((player, index) => (
-                  <article className="prediction-roster-player readonly" key={getPlayerKey(player)}>
-                    <span>{index + 1}</span>
-                    <strong>{player.name}</strong>
-                    <b className="prediction-rating">{Number(player.rating).toFixed(2)}</b>
-                  </article>
-                ))}
-              </div>
+              {tournament.roster.length === 0 ? (
+                <div className="prediction-empty-list">
+                  <strong>Состав пока не опубликован</strong>
+                  <p>Когда админ добавит участников, здесь появятся игроки турнира.</p>
+                </div>
+              ) : (
+                <div className="seed-board-grid">
+                  {seedBoardColumns.map((column, columnIndex) => (
+                    <div className="seed-board-column" key={`seed-column-${columnIndex}`}>
+                      {column.map((player) => {
+                        const seedIndex = sortedRoster.findIndex((item) => getPlayerKey(item) === getPlayerKey(player)) + 1;
+                        const rating = Number(player.rating);
+
+                        return (
+                          <article
+                            className={`seed-board-row ${seedIndex === 1 ? "top-seed" : ""}`}
+                            key={getPlayerKey(player)}
+                            style={{ "--rating-progress": `${getRatingProgress(rating)}%` }}
+                          >
+                            <span className="seed-rank">{seedIndex}</span>
+                            <div className="seed-player-copy">
+                              <strong>{player.name}</strong>
+                              <small>Seed #{seedIndex}</small>
+                            </div>
+                            <div className="seed-rating-cell">
+                              <b>{Number.isFinite(rating) ? rating.toFixed(2) : "—"}</b>
+                              <i />
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {!hasCompletedResults && (
+              <aside className="surface tournament-forecast-ready-card">
+                <img src="/assets/trophy.png" alt="" />
+                <div>
+                  <span>Готов к прогнозу</span>
+                  <h2>Расставь всех игроков по местам от 1 до {expectedPlayerIds.length || tournament.roster.length || "—"}.</h2>
+                  <p>Каждый игрок может занять только одно место. Свой прогноз можно изменить до дедлайна.</p>
+                </div>
+                <div className="forecast-deadline-box">
+                  <span>Дедлайн для прогнозов</span>
+                  <strong>{formatForecastTimeLeft(tournament.predictionCloseAt)}</strong>
+                  <p>{tournament.predictionCloseAt ? formatVladivostokDateTime(tournament.predictionCloseAt) : "VLAT"}</p>
+                </div>
+                <button type="button" onClick={() => onOpenPredictions(tournament.id)}>
+                  {isPredictionClosed ? "Открыть прогноз" : "Добавить прогноз"}
+                </button>
+              </aside>
             )}
           </section>
-        </section>
+        </>
       ) : hasCompletedResults ? (
         forecastResultsLoading ? (
           <section className="surface prediction-empty-list tall">

@@ -1677,6 +1677,255 @@ main {
   margin-top: 14px;
 }
 
+.roster-rating-strip {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+  overflow: hidden;
+  padding: 0;
+}
+
+.roster-rating-strip article {
+  align-items: center;
+  display: grid;
+  gap: 7px 14px;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  min-height: 96px;
+  padding: 20px 24px;
+}
+
+.roster-rating-strip article + article {
+  border-left: 1px solid var(--line);
+}
+
+.roster-rating-strip article::before {
+  align-items: center;
+  background: var(--green-soft);
+  border: 1px solid rgba(29, 93, 42, 0.14);
+  border-radius: 999px;
+  color: var(--green);
+  content: "PB";
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  grid-row: 1 / span 2;
+  height: 46px;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  width: 46px;
+}
+
+.roster-rating-strip span,
+.tournament-forecast-ready-card span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.roster-rating-strip strong {
+  color: var(--text);
+  font-size: clamp(18px, 2.1vw, 28px);
+  line-height: 1.05;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster-rating-strip b {
+  background: var(--green-soft);
+  border: 1px solid rgba(29, 93, 42, 0.14);
+  border-radius: 999px;
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 950;
+  justify-self: end;
+  padding: 8px 10px;
+}
+
+.tournament-seed-layout {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.34fr);
+  margin-top: 14px;
+}
+
+.tournament-seed-layout.single {
+  grid-template-columns: 1fr;
+}
+
+.tournament-seed-card {
+  min-width: 0;
+}
+
+.seed-board-title {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+  padding-bottom: 14px;
+}
+
+.seed-board-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seed-board-column + .seed-board-column {
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
+}
+
+.seed-board-row {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 54px minmax(0, 1fr) minmax(130px, 0.32fr);
+  min-height: 78px;
+  padding: 11px 0;
+}
+
+.seed-board-row.top-seed {
+  background: rgba(29, 93, 42, 0.07);
+  border: 1px solid rgba(29, 93, 42, 0.18);
+  border-radius: 8px;
+  margin: 0 0 2px;
+  padding: 12px 14px;
+}
+
+.seed-rank {
+  color: var(--green);
+  font-size: clamp(34px, 4.4vw, 56px);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.9;
+}
+
+.seed-player-copy {
+  min-width: 0;
+}
+
+.seed-player-copy strong,
+.seed-player-copy small {
+  display: block;
+}
+
+.seed-player-copy strong {
+  color: var(--text);
+  font-size: clamp(16px, 1.55vw, 22px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.seed-player-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  margin-top: 7px;
+  text-transform: uppercase;
+}
+
+.seed-rating-cell {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.seed-rating-cell b {
+  color: var(--green);
+  font-size: clamp(20px, 2vw, 28px);
+  font-weight: 950;
+  line-height: 1;
+}
+
+.seed-rating-cell i {
+  background: rgba(29, 93, 42, 0.12);
+  border-radius: 999px;
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  position: relative;
+  width: 118px;
+}
+
+.seed-rating-cell i::after {
+  background: var(--green);
+  border-radius: inherit;
+  content: "";
+  inset: 0 auto 0 0;
+  position: absolute;
+  width: var(--rating-progress, 50%);
+}
+
+.tournament-forecast-ready-card {
+  align-content: start;
+  display: grid;
+  gap: 22px;
+  padding: 28px;
+}
+
+.tournament-forecast-ready-card img {
+  border-radius: 999px;
+  height: 96px;
+  justify-self: center;
+  object-fit: cover;
+  width: 96px;
+}
+
+.tournament-forecast-ready-card h2 {
+  font-size: clamp(22px, 2.4vw, 34px);
+  line-height: 1.08;
+  margin: 8px 0 0;
+}
+
+.tournament-forecast-ready-card p {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 10px 0 0;
+}
+
+.forecast-deadline-box {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.forecast-deadline-box strong {
+  color: var(--green);
+  display: block;
+  font-size: clamp(34px, 4vw, 48px);
+  line-height: 1;
+  margin-top: 10px;
+}
+
+.forecast-deadline-box p {
+  margin-top: 8px;
+}
+
+.tournament-forecast-ready-card button {
+  background: var(--green);
+  border-radius: 8px;
+  box-shadow: 0 16px 34px rgba(29, 93, 42, 0.2);
+  color: #fffefa;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 950;
+  min-height: 58px;
+  padding: 14px 18px;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.tournament-forecast-ready-card button:hover {
+  background: #166022;
+  transform: translateY(-1px);
+}
+
 .prediction-mobile-card {
   display: none;
   gap: 14px;
@@ -4342,6 +4591,7 @@ p {
   .forecast-results-hero,
   .forecast-results-grid,
   .results-preview-grid,
+  .tournament-seed-layout,
   .forecast-registry-layout {
     grid-template-columns: 1fr;
   }
@@ -4619,6 +4869,24 @@ p {
     grid-template-columns: 1fr;
   }
 
+  .roster-rating-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-rating-strip article + article {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .seed-board-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .seed-board-column + .seed-board-column {
+    border-left: 0;
+    padding-left: 0;
+  }
+
   .prediction-workspace {
     display: none;
   }
@@ -4739,6 +5007,33 @@ p {
 
   .prediction-roster-grid {
     grid-template-columns: 1fr;
+  }
+
+  .roster-rating-strip article {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    padding: 16px;
+  }
+
+  .seed-board-row {
+    gap: 12px;
+    grid-template-columns: 42px minmax(0, 1fr) minmax(88px, auto);
+    min-height: 66px;
+  }
+
+  .seed-rank {
+    font-size: 34px;
+  }
+
+  .seed-player-copy strong {
+    font-size: 15px;
+  }
+
+  .seed-rating-cell i {
+    width: 78px;
+  }
+
+  .tournament-forecast-ready-card {
+    padding: 18px;
   }
 
   .prediction-slot-grid {
