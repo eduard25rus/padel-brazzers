@@ -1507,6 +1507,36 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "PUT" && url.pathname === "/api/me/profile") {
+    const user = getAuthedUser(store, request);
+    if (user?.status !== "active") {
+      jsonResponse(response, 403, { message: "Профиль доступен только подтвержденным участникам." });
+      return;
+    }
+
+    const body = await readJson(request);
+    const lundaNick = String(body.lundaNick ?? "").trim();
+    if (!lundaNick) {
+      jsonResponse(response, 400, { message: "Укажи ник в Lunda." });
+      return;
+    }
+
+    if (store.users.some((item) => item.id !== user.id && String(item.lundaNick ?? "").toLowerCase() === lundaNick.toLowerCase())) {
+      jsonResponse(response, 409, { message: "Этот ник в Lunda уже занят." });
+      return;
+    }
+
+    const userIndex = store.users.findIndex((item) => item.id === user.id);
+    store.users[userIndex] = {
+      ...store.users[userIndex],
+      lundaNick,
+      updatedAt: new Date().toISOString(),
+    };
+    writeStore(store);
+    jsonResponse(response, 200, authPayload(store, store.users[userIndex]));
+    return;
+  }
+
   const ownPredictionMatch = url.pathname.match(/^\/api\/forecast-tournaments\/([^/]+)\/prediction$/);
   if ((request.method === "GET" || request.method === "PUT") && ownPredictionMatch) {
     const user = getAuthedUser(store, request);
@@ -1605,7 +1635,7 @@ async function handleApi(request, response, url) {
       return;
     }
 
-    if (store.users.some((user) => user.lundaNick.toLowerCase() === lundaNick.toLowerCase())) {
+    if (store.users.some((user) => String(user.lundaNick ?? "").toLowerCase() === lundaNick.toLowerCase())) {
       jsonResponse(response, 409, { message: "Этот ник в Lunda уже занят." });
       return;
     }

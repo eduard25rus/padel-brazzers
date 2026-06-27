@@ -640,6 +640,30 @@ function normalizeLeaderboardName(name) {
   return playerNameAliases[name] ?? name;
 }
 
+function normalizeNameKey(name) {
+  return normalizeLeaderboardName(String(name ?? ""))
+    .toLowerCase()
+    .replace(/[.,|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNameMatchKeys(name) {
+  const normalized = normalizeNameKey(name);
+  if (!normalized) {
+    return [];
+  }
+
+  const parts = normalized.split(" ").filter(Boolean);
+  const keys = new Set([normalized, parts.join("")]);
+  if (parts.length === 2) {
+    keys.add(`${parts[1]} ${parts[0]}`);
+    keys.add(`${parts[1]}${parts[0]}`);
+  }
+
+  return [...keys];
+}
+
 function getCompletedTournamentSources(pointMethod, completedResults = []) {
   return [
     ...completedResults.map((result) => ({
@@ -767,9 +791,10 @@ function getUserNameCandidates(user) {
     getUserDisplayName(user),
     user?.lundaNick,
     user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "",
+    user?.firstName && user?.lastName ? `${user.lastName} ${user.firstName}` : "",
   ]
     .filter(Boolean)
-    .map((name) => normalizeLeaderboardName(String(name)).toLowerCase());
+    .flatMap(getNameMatchKeys);
 }
 
 function getMyTournamentStats(user, pointMethod, completedResults = []) {
@@ -778,7 +803,7 @@ function getMyTournamentStats(user, pointMethod, completedResults = []) {
 
   for (const tournament of getCompletedTournamentSources(pointMethod, completedResults)) {
     for (const row of tournament.rows) {
-      const isMine = row.participants.some((participant) => candidates.has(normalizeLeaderboardName(participant).toLowerCase()));
+      const isMine = row.participants.some((participant) => getNameMatchKeys(participant).some((key) => candidates.has(key)));
       if (!isMine) {
         continue;
       }
@@ -973,77 +998,6 @@ function EditableInsightField({ as = "span", multiline = false, onChange, value 
     <Tag className="editable-story-text" title="Двойной клик, чтобы отредактировать" onDoubleClick={() => setEditing(true)}>
       {value || "Двойной клик, чтобы добавить текст"}
     </Tag>
-  );
-}
-
-function EditableTournamentTitle({ canEdit, onRename, title, tournamentId }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(title);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!editing) {
-      setDraft(title);
-    }
-  }, [editing, title]);
-
-  const commit = async () => {
-    const nextTitle = draft.trim();
-    if (!nextTitle || nextTitle === title) {
-      setDraft(title);
-      setEditing(false);
-      return;
-    }
-
-    setSaving(true);
-    const result = await onRename(tournamentId, nextTitle);
-    setSaving(false);
-    if (!result.ok) {
-      setDraft(title);
-      setEditing(false);
-      return;
-    }
-    setEditing(false);
-  };
-
-  if (canEdit && editing) {
-    return (
-      <input
-        autoFocus
-        className="tournament-title-editor"
-        value={draft}
-        disabled={saving}
-        onBlur={commit}
-        onChange={(event) => setDraft(event.target.value)}
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            commit();
-          }
-          if (event.key === "Escape") {
-            setDraft(title);
-            setEditing(false);
-          }
-        }}
-      />
-    );
-  }
-
-  return (
-    <strong
-      className={canEdit ? "editable-tournament-title" : ""}
-      title={canEdit ? "Нажми, чтобы переименовать" : undefined}
-      onClick={(event) => {
-        if (!canEdit) {
-          return;
-        }
-
-        event.stopPropagation();
-        setEditing(true);
-      }}
-    >
-      {title}
-    </strong>
   );
 }
 
@@ -3157,6 +3111,7 @@ function ForecastTournamentDetail({
   );
   const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: sortedRoster.length }, () => null));
   const [mobileDragIndex, setMobileDragIndex] = useState(null);
+  const [desktopEditing, setDesktopEditing] = useState(false);
   const [mobileEditing, setMobileEditing] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [forecastLoading, setForecastLoading] = useState(false);
@@ -3208,7 +3163,9 @@ function ForecastTournamentDetail({
       || forecastSaveMessage.startsWith("Прогноз сохранен на сервере")
     );
   const isMobileSavedLocked = hasSavedCompleteForecast && !mobileEditing;
+  const isDesktopSavedLocked = hasSavedCompleteForecast && !desktopEditing;
   const canEditMobileForecast = !isMobileSavedLocked;
+  const canEditDesktopForecast = !isDesktopSavedLocked;
   const canManageTournament = auth.adminMode && auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
   const canViewPredictionRegistry = canManageTournament;
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
@@ -3240,6 +3197,7 @@ function ForecastTournamentDetail({
 
   useEffect(() => {
     setForecastSlots(Array.from({ length: sortedRoster.length }, () => null));
+    setDesktopEditing(false);
     setMobileEditing(false);
     setSelectedPlayerId(null);
     setForecastSaveMessage("");
@@ -3325,6 +3283,10 @@ function ForecastTournamentDetail({
   }, [hasCompletedResults, tournament.id, auth.currentUser?.id]);
 
   const placePlayer = (slotIndex, playerId) => {
+    if (!canEditDesktopForecast) {
+      return;
+    }
+
     const player = sortedRoster.find((item) => getPlayerKey(item) === playerId);
     if (!player) {
       return;
@@ -3341,6 +3303,10 @@ function ForecastTournamentDetail({
   };
 
   const clearSlot = (slotIndex) => {
+    if (!canEditDesktopForecast) {
+      return;
+    }
+
     setForecastSlots((current) => current.map((slot, index) => (index === slotIndex ? null : slot)));
     setForecastSaveMessage("");
     setForecastSaveTone("success");
@@ -3348,6 +3314,10 @@ function ForecastTournamentDetail({
 
   const handleSlotDrop = (event, slotIndex) => {
     event.preventDefault();
+    if (!canEditDesktopForecast) {
+      return;
+    }
+
     const sourceSlotValue = event.dataTransfer.getData("application/x-padel-slot");
     const sourceSlotIndex = Number(sourceSlotValue);
     if (sourceSlotValue !== "" && Number.isInteger(sourceSlotIndex) && sourceSlotIndex >= 0 && sourceSlotIndex < forecastSlots.length) {
@@ -3422,6 +3392,7 @@ function ForecastTournamentDetail({
     }
 
     setForecastSlots(slots);
+    setDesktopEditing(false);
     setMobileEditing(false);
     setForecastSaveMessage(`Прогноз сохранен на сервере: ${formatVladivostokInstant(result.prediction.updatedAt)} VLAT.`);
     setForecastSaveTone("success");
@@ -3749,7 +3720,7 @@ function ForecastTournamentDetail({
           </div>
           {tournament.roster.length > 0 && (
             <div className="prediction-placement-hint">
-              Выбери игрока и перетащи в правую часть.
+              {isDesktopSavedLocked ? "Прогноз сохранен. Чтобы изменить состав мест, нажми «Редактировать» справа." : "Выбери игрока и перетащи в правую часть."}
             </div>
           )}
           {tournament.roster.length === 0 ? (
@@ -3766,12 +3737,22 @@ function ForecastTournamentDetail({
 
                 return (
                 <button
-                  className={`prediction-roster-player ${isSelected ? "selected" : ""} ${isPlaced ? "placed" : ""}`}
-                  draggable
+                  className={`prediction-roster-player ${isSelected ? "selected" : ""} ${isPlaced ? "placed" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
+                  draggable={canEditDesktopForecast}
                   key={playerId}
                   type="button"
-                  onClick={() => setSelectedPlayerId(isSelected ? null : playerId)}
+                  onClick={() => {
+                    if (!canEditDesktopForecast) {
+                      return;
+                    }
+
+                    setSelectedPlayerId(isSelected ? null : playerId);
+                  }}
                   onDragStart={(event) => {
+                    if (!canEditDesktopForecast) {
+                      return;
+                    }
+
                     event.dataTransfer.setData("text/plain", playerId);
                     event.dataTransfer.effectAllowed = "move";
                   }}
@@ -3792,11 +3773,21 @@ function ForecastTournamentDetail({
               <span>Мой прогноз</span>
               <h2>{expectedPlayerIds.length} мест турнира</h2>
             </div>
-            <button disabled={!isForecastComplete || forecastLoading || forecastSaving} type="button" onClick={saveForecast}>
-              {forecastSaving ? "Сохраняем..." : "Сохранить прогноз"}
-            </button>
+            {isDesktopSavedLocked ? (
+              <button type="button" onClick={() => setDesktopEditing(true)}>
+                Редактировать
+              </button>
+            ) : (
+              <button disabled={!isForecastComplete || forecastLoading || forecastSaving} type="button" onClick={() => saveForecast()}>
+                {forecastSaving ? "Сохраняем..." : "Сохранить прогноз"}
+              </button>
+            )}
           </div>
-          {forecastSaveMessage && <strong className={`prediction-save-message ${forecastSaveTone}`}>{forecastSaveMessage}</strong>}
+          {isDesktopSavedLocked ? (
+            <strong className="prediction-save-message success">Ваш прогноз сохранен.</strong>
+          ) : forecastSaveMessage && !forecastSaveMessage.startsWith("Загружен твой сохраненный прогноз") ? (
+            <strong className={`prediction-save-message ${forecastSaveTone}`}>{forecastSaveMessage}</strong>
+          ) : null}
           {tournament.roster.length === 0 ? (
             <div className="prediction-empty-list tall">
               <strong>Расстановка откроется после публикации состава</strong>
@@ -3805,14 +3796,19 @@ function ForecastTournamentDetail({
           ) : (
             <>
               {rankingHint && <div className="prediction-placement-hint">{rankingHint}</div>}
-              <div className="prediction-slot-grid">
+              {isDesktopSavedLocked && <div className="prediction-placement-hint">Чтобы изменить порядок, нажми «Редактировать».</div>}
+              <div className={`prediction-slot-grid ${!canEditDesktopForecast ? "locked" : ""}`}>
                 {forecastSlots.map((slot, index) => (
                   <button
-                    className={`prediction-slot ${slot ? "filled" : ""} ${slot?.invalid ? "invalid" : ""}`}
-                    draggable={Boolean(slot && !slot.invalid)}
+                    className={`prediction-slot ${slot ? "filled" : ""} ${slot?.invalid ? "invalid" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
+                    draggable={Boolean(canEditDesktopForecast && slot && !slot.invalid)}
                     key={`slot-${index}`}
                     type="button"
                     onClick={() => {
+                      if (!canEditDesktopForecast) {
+                        return;
+                      }
+
                       if (selectedPlayerId) {
                         placePlayer(index, selectedPlayerId);
                         return;
@@ -3824,7 +3820,7 @@ function ForecastTournamentDetail({
                     }}
                     onDragOver={(event) => event.preventDefault()}
                     onDragStart={(event) => {
-                      if (!slot || slot.invalid) {
+                      if (!canEditDesktopForecast || !slot || slot.invalid) {
                         return;
                       }
 
@@ -4175,12 +4171,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
                   <img src={tournament.image} alt="" />
                   <div className="tournament-copy">
                     <span>{tournament.date} · {tournament.club}</span>
-                    <EditableTournamentTitle
-                      canEdit={auth.adminMode && auth.currentUser?.role === "admin" && tournament.imported}
-                      onRename={onRenameCompletedTournament}
-                      title={tournament.title}
-                      tournamentId={tournament.id}
-                    />
+                    <strong>{tournament.title}</strong>
                     <p>{tournament.format} · {tournament.teams} · {tournament.rounds} · {tournament.matches}</p>
                   </div>
                   <div className="tournament-result">
@@ -4704,13 +4695,30 @@ function LeadersScreen({ auth, completedTournamentResults, forecastLeaders, onOp
   );
 }
 
-function MemberCabinetScreen({ auth, cabinet, completedTournamentResults, loading, onOpenForecastTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, pointMethod, section }) {
+function MemberCabinetScreen({ auth, cabinet, completedTournamentResults, loading, onOpenForecastTournament, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenSection, onUpdateProfile, pointMethod, section }) {
   const activeSection = section ?? "forecasts";
+  const [profileForm, setProfileForm] = useState(() => ({ lundaNick: auth.currentUser?.lundaNick ?? "" }));
+  const [profileMessage, setProfileMessage] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
   const myTournamentStats = useMemo(() => getMyTournamentStats(auth.currentUser, pointMethod, completedTournamentResults), [auth.currentUser, completedTournamentResults, pointMethod]);
   const forecastPoints = cabinet?.forecastPoints ?? 0;
   const predictionCount = cabinet?.predictionCount ?? 0;
   const readyPredictionCount = cabinet?.readyPredictionCount ?? 0;
   const needsReviewCount = cabinet?.needsReviewCount ?? 0;
+
+  useEffect(() => {
+    setProfileForm({ lundaNick: auth.currentUser?.lundaNick ?? "" });
+    setProfileMessage("");
+  }, [auth.currentUser?.id, auth.currentUser?.lundaNick]);
+
+  const submitProfile = async (event) => {
+    event.preventDefault();
+    setProfileSaving(true);
+    setProfileMessage("");
+    const result = await onUpdateProfile(profileForm);
+    setProfileSaving(false);
+    setProfileMessage(result.ok ? "Профиль обновлен." : result.message);
+  };
 
   return (
     <main className="predictions-shell member-cabinet-shell">
@@ -4741,6 +4749,25 @@ function MemberCabinetScreen({ auth, cabinet, completedTournamentResults, loadin
         <button className={activeSection === "forecasts" ? "active" : ""} type="button" onClick={() => onOpenSection("forecasts")}>Мои прогнозы</button>
         <button className={activeSection === "tournaments" ? "active" : ""} type="button" onClick={() => onOpenSection("tournaments")}>Мои турниры</button>
       </section>
+
+      <form className="surface member-profile-card" onSubmit={submitProfile}>
+        <div>
+          <span>Профиль игрока</span>
+          <strong>Ник в Lunda</strong>
+          <p>По нему и по имени мы связываем твой аккаунт с итоговыми таблицами турниров.</p>
+        </div>
+        <input
+          required
+          value={profileForm.lundaNick}
+          onChange={(event) => {
+            setProfileForm({ lundaNick: event.target.value });
+            setProfileMessage("");
+          }}
+          placeholder="Например, Шевченко Эдуард"
+        />
+        <button disabled={profileSaving} type="submit">{profileSaving ? "Сохраняем..." : "Сохранить"}</button>
+        {profileMessage && <small className={profileMessage.includes("обновлен") ? "success" : "error"}>{profileMessage}</small>}
+      </form>
 
       {activeSection === "forecasts" ? (
         <section className="surface member-cabinet-panel">
@@ -4819,7 +4846,7 @@ function MemberCabinetScreen({ auth, cabinet, completedTournamentResults, loadin
               ))}
             </div>
           ) : (
-            <p className="leaders-empty">Пока не нашли тебя в итоговых таблицах двух текущих турниров. Если имя в Lunda отличается от имени в таблице, позже добавим привязку игрока к аккаунту.</p>
+            <p className="leaders-empty">Пока не нашли тебя в итоговых таблицах турниров. Проверь ник в Lunda или порядок имени и фамилии в профиле.</p>
           )}
         </section>
       )}
@@ -5109,6 +5136,19 @@ export function App() {
         method: "PUT",
       });
       setSettings(result.settings ?? defaultSettings);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  };
+
+  const updateProfile = async (payload) => {
+    try {
+      const result = await apiRequest("/api/me/profile", {
+        body: JSON.stringify(payload),
+        method: "PUT",
+      });
+      applyAuthPayload(result);
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -5407,6 +5447,7 @@ export function App() {
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           onOpenSection={(section) => navigate({ name: "cabinet", section })}
+          onUpdateProfile={updateProfile}
           pointMethod={activeLeaderboardPointMethod}
           section={screen.section}
         />

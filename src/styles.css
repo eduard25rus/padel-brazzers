@@ -833,35 +833,6 @@ main {
   margin: 7px 0 8px;
 }
 
-.editable-tournament-title {
-  border-radius: 6px;
-  cursor: text;
-  padding: 2px 4px;
-}
-
-.editable-tournament-title:hover {
-  background: rgba(29, 93, 42, 0.07);
-}
-
-.tournament-title-editor {
-  background: #fffefa;
-  border: 1px solid rgba(29, 93, 42, 0.25);
-  border-radius: 8px;
-  color: var(--text);
-  display: block;
-  font-family: inherit;
-  font-size: 28px;
-  font-weight: 900;
-  line-height: 1.05;
-  margin: 7px 0 8px;
-  padding: 6px 8px;
-  width: 100%;
-}
-
-.tournament-title-editor:focus {
-  outline: none;
-}
-
 .tournament-copy p {
   font-size: 13px;
 }
@@ -1762,6 +1733,17 @@ main {
   opacity: 0.55;
 }
 
+.prediction-roster-player.locked {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.prediction-roster-player.locked:hover {
+  background: rgba(255, 254, 250, 0.58);
+  border-color: var(--line);
+  transform: none;
+}
+
 .prediction-roster-player strong {
   flex: 1;
   font-size: 13px;
@@ -2565,6 +2547,14 @@ main {
   background: rgba(255, 254, 250, 0.92);
   border-style: solid;
   cursor: grab;
+}
+
+.prediction-slot.locked,
+.prediction-slot.locked:hover {
+  background: rgba(255, 254, 250, 0.72);
+  border-color: var(--line);
+  cursor: default;
+  transform: none;
 }
 
 .prediction-slot.filled:active {
@@ -3653,6 +3643,75 @@ p {
   color: #fffefa;
 }
 
+.member-profile-card {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.55fr) auto;
+  padding: 18px 22px;
+}
+
+.member-profile-card span {
+  color: var(--green);
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.member-profile-card strong {
+  display: block;
+  font-size: 18px;
+  margin-top: 5px;
+}
+
+.member-profile-card p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+
+.member-profile-card input {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 11px 12px;
+}
+
+.member-profile-card button {
+  background: var(--green);
+  border-radius: 8px;
+  color: #fffefa;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 44px;
+  padding: 11px 14px;
+}
+
+.member-profile-card button:disabled {
+  background: #d8dfd7;
+  color: #748075;
+  cursor: not-allowed;
+}
+
+.member-profile-card > small {
+  font-weight: 900;
+  grid-column: 2 / -1;
+}
+
+.member-profile-card > small.success {
+  color: var(--green);
+}
+
+.member-profile-card > small.error {
+  color: var(--loss);
+}
+
 .member-cabinet-panel {
   padding: 22px;
 }
@@ -4389,6 +4448,15 @@ p {
 
   .admin-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .member-profile-card {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .member-profile-card > small {
+    grid-column: auto;
   }
 
   .home-hero-stats div {
