@@ -1024,6 +1024,7 @@ main {
 .prediction-tournament-card,
 .prediction-roster-card,
 .prediction-ranking-card,
+.prediction-mobile-card,
 .prediction-final-table,
 .prediction-leaderboard {
   padding: 22px;
@@ -1601,6 +1602,12 @@ main {
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(350px, 0.78fr) minmax(0, 1.22fr);
+  margin-top: 14px;
+}
+
+.prediction-mobile-card {
+  display: none;
+  gap: 14px;
   margin-top: 14px;
 }
 
@@ -2566,6 +2573,106 @@ main {
 .prediction-row-actions button:disabled {
   color: #b1b8b2;
   cursor: not-allowed;
+}
+
+.prediction-mobile-list {
+  display: grid;
+  gap: 8px;
+}
+
+.prediction-mobile-row {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.76);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr) 42px;
+  min-height: 62px;
+  padding: 9px 10px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.prediction-mobile-row.dragging {
+  background: var(--green-soft);
+  border-color: rgba(29, 93, 42, 0.34);
+  transform: scale(0.99);
+}
+
+.prediction-mobile-row.invalid {
+  background: rgba(219, 63, 74, 0.08);
+  border-color: rgba(219, 63, 74, 0.36);
+}
+
+.prediction-mobile-row > b {
+  align-items: center;
+  background: var(--green);
+  border-radius: 50%;
+  color: #fffefa;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 950;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.prediction-mobile-row.invalid > b {
+  background: var(--loss);
+}
+
+.prediction-mobile-player strong,
+.prediction-mobile-player small {
+  display: block;
+}
+
+.prediction-mobile-player strong {
+  font-size: 15px;
+  line-height: 1.18;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prediction-mobile-player small {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  margin-top: 4px;
+}
+
+.prediction-mobile-row.invalid .prediction-mobile-player strong,
+.prediction-mobile-row.invalid .prediction-mobile-player small {
+  color: var(--loss);
+}
+
+.prediction-mobile-handle {
+  align-items: center;
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: grab;
+  display: inline-flex;
+  font-size: 20px;
+  font-weight: 950;
+  height: 42px;
+  justify-content: center;
+  letter-spacing: -3px;
+  touch-action: none;
+  width: 42px;
+}
+
+.prediction-mobile-handle:active {
+  cursor: grabbing;
+}
+
+.prediction-mobile-handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .prediction-ranking-card footer {
@@ -4311,6 +4418,14 @@ p {
   .prediction-scoring-details div {
     grid-template-columns: 1fr;
   }
+
+  .prediction-workspace {
+    display: none;
+  }
+
+  .prediction-mobile-card {
+    display: grid;
+  }
 }
 
 @media (max-width: 560px) {
@@ -4416,6 +4531,7 @@ p {
   .prediction-tournament-card,
   .prediction-roster-card,
   .prediction-ranking-card,
+  .prediction-mobile-card,
   .prediction-final-table,
   .prediction-leaderboard {
     padding: 16px;
@@ -4438,6 +4554,21 @@ p {
   .prediction-row-actions {
     grid-column: 1 / -1;
     justify-content: flex-end;
+  }
+
+  .prediction-mobile-row {
+    grid-template-columns: 32px minmax(0, 1fr) 40px;
+    min-height: 58px;
+    padding: 8px;
+  }
+
+  .prediction-mobile-player strong {
+    font-size: 14px;
+  }
+
+  .prediction-mobile-handle {
+    height: 40px;
+    width: 40px;
   }
 
   .tournament-row {

@@ -3129,6 +3129,7 @@ function ForecastTournamentDetail({
     [tournament.roster],
   );
   const [forecastSlots, setForecastSlots] = useState(() => Array.from({ length: sortedRoster.length }, () => null));
+  const [mobileDragIndex, setMobileDragIndex] = useState(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastSaving, setForecastSaving] = useState(false);
@@ -3147,6 +3148,28 @@ function ForecastTournamentDetail({
   const forecastPlayerIds = new Set(currentForecastSlots.map((slot) => String(getPlayerKey(slot))));
   const expectedPlayerIds = sortedRoster.map((player) => String(getPlayerKey(player)));
   const isForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => forecastPlayerIds.has(playerId));
+  const mobileForecastSlots = useMemo(() => {
+    const hasPlacedSlots = forecastSlots.some(Boolean);
+    if (!hasPlacedSlots) {
+      return sortedRoster;
+    }
+
+    const placedPlayerIds = new Set(forecastSlots.filter((slot) => slot && !slot.invalid).map((slot) => String(getPlayerKey(slot))));
+    const missingPlayers = sortedRoster.filter((player) => !placedPlayerIds.has(String(getPlayerKey(player))));
+    let missingIndex = 0;
+
+    return forecastSlots.map((slot) => {
+      if (slot) {
+        return slot;
+      }
+
+      const nextPlayer = missingPlayers[missingIndex] ?? null;
+      missingIndex += 1;
+      return nextPlayer;
+    });
+  }, [forecastSlots, sortedRoster]);
+  const mobileForecastPlayerIds = new Set(mobileForecastSlots.filter((slot) => slot && !slot.invalid).map((slot) => String(getPlayerKey(slot))));
+  const isMobileForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => mobileForecastPlayerIds.has(playerId));
   const hasLoadedCompleteSavedForecast = isForecastComplete
     && forecastSaveTone === "success"
     && forecastSaveMessage.startsWith("Загружен твой сохраненный прогноз");
@@ -3307,15 +3330,45 @@ function ForecastTournamentDetail({
     placePlayer(slotIndex, playerId);
   };
 
-  const saveForecast = async () => {
-    if (!isForecastComplete) {
+  const reorderForecastSlots = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= mobileForecastSlots.length || toIndex >= mobileForecastSlots.length) {
+      return;
+    }
+
+    const next = [...mobileForecastSlots];
+    const [movedPlayer] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, movedPlayer);
+    setForecastSlots(next);
+    setSelectedPlayerId(null);
+    setForecastSaveMessage("");
+    setForecastSaveTone("success");
+  };
+
+  const handleMobilePointerMove = (event) => {
+    if (mobileDragIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-mobile-forecast-index]");
+    const targetIndex = Number(target?.getAttribute("data-mobile-forecast-index"));
+    if (Number.isInteger(targetIndex) && targetIndex !== mobileDragIndex) {
+      reorderForecastSlots(mobileDragIndex, targetIndex);
+      setMobileDragIndex(targetIndex);
+    }
+  };
+
+  const saveForecast = async (slots = forecastSlots) => {
+    const playerIds = new Set(slots.filter((slot) => slot && !slot.invalid).map((slot) => String(getPlayerKey(slot))));
+    const isComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => playerIds.has(playerId));
+    if (!isComplete) {
       return;
     }
 
     setForecastSaving(true);
     setForecastSaveMessage("");
     setForecastSaveTone("success");
-    const placements = forecastSlots
+    const placements = slots
       .map((slot, index) => (slot && !slot.invalid ? { place: index + 1, playerId: String(getPlayerKey(slot)) } : null))
       .filter(Boolean);
     const result = await onSaveForecastPrediction(tournament.id, { placements });
@@ -3512,6 +3565,91 @@ function ForecastTournamentDetail({
           <p>Прием прогнозов закрыт. После внесения результатов здесь появятся финальная таблица, твой прогноз и рейтинг прогнозистов.</p>
         </section>
       ) : (
+      <>
+      <section className="surface prediction-mobile-card" id="mobile-ranking">
+        <div className="prediction-card-head">
+          <div className="section-title">
+            <span>Мой прогноз</span>
+            <h2>{expectedPlayerIds.length} мест турнира</h2>
+          </div>
+          <button disabled={!isMobileForecastComplete || forecastLoading || forecastSaving} type="button" onClick={() => saveForecast(mobileForecastSlots)}>
+            {forecastSaving ? "Сохраняем..." : "Сохранить прогноз"}
+          </button>
+        </div>
+        {forecastSaveMessage && <strong className={`prediction-save-message ${forecastSaveTone}`}>{forecastSaveMessage}</strong>}
+        {tournament.roster.length === 0 ? (
+          <div className="prediction-empty-list tall">
+            <strong>Расстановка откроется после публикации состава</strong>
+            <p>Здесь будет нужное количество мест турнира для прогноза.</p>
+          </div>
+        ) : (
+          <>
+            <div className="prediction-placement-hint">
+              Перетаскивай игроков за ручку справа. При первом открытии порядок уже выставлен по рейтингу.
+            </div>
+            <div
+              className="prediction-mobile-list"
+              onPointerCancel={() => setMobileDragIndex(null)}
+              onPointerMove={handleMobilePointerMove}
+              onPointerUp={() => setMobileDragIndex(null)}
+            >
+              {mobileForecastSlots.map((slot, index) => (
+                <article
+                  className={`prediction-mobile-row ${slot?.invalid ? "invalid" : ""} ${mobileDragIndex === index ? "dragging" : ""}`}
+                  data-mobile-forecast-index={index}
+                  draggable={Boolean(slot && !slot.invalid)}
+                  key={`${slot?.id ?? slot?.name ?? "empty"}-${index}`}
+                  onDragEnd={() => setMobileDragIndex(null)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragStart={(event) => {
+                    if (!slot || slot.invalid) {
+                      return;
+                    }
+
+                    event.dataTransfer.setData("application/x-padel-mobile-slot", String(index));
+                    event.dataTransfer.effectAllowed = "move";
+                    setMobileDragIndex(index);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const sourceIndex = Number(event.dataTransfer.getData("application/x-padel-mobile-slot"));
+                    if (Number.isInteger(sourceIndex)) {
+                      reorderForecastSlots(sourceIndex, index);
+                    }
+                    setMobileDragIndex(null);
+                  }}
+                >
+                  <b>{index + 1}</b>
+                  <div className="prediction-mobile-player">
+                    <strong>{slot?.name ?? "Место свободно"}</strong>
+                    {slot?.invalid ? <small>Выбыл из состава</small> : <small>{slot ? Number(slot.rating).toFixed(2) : "—"}</small>}
+                  </div>
+                  <button
+                    aria-label={`Перетащить место ${index + 1}`}
+                    className="prediction-mobile-handle"
+                    disabled={!slot || slot.invalid}
+                    type="button"
+                    onPointerCancel={() => setMobileDragIndex(null)}
+                    onPointerDown={(event) => {
+                      if (!slot || slot.invalid) {
+                        return;
+                      }
+
+                      event.preventDefault();
+                      event.currentTarget.setPointerCapture?.(event.pointerId);
+                      setMobileDragIndex(index);
+                    }}
+                    onPointerMove={handleMobilePointerMove}
+                    onPointerUp={() => setMobileDragIndex(null)}
+                  >
+                    ⋮⋮
+                  </button>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
       <section className="prediction-workspace">
         <section className="surface prediction-roster-card" id="roster">
           <div className="section-title">
@@ -3621,6 +3759,7 @@ function ForecastTournamentDetail({
           )}
         </section>
       </section>
+      </>
       )}
     </main>
   );
