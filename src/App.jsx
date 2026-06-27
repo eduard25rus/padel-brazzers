@@ -1703,7 +1703,7 @@ function MexicanoDescriptionPanel({ onClose }) {
   );
 }
 
-function AuthControls({ currentUser, notifications = [], onLogin, onLogout, onOpenAdmin, onOpenCabinet, onOpenForecastTournament, onReadNotification, onRegister }) {
+function AuthControls({ adminMode = false, currentUser, notifications = [], onLogin, onLogout, onOpenAdmin, onOpenCabinet, onOpenForecastTournament, onReadNotification, onRegister, onToggleAdminMode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   if (currentUser) {
@@ -1721,6 +1721,17 @@ function AuthControls({ currentUser, notifications = [], onLogin, onLogout, onOp
         {notifications.length > 0 && (
           <button type="button" onClick={() => setNotificationsOpen((value) => !value)}>
             Уведомления {unreadNotifications.length || ""}
+          </button>
+        )}
+        {canOpenAdmin && (
+          <button
+            aria-pressed={adminMode}
+            className={`admin-mode-toggle ${adminMode ? "active" : ""}`}
+            type="button"
+            onClick={onToggleAdminMode}
+          >
+            <span />
+            <b>Админ</b>
           </button>
         )}
         {!isPending && <button type="button" onClick={onOpenCabinet}>Кабинет</button>}
@@ -3189,8 +3200,8 @@ function ForecastTournamentDetail({
     );
   const isMobileSavedLocked = hasSavedCompleteForecast && !mobileEditing;
   const canEditMobileForecast = !isMobileSavedLocked;
-  const canManageTournament = auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
-  const canViewPredictionRegistry = canManageTournament || settings.predictionRegistryVisibility === "all";
+  const canManageTournament = auth.adminMode && auth.currentUser?.role === "admin" && auth.currentUser?.status === "active";
+  const canViewPredictionRegistry = canManageTournament;
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
   const isPredictionClosed = Boolean(getVladivostokDeadlineMs(tournament.predictionCloseAt) && getVladivostokDeadlineMs(tournament.predictionCloseAt) <= Date.now());
   const hasCompletedResults = Boolean(tournament.completedResultId);
@@ -4156,7 +4167,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
                   <div className="tournament-copy">
                     <span>{tournament.date} · {tournament.club}</span>
                     <EditableTournamentTitle
-                      canEdit={auth.currentUser?.role === "admin" && tournament.imported}
+                      canEdit={auth.adminMode && auth.currentUser?.role === "admin" && tournament.imported}
                       onRename={onRenameCompletedTournament}
                       title={tournament.title}
                       tournamentId={tournament.id}
@@ -4814,6 +4825,7 @@ export function App() {
   const [completedTournamentResults, setCompletedTournamentResults] = useState([]);
   const [forecastTournaments, setForecastTournaments] = useState([]);
   const [forecastLeaders, setForecastLeaders] = useState([]);
+  const [adminMode, setAdminMode] = useState(true);
   const [leaderboardPointMethods, setLeaderboardPointMethods] = useState(fallbackLeaderboardPointMethods);
   const [memberCabinet, setMemberCabinet] = useState(null);
   const [memberCabinetLoading, setMemberCabinetLoading] = useState(false);
@@ -5174,7 +5186,10 @@ export function App() {
     }
   };
 
+  const effectiveAdminMode = canOpenAdmin && adminMode;
+
   const auth = {
+    adminMode: effectiveAdminMode,
     currentUser,
     hasUsers: authState.hasUsers,
     notifications: authState.notifications,
@@ -5187,6 +5202,7 @@ export function App() {
     onLogout: logoutUser,
     onReadNotification: readNotification,
     onRegister: () => setAuthMode("register"),
+    onToggleAdminMode: () => setAdminMode((value) => !value),
   };
 
   const authModal = authMode && (

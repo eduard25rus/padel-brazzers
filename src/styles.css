@@ -298,6 +298,59 @@ main {
   margin-top: 2px;
 }
 
+.auth-user-card .admin-mode-toggle {
+  align-items: center;
+  background: rgba(255, 254, 250, 0.86);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  display: inline-flex;
+  gap: 7px;
+  padding: 8px 10px;
+}
+
+.admin-mode-toggle > span {
+  background: #c9d2ca;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 18px;
+  position: relative;
+  width: 34px;
+}
+
+.admin-mode-toggle > span::after {
+  background: #fffefa;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(17, 24, 18, 0.22);
+  content: "";
+  height: 14px;
+  left: 2px;
+  position: absolute;
+  top: 2px;
+  transition:
+    background 160ms ease,
+    left 160ms ease;
+  width: 14px;
+}
+
+.admin-mode-toggle b {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.auth-user-card .admin-mode-toggle.active {
+  background: var(--green-soft);
+  border-color: rgba(29, 93, 42, 0.28);
+  color: var(--green);
+}
+
+.admin-mode-toggle.active > span {
+  background: var(--green);
+}
+
+.admin-mode-toggle.active > span::after {
+  left: 18px;
+}
+
 .auth-notification-popover {
   background: #fffefa;
   border: 1px solid var(--line);
