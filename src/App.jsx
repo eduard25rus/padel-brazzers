@@ -506,6 +506,19 @@ function getInitials(user) {
   return `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "PB";
 }
 
+function getPlayerInitials(name) {
+  const parts = String(name ?? "")
+    .replace(/^@/, "")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return "PB";
+  }
+
+  return parts.slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
 function getUserDisplayName(user) {
   if (!user) {
     return "";
@@ -2971,15 +2984,25 @@ function ForecastResultsImportScreen({
   );
 }
 
-function ForecastResultsPanel({ currentUser, resultsSummary }) {
+function ForecastResultsPanel({ currentUser, resultsSummary, tournament }) {
   const [selectedUserId, setSelectedUserId] = useState(resultsSummary.viewerUserId ?? resultsSummary.leaderboard?.[0]?.userId ?? "");
+  const [activeFilter, setActiveFilter] = useState("all");
   const selectedResult = resultsSummary.leaderboard.find((row) => row.userId === selectedUserId)
     ?? resultsSummary.leaderboard.find((row) => row.userId === resultsSummary.viewerUserId)
     ?? resultsSummary.leaderboard[0]
     ?? null;
+  const totalForecastRows = resultsSummary.leaderboard.reduce((sum, row) => sum + Math.max(1, row.rows?.length ?? 1), 0);
+  const exactRate = totalForecastRows
+    ? Math.round((resultsSummary.leaderboard.reduce((sum, row) => sum + Number(row.exactCount ?? 0), 0) / totalForecastRows) * 100)
+    : 0;
+  const finalStandings = resultsSummary.finalStandings ?? [];
+  const actualByPlace = new Map(finalStandings.map((row) => [Number(row.place), row]));
+  const actualByPlayer = new Map(finalStandings.map((row) => [String(row.playerName).toLowerCase(), row]));
+  const selectedRows = selectedResult?.rows ?? [];
 
   useEffect(() => {
     setSelectedUserId(resultsSummary.viewerUserId ?? resultsSummary.leaderboard?.[0]?.userId ?? "");
+    setActiveFilter("all");
   }, [resultsSummary.tournamentId, resultsSummary.viewerUserId]);
 
   const rowTone = (row) => {
@@ -2994,94 +3017,244 @@ function ForecastResultsPanel({ currentUser, resultsSummary }) {
     }
     return "miss";
   };
+  const isMissRow = (row) => row.diff === null || row.diff > 2;
+  const filteredRows = selectedRows.filter((row) => {
+    if (activeFilter === "exact") {
+      return row.diff === 0;
+    }
+    if (activeFilter === "near") {
+      return row.diff === 1 || row.diff === 2;
+    }
+    if (activeFilter === "miss") {
+      return isMissRow(row);
+    }
+    return true;
+  });
+  const missCount = selectedRows.filter(isMissRow).length;
+  const filters = [
+    { id: "all", label: "Все", count: selectedRows.length },
+    { id: "exact", label: "Точные", count: selectedResult?.exactCount ?? 0 },
+    { id: "near", label: "Рядом", count: (selectedResult?.oneOffCount ?? 0) + (selectedResult?.twoOffCount ?? 0) },
+    { id: "miss", label: "Ошибки", count: missCount },
+    { id: "bonus", label: "Бонусы", count: selectedResult?.bonuses?.length ?? 0 },
+  ];
+  const getAccuracyLabel = (row) => {
+    if (row.diff === 0) {
+      return "точно";
+    }
+    if (row.diff === 1) {
+      return "±1";
+    }
+    if (row.diff === 2) {
+      return "±2";
+    }
+    return "промах";
+  };
+  const getMovementLabel = (row) => {
+    if (!row.actualPlace) {
+      return "";
+    }
+    const delta = Number(row.actualPlace) - Number(row.predictedPlace);
+    if (delta === 0) {
+      return "=";
+    }
+    return `${delta > 0 ? "+" : "-"}${Math.abs(delta)}`;
+  };
+  const formatActualMeta = (row) => {
+    const actual = actualByPlayer.get(String(row.playerName).toLowerCase()) ?? actualByPlace.get(Number(row.actualPlace));
+    if (!actual) {
+      return row.actualPlace ? `${row.actualPlace} место` : "нет в финале";
+    }
+    return `${actual.place} место · ${formatScorePair(actual.pointsFor, actual.pointsAgainst)} · ${formatTournamentRecord(actual.wins, actual.losses, actual.draws)}`;
+  };
+  const visibleRows = activeFilter === "bonus" ? [] : filteredRows;
 
   return (
-    <section className="forecast-results-panel">
-      <section className="surface forecast-results-hero">
-        <div className="section-title">
-          <span>Итоги прогнозов</span>
-          <h2>Результаты турнира и ставки участников</h2>
+    <section className="forecast-results-panel forecast-results-redesign">
+      <section className="forecast-results-topline">
+        <div className="forecast-results-brand">
+          <span>PB</span>
+          <div>
+            <strong>Padel Club</strong>
+            <small>{tournament?.club ?? "Moscow"}</small>
+          </div>
         </div>
-        <div className="forecast-result-metrics">
-          <div><strong>{resultsSummary.leaderboard.length}</strong><span>прогнозистов</span></div>
-          <div><strong>{resultsSummary.leaderboard[0]?.points ?? 0}</strong><span>лучший результат</span></div>
-          <div><strong>{selectedResult?.points ?? 0}</strong><span>{selectedResult?.userId === currentUser?.id ? "твой счет" : "выбранный счет"}</span></div>
+        <div className="forecast-results-heading">
+          <h1>Результаты прогнозов</h1>
+          <p>{tournament?.title ?? "Турнир"} · {tournament?.date ? formatVladivostokDate(tournament.date) : "Дата турнира"} · {tournament?.club ?? "Padel Club"}</p>
+        </div>
+        <div className="forecast-results-kpis">
+          <div><span>Участников</span><strong>{resultsSummary.leaderboard.length}</strong></div>
+          <div><span>Ср. точность</span><strong>{exactRate}%</strong></div>
+          <div><span>Лидирует</span><strong>{resultsSummary.leaderboard[0]?.name ?? "—"}</strong></div>
+          <button type="button">О турнире</button>
         </div>
       </section>
 
-      <section className="forecast-results-grid">
-        <article className="surface forecast-final-table">
-          <div className="section-title">
-            <span>Финальная таблица</span>
-            <h2>{resultsSummary.finalStandings.length} игроков</h2>
-          </div>
-          <div className="forecast-mini-list">
-            {resultsSummary.finalStandings.map((row) => (
-              <div key={`${row.place}-${row.playerName}`}>
-                <b>{row.place}</b>
-                <strong>{row.playerName}</strong>
-                <span>{formatTournamentRecord(row.wins, row.losses, row.draws)} · {formatScorePair(row.pointsFor, row.pointsAgainst)}</span>
-              </div>
-            ))}
-          </div>
-        </article>
+      <section className="forecast-person-carousel" aria-label="Прогнозисты">
+        {resultsSummary.leaderboard.map((row) => (
+          <button className={selectedResult?.userId === row.userId ? "active" : ""} type="button" key={row.userId} onClick={() => setSelectedUserId(row.userId)}>
+            <b>{row.rank}</b>
+            <span>
+              <strong>{row.name}</strong>
+              <small>{row.points} очков</small>
+            </span>
+            <em>{row.exactCount} точно</em>
+          </button>
+        ))}
+      </section>
 
-        <article className="surface forecast-breakdown-card">
-          <div className="section-title">
-            <span>{selectedResult?.userId === currentUser?.id ? "Твой прогноз" : "Прогноз участника"}</span>
-            <h2>{selectedResult ? `${selectedResult.name} · ${selectedResult.points} очков` : "Прогнозов пока нет"}</h2>
-          </div>
-          {selectedResult ? (
-            <>
-              <div className="forecast-breakdown-summary">
-                <b>{selectedResult.exactCount}<small>точных</small></b>
-                <b>{selectedResult.oneOffCount}<small>±1 место</small></b>
-                <b>{selectedResult.twoOffCount}<small>±2 места</small></b>
-                <b>{selectedResult.bonusPoints}<small>бонусы</small></b>
+      {selectedResult ? (
+        <>
+          <section className="surface forecast-selected-mobile">
+            <div className="forecast-selected-avatar">{getPlayerInitials(selectedResult.name)}</div>
+            <strong>{selectedResult.name} · {selectedResult.points} очков</strong>
+            <div><b>{selectedResult.exactCount}</b><span>точных попаданий</span></div>
+            <div><b>{selectedResult.oneOffCount + selectedResult.twoOffCount}</b><span>попаданий рядом</span></div>
+            <div><b>{selectedResult.bonusPoints}</b><span>бонусов</span></div>
+          </section>
+
+          <section className="forecast-results-layout">
+            <article className="surface forecast-result-board">
+              <div className="forecast-board-head">
+                <span>Место прогноза</span>
+                <span>Прогноз {selectedResult.name}</span>
+                <span>Начислено очков</span>
+                <span>Точность</span>
               </div>
-              <div className="forecast-breakdown-list">
-                {selectedResult.rows.map((row) => (
-                  <div className={rowTone(row)} key={`${selectedResult.userId}-${row.predictedPlace}`}>
-                    <span>{row.predictedPlace}</span>
-                    <strong>{row.playerName}</strong>
-                    <em>{row.actualPlace ? `факт: ${row.actualPlace}` : "нет в финале"}</em>
-                    <b>+{row.points}</b>
-                  </div>
-                ))}
-              </div>
-              {selectedResult.bonuses.length > 0 && (
-                <div className="forecast-bonus-list">
-                  {selectedResult.bonuses.map((bonus) => (
-                    <span key={bonus.label}>{bonus.label}: +{bonus.points}</span>
-                  ))}
+
+              {activeFilter === "bonus" ? (
+                <div className="forecast-bonus-focus">
+                  {(selectedResult.bonuses ?? []).length ? selectedResult.bonuses.map((bonus) => (
+                    <div key={bonus.label}>
+                      <strong>{bonus.label}</strong>
+                      <b>+{bonus.points}</b>
+                      <span>получено</span>
+                    </div>
+                  )) : (
+                    <p>У этого прогноза бонусов нет.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="forecast-result-rows">
+                  {visibleRows.map((row) => {
+                    const actualSlot = actualByPlace.get(Number(row.predictedPlace));
+                    return (
+                      <div className={`forecast-result-row ${rowTone(row)}`} key={`${selectedResult.userId}-${row.predictedPlace}`}>
+                        <b>{row.predictedPlace}</b>
+                        <div className="forecast-result-player">
+                          <strong>{row.playerName}</strong>
+                          <small>Факт: {formatActualMeta(row)}</small>
+                        </div>
+                        <div className="forecast-result-mobile-score">
+                          <span>{getMovementLabel(row)}</span>
+                          <b>+{row.points}</b>
+                        </div>
+                        <div className="forecast-result-points">
+                          <strong>{row.points}</strong>
+                          <span>очков</span>
+                        </div>
+                        <em className={rowTone(row)}>{getAccuracyLabel(row)}</em>
+                        <div className="forecast-result-fact">
+                          <b>{actualSlot?.place ?? row.actualPlace ?? "—"}</b>
+                          <strong>{actualSlot?.playerName ?? row.playerName}</strong>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {visibleRows.length === 0 && (
+                    <p className="forecast-empty-filter">По этому фильтру строк нет.</p>
+                  )}
                 </div>
               )}
-            </>
-          ) : (
-            <p>После сохраненных прогнозов здесь появится расчет.</p>
-          )}
-        </article>
-      </section>
 
-      <section className="surface forecast-leaderboard-card">
-        <div className="section-title">
-          <span>Прогнозисты</span>
-          <h2>Кто сколько набрал</h2>
-        </div>
-        <div className="forecast-leaderboard-list">
-          {resultsSummary.leaderboard.map((row) => (
-            <button className={selectedResult?.userId === row.userId ? "active" : ""} type="button" key={row.userId} onClick={() => setSelectedUserId(row.userId)}>
-              <b>{row.rank}</b>
-              <span>
-                <strong>{row.name}</strong>
-                <small>{row.exactCount} точных · {row.oneOffCount} рядом · {row.bonusPoints} бонусов</small>
-              </span>
-              <em>{row.points}</em>
-            </button>
-          ))}
-        </div>
-      </section>
+              <div className="forecast-result-legend">
+                <span><i className="exact" />точно</span>
+                <span><i className="near" />±1 рядом</span>
+                <span><i className="two-off" />±2 далеко</span>
+                <span><i className="miss" />промах</span>
+                <small>Очки: точно — {resultsSummary.scoringMethod?.exactPlace ?? 0}, ±1 место — {resultsSummary.scoringMethod?.onePositionError ?? 0}, ±2 места — {resultsSummary.scoringMethod?.twoPositionError ?? 0}, промах — 0</small>
+              </div>
+            </article>
+
+            <aside className="surface forecast-result-side">
+              <div className="forecast-side-person">
+                <span>{getPlayerInitials(selectedResult.name)}</span>
+                <div>
+                  <strong>{selectedResult.name}</strong>
+                  <small>{selectedResult.userId === currentUser?.id ? "Твой прогноз" : "Прогнозы"}</small>
+                </div>
+                <b>{selectedResult.points}<small>очки</small></b>
+              </div>
+              <div className="forecast-side-stats">
+                <div><strong>{selectedResult.exactCount}</strong><span>Точные</span></div>
+                <div><strong>{selectedResult.oneOffCount + selectedResult.twoOffCount}</strong><span>Рядом</span></div>
+                <div><strong>{missCount}</strong><span>Ошибки</span></div>
+              </div>
+              <div className="forecast-side-bonuses">
+                <h3>Бонусы</h3>
+                <div>
+                  {(selectedResult.bonuses ?? []).length ? selectedResult.bonuses.map((bonus) => (
+                    <span key={bonus.label}><strong>{bonus.label}</strong><b>+{bonus.points}</b><small>получено</small></span>
+                  )) : (
+                    <p>Бонусы не получены.</p>
+                  )}
+                </div>
+              </div>
+              <div className="forecast-side-filters">
+                <h3>Фильтры</h3>
+                {filters.map((filter) => (
+                  <button className={activeFilter === filter.id ? "active" : ""} type="button" key={filter.id} onClick={() => setActiveFilter(filter.id)}>
+                    <span>{filter.label}</span>
+                    <b>{filter.count}</b>
+                  </button>
+                ))}
+                <button className="reset" type="button" onClick={() => setActiveFilter("all")}>Сбросить фильтры</button>
+              </div>
+            </aside>
+          </section>
+        </>
+      ) : (
+        <section className="surface prediction-empty-list tall">
+          <strong>Прогнозов пока нет</strong>
+          <p>После сохраненных прогнозов здесь появится расчет.</p>
+        </section>
+      )}
     </section>
+  );
+}
+
+function ForecastMetricIcon({ type }) {
+  if (type === "trend") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M4 19V5" />
+        <path d="M4 19h16" />
+        <path d="m7 15 4-4 3 3 5-7" />
+        <path d="M15 7h4v4" />
+      </svg>
+    );
+  }
+
+  if (type === "spread") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M5 12h14" />
+        <path d="m9 8-4 4 4 4" />
+        <path d="m15 8 4 4-4 4" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M8 5h8v3a4 4 0 0 1-8 0V5Z" />
+      <path d="M8 7H5a3 3 0 0 0 3 3" />
+      <path d="M16 7h3a3 3 0 0 1-3 3" />
+      <path d="M12 12v4" />
+      <path d="M9 19h6" />
+      <path d="M10 16h4v3h-4z" />
+    </svg>
   );
 }
 
@@ -3171,6 +3344,7 @@ function ForecastTournamentDetail({
   const tournamentScoringMethod = getTournamentScoringMethod(tournament, scoringMethods);
   const isPredictionClosed = Boolean(getVladivostokDeadlineMs(tournament.predictionCloseAt) && getVladivostokDeadlineMs(tournament.predictionCloseAt) <= Date.now());
   const hasCompletedResults = Boolean(tournament.completedResultId);
+  const isForecastResultsView = !isTournamentView && hasCompletedResults;
   const ratingValues = sortedRoster
     .map((player) => Number(player.rating))
     .filter((rating) => Number.isFinite(rating));
@@ -3459,6 +3633,7 @@ function ForecastTournamentDetail({
         action={<AuthControls {...auth} />}
       />
 
+      {!isForecastResultsView && (
       <section className="prediction-detail-grid" id="top">
         <section className="surface hero-card prediction-detail-hero">
           <img src={tournament.image} alt="" />
@@ -3566,8 +3741,9 @@ function ForecastTournamentDetail({
           </div>
         </section>
       </section>
+      )}
 
-      {canManageTournament && adminEditing && (
+      {!isForecastResultsView && canManageTournament && adminEditing && (
         <section className="forecast-edit-panel" id="edit-tournament">
           <AdminTournamentForm
             forecastTournaments={forecastTournaments}
@@ -3582,90 +3758,30 @@ function ForecastTournamentDetail({
       )}
 
       {isTournamentView ? (
-        <>
-          {tournament.roster.length > 0 && (
-            <section className="surface roster-rating-strip">
-              <article>
-                <span>Сильнейший игрок</span>
-                <strong>{topRatedPlayer?.name ?? "—"}</strong>
-                <b>{topRatedPlayer ? Number(topRatedPlayer.rating).toFixed(2) : "—"}</b>
-              </article>
-              <article>
-                <span>Средний рейтинг</span>
-                <strong>{averageRating.toFixed(2)}</strong>
-                <b>{tournament.roster.length} игроков</b>
-              </article>
-              <article>
-                <span>Разброс рейтинга</span>
-                <strong>{ratingSpread.toFixed(2)}</strong>
-                <b>{maxRating.toFixed(2)} - {minRating.toFixed(2)}</b>
-              </article>
-            </section>
-          )}
-
-          <section className={`tournament-seed-layout ${hasCompletedResults ? "single" : ""}`}>
-            <section className="surface prediction-roster-card tournament-seed-card" id="roster">
-              <div className="section-title seed-board-title">
-                <span>Состав турнира (Seed Board)</span>
-                <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Состав пока не опубликован"}</h2>
+        <section className="prediction-workspace tournament-overview-workspace">
+          <section className="surface prediction-roster-card" id="roster">
+            <div className="section-title">
+              <span>Стартовый состав</span>
+              <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Состав пока не опубликован"}</h2>
+            </div>
+            {tournament.roster.length === 0 ? (
+              <div className="prediction-empty-list">
+                <strong>Состав пока не опубликован</strong>
+                <p>Когда админ добавит участников, здесь появятся игроки турнира.</p>
               </div>
-              {tournament.roster.length === 0 ? (
-                <div className="prediction-empty-list">
-                  <strong>Состав пока не опубликован</strong>
-                  <p>Когда админ добавит участников, здесь появятся игроки турнира.</p>
-                </div>
-              ) : (
-                <div className="seed-board-grid">
-                  {seedBoardColumns.map((column, columnIndex) => (
-                    <div className="seed-board-column" key={`seed-column-${columnIndex}`}>
-                      {column.map((player) => {
-                        const seedIndex = sortedRoster.findIndex((item) => getPlayerKey(item) === getPlayerKey(player)) + 1;
-                        const rating = Number(player.rating);
-
-                        return (
-                          <article
-                            className={`seed-board-row ${seedIndex === 1 ? "top-seed" : ""}`}
-                            key={getPlayerKey(player)}
-                            style={{ "--rating-progress": `${getRatingProgress(rating)}%` }}
-                          >
-                            <span className="seed-rank">{seedIndex}</span>
-                            <div className="seed-player-copy">
-                              <strong>{player.name}</strong>
-                              <small>Seed #{seedIndex}</small>
-                            </div>
-                            <div className="seed-rating-cell">
-                              <b>{Number.isFinite(rating) ? rating.toFixed(2) : "—"}</b>
-                              <i />
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {!hasCompletedResults && (
-              <aside className="surface tournament-forecast-ready-card">
-                <img src="/assets/trophy.png" alt="" />
-                <div>
-                  <span>Готов к прогнозу</span>
-                  <h2>Расставь всех игроков по местам от 1 до {expectedPlayerIds.length || tournament.roster.length || "—"}.</h2>
-                  <p>Каждый игрок может занять только одно место. Свой прогноз можно изменить до дедлайна.</p>
-                </div>
-                <div className="forecast-deadline-box">
-                  <span>Дедлайн для прогнозов</span>
-                  <strong>{formatForecastTimeLeft(tournament.predictionCloseAt)}</strong>
-                  <p>{tournament.predictionCloseAt ? formatVladivostokDateTime(tournament.predictionCloseAt) : "VLAT"}</p>
-                </div>
-                <button type="button" onClick={() => onOpenPredictions(tournament.id)}>
-                  {isPredictionClosed ? "Открыть прогноз" : "Добавить прогноз"}
-                </button>
-              </aside>
+            ) : (
+              <div className="prediction-roster-grid tournament-overview-roster">
+                {sortedRoster.map((player, index) => (
+                  <article className="prediction-roster-player readonly" key={getPlayerKey(player)}>
+                    <span>{index + 1}</span>
+                    <strong>{player.name}</strong>
+                    <b className="prediction-rating">{Number(player.rating).toFixed(2)}</b>
+                  </article>
+                ))}
+              </div>
             )}
           </section>
-        </>
+        </section>
       ) : hasCompletedResults ? (
         forecastResultsLoading ? (
           <section className="surface prediction-empty-list tall">
@@ -3673,7 +3789,7 @@ function ForecastTournamentDetail({
             <p>Подгружаем финальную таблицу и сохраненные ставки участников.</p>
           </section>
         ) : forecastResultsSummary?.completed ? (
-          <ForecastResultsPanel currentUser={auth.currentUser} resultsSummary={forecastResultsSummary} />
+          <ForecastResultsPanel currentUser={auth.currentUser} resultsSummary={forecastResultsSummary} tournament={tournament} />
         ) : (
           <section className="surface prediction-empty-list tall">
             <strong>Итоги скоро появятся</strong>
@@ -3787,10 +3903,38 @@ function ForecastTournamentDetail({
           </>
         )}
       </section>
+      {tournament.roster.length > 0 && (
+        <section className="surface roster-rating-strip prediction-only-rating-strip">
+          <article>
+            <div className="forecast-metric-icon"><ForecastMetricIcon type="trophy" /></div>
+            <div>
+              <span>Сильнейший игрок</span>
+              <strong>{topRatedPlayer?.name ?? "—"}</strong>
+              <b>{topRatedPlayer ? Number(topRatedPlayer.rating).toFixed(2) : "—"}</b>
+            </div>
+          </article>
+          <article>
+            <div className="forecast-metric-icon"><ForecastMetricIcon type="trend" /></div>
+            <div>
+              <span>Средний рейтинг</span>
+              <strong>{averageRating.toFixed(2)}</strong>
+              <b>{tournament.roster.length} игроков</b>
+            </div>
+          </article>
+          <article>
+            <div className="forecast-metric-icon"><ForecastMetricIcon type="spread" /></div>
+            <div>
+              <span>Разброс рейтинга</span>
+              <strong>{ratingSpread.toFixed(2)}</strong>
+              <b>{maxRating.toFixed(2)} - {minRating.toFixed(2)}</b>
+            </div>
+          </article>
+        </section>
+      )}
       <section className="prediction-workspace">
-        <section className="surface prediction-roster-card" id="roster">
-          <div className="section-title">
-            <span>Состав турнира</span>
+        <section className="surface prediction-roster-card forecast-seed-card" id="roster">
+          <div className="section-title seed-board-title">
+            <span>Состав турнира (Seed Board) <small className="seed-info">i</small></span>
             <h2>{tournament.roster.length ? `${tournament.roster.length} игроков по рейтингу` : "Игроки появятся из управляющей части"}</h2>
           </div>
           {tournament.roster.length > 0 && (
@@ -3804,40 +3948,54 @@ function ForecastTournamentDetail({
               <p>Когда организатор добавит участников, здесь появятся плашки игроков.</p>
             </div>
           ) : (
-            <div className="prediction-roster-grid">
-              {sortedRoster.map((player, index) => {
-                const playerId = getPlayerKey(player);
-                const isSelected = selectedPlayerId === playerId;
-                const isPlaced = forecastSlots.some((slot) => slot && !slot.invalid && getPlayerKey(slot) === playerId);
+            <div className="seed-board-grid forecast-seed-grid">
+              {seedBoardColumns.map((column, columnIndex) => (
+                <div className="seed-board-column" key={`forecast-seed-column-${columnIndex}`}>
+                  {column.map((player) => {
+                    const playerId = getPlayerKey(player);
+                    const seedIndex = sortedRoster.findIndex((item) => getPlayerKey(item) === playerId) + 1;
+                    const rating = Number(player.rating);
+                    const isSelected = selectedPlayerId === playerId;
+                    const isPlaced = forecastSlots.some((slot) => slot && !slot.invalid && getPlayerKey(slot) === playerId);
 
-                return (
-                <button
-                  className={`prediction-roster-player ${isSelected ? "selected" : ""} ${isPlaced ? "placed" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
-                  draggable={canEditDesktopForecast}
-                  key={playerId}
-                  type="button"
-                  onClick={() => {
-                    if (!canEditDesktopForecast) {
-                      return;
-                    }
+                    return (
+                      <button
+                        className={`seed-board-row forecast-seed-player ${seedIndex === 1 ? "top-seed" : ""} ${isSelected ? "selected" : ""} ${isPlaced ? "placed" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
+                        draggable={canEditDesktopForecast}
+                        key={playerId}
+                        style={{ "--rating-progress": `${getRatingProgress(rating)}%` }}
+                        type="button"
+                        onClick={() => {
+                          if (!canEditDesktopForecast) {
+                            return;
+                          }
 
-                    setSelectedPlayerId(isSelected ? null : playerId);
-                  }}
-                  onDragStart={(event) => {
-                    if (!canEditDesktopForecast) {
-                      return;
-                    }
+                          setSelectedPlayerId(isSelected ? null : playerId);
+                        }}
+                        onDragStart={(event) => {
+                          if (!canEditDesktopForecast) {
+                            return;
+                          }
 
-                    event.dataTransfer.setData("text/plain", playerId);
-                    event.dataTransfer.effectAllowed = "move";
-                  }}
-                >
-                  <span>{index + 1}</span>
-                  <strong>{player.name}</strong>
-                  <b className="prediction-rating">{Number(player.rating).toFixed(2)}</b>
-                </button>
-              );
-              })}
+                          event.dataTransfer.setData("text/plain", playerId);
+                          event.dataTransfer.effectAllowed = "move";
+                        }}
+                      >
+                        <span className="seed-rank">{seedIndex}</span>
+                        <span className="seed-avatar">{getPlayerInitials(player.name)}</span>
+                        <div className="seed-player-copy">
+                          <strong>{player.name}</strong>
+                          <small>Seed #{seedIndex}</small>
+                        </div>
+                        <div className="seed-rating-cell">
+                          <b>{Number.isFinite(rating) ? rating.toFixed(2) : "—"}</b>
+                          <i />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </section>
@@ -5094,6 +5252,9 @@ export function App() {
         method: "POST",
       });
       setCompletedTournamentResults(result.results ?? []);
+      if (Array.isArray(result.forecastLeaders)) {
+        setForecastLeaders(result.forecastLeaders);
+      }
       setForecastTournaments(result.tournaments ?? []);
       return { ok: true, result: result.result };
     } catch (error) {
