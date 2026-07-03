@@ -12,6 +12,7 @@ implementation screenshot path:
 - Computer Use capture, Chrome, 127.0.0.1:4173/predictions/forecast-qa, mobile-like narrow window.
 - Computer Use capture, Chrome, 127.0.0.1:4173/predictions/forecast-mobile-qa, narrow window after compact mobile overrides.
 - Computer Use capture, Chrome, 127.0.0.1:4173/predictions/forecast-open-qa, desktop window with open forecast composition state.
+- Computer Use capture, Chrome, 127.0.0.1:4173/predictions, narrow window with split upcoming/completed forecast registry.
 
 viewport:
 - Desktop-like Chrome window: page shows header, forecaster carousel, unified forecast/fact table, right summary panel.
@@ -35,6 +36,7 @@ findings:
 - No P0/P1/P2 issues found in the checked desktop and mobile states.
 - Latest pass: mobile forecast results no longer use oversized carousel/table typography; fact names truncate instead of stacking vertically.
 - Latest pass: desktop forecast composition seed-board player names render as readable row text instead of single-letter columns.
+- Latest pass: forecast registry separates upcoming and completed tournaments; upcoming CTA uses a red "Прием прогнозов" treatment.
 
 patches made since previous QA pass:
 - Replaced the old separated final-table/breakdown/leaderboard results layout with a unified results matrix.
@@ -45,6 +47,8 @@ patches made since previous QA pass:
 - Tuned mobile text wrapping in the fact column and summary card.
 - Tightened seed-board desktop columns, rank/avatar/rating sizing, and name wrapping for the forecast composition page.
 - Added final mobile overrides at the end of the stylesheet so legacy duplicate media blocks cannot re-enlarge the results page.
+- Reworked the mobile results row to mirror the desktop structure: forecast player plus muted fact line, with only earned points on the right.
+- Split the forecast registry into upcoming and completed sections with a clearer red call-to-action for open forecast intake.
 
 follow-up polish:
 - Replace the temporary PB mark with the final club logo asset if a real logo file becomes available.

@@ -1024,6 +1024,10 @@ main {
   border-color: rgba(29, 93, 42, 0.18);
 }
 
+.forecast-history-card {
+  background: rgba(255, 254, 250, 0.7);
+}
+
 .registry-head {
   align-items: center;
   border-bottom: 1px solid var(--line);
@@ -1109,6 +1113,18 @@ main {
   border-bottom-color: rgba(29, 93, 42, 0.14);
 }
 
+.forecast-registry-row.forecast-open {
+  border-bottom-color: rgba(219, 63, 74, 0.18);
+}
+
+.forecast-registry-row.forecast-completed {
+  opacity: 0.82;
+}
+
+.forecast-registry-row.forecast-completed:hover {
+  opacity: 1;
+}
+
 .tournament-row img {
   aspect-ratio: 1.28 / 1;
   border: 1px solid var(--line);
@@ -1155,6 +1171,25 @@ main {
 
 .tournament-result small {
   color: #7a857d;
+}
+
+.tournament-result.forecast-cta span {
+  color: #a3282d;
+}
+
+.tournament-result.forecast-cta strong {
+  background: rgba(219, 63, 74, 0.1);
+  border: 1px solid rgba(219, 63, 74, 0.22);
+  border-radius: 8px;
+  color: #b4232c;
+  display: inline-flex;
+  font-size: 15px;
+  justify-content: center;
+  padding: 9px 12px;
+}
+
+.tournament-result.forecast-cta small {
+  color: #9a3a3f;
 }
 
 .home-side {
@@ -6341,68 +6376,68 @@ p {
 
 @media (max-width: 820px) {
   .forecast-results-redesign {
-    gap: 14px;
+    gap: 10px;
   }
 
   .forecast-results-heading h1 {
-    font-size: 24px;
+    font-size: 22px;
     line-height: 1.08;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
 
   .forecast-results-heading p {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .forecast-person-carousel {
-    gap: 8px;
+    gap: 7px;
     margin-left: -12px;
     margin-right: -12px;
     padding: 0 12px 4px;
   }
 
   .forecast-person-carousel button {
-    flex-basis: 126px;
-    gap: 8px;
-    min-height: 142px;
-    padding: 12px;
+    flex-basis: 112px;
+    gap: 7px;
+    min-height: 118px;
+    padding: 10px;
   }
 
   .forecast-person-carousel button > b {
-    font-size: 13px;
-    height: 26px;
-    width: 26px;
+    font-size: 12px;
+    height: 23px;
+    width: 23px;
   }
 
   .forecast-person-carousel strong {
-    font-size: 17px;
+    font-size: 15px;
     line-height: 1.08;
   }
 
   .forecast-person-carousel small {
-    font-size: 15px;
+    font-size: 13px;
   }
 
   .forecast-person-carousel em {
-    font-size: 11px;
-    padding-top: 8px;
+    font-size: 10px;
+    padding-top: 7px;
   }
 
   .forecast-selected-mobile {
-    gap: 10px;
-    grid-template-columns: 44px repeat(3, minmax(0, 1fr));
-    padding: 12px;
+    gap: 8px;
+    grid-template-columns: 38px repeat(3, minmax(0, 1fr));
+    padding: 10px;
   }
 
   .forecast-selected-avatar {
-    font-size: 13px;
-    height: 44px;
-    width: 44px;
+    font-size: 12px;
+    height: 38px;
+    width: 38px;
   }
 
   .forecast-selected-mobile > strong {
     align-self: center;
-    font-size: 20px;
+    font-size: 17px;
     grid-column: 2 / -1;
     line-height: 1.12;
   }
@@ -6410,7 +6445,7 @@ p {
   .forecast-selected-mobile > div:not(.forecast-selected-avatar) {
     border-left: 0;
     border-top: 1px solid var(--line);
-    padding: 9px 0 0;
+    padding: 7px 0 0;
   }
 
   .forecast-selected-mobile > div:nth-of-type(2) {
@@ -6426,11 +6461,11 @@ p {
   }
 
   .forecast-selected-mobile b {
-    font-size: 20px;
+    font-size: 17px;
   }
 
   .forecast-selected-mobile span {
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1.12;
   }
 
@@ -6439,98 +6474,83 @@ p {
   }
 
   .forecast-board-head {
-    font-size: 11px;
-    grid-template-columns: minmax(0, 1fr) 92px;
-    padding: 14px 16px 12px;
+    font-size: 10px;
+    grid-template-columns: minmax(0, 1fr) 52px;
+    padding: 11px 12px 10px;
+  }
+
+  .forecast-board-head span:nth-child(2)::after {
+    content: "Очки";
   }
 
   .forecast-result-row {
-    grid-template-columns: 28px minmax(0, 1fr) 54px 86px;
-    min-height: 68px;
+    grid-template-columns: 24px minmax(0, 1fr) 52px;
+    min-height: 58px;
   }
 
   .forecast-result-row > b {
-    font-size: 21px;
-    padding-left: 12px;
+    font-size: 19px;
+    padding-left: 9px;
   }
 
   .forecast-result-player {
-    padding: 12px 6px 12px 0;
+    padding: 9px 6px 9px 0;
   }
 
   .forecast-result-player strong {
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1.12;
   }
 
+  .forecast-result-player small {
+    color: #7f8983;
+    display: block;
+    font-size: 10px;
+    line-height: 1.2;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .forecast-result-mobile-score {
-    gap: 5px;
+    gap: 0;
     justify-content: flex-end;
     padding-right: 8px;
   }
 
   .forecast-result-mobile-score span {
-    font-size: 16px;
+    display: none;
   }
 
   .forecast-result-mobile-score b {
     border-radius: 7px;
-    font-size: 15px;
-    min-width: 36px;
+    font-size: 13px;
+    min-width: 34px;
     padding: 6px 7px;
   }
 
   .forecast-result-fact {
-    gap: 5px;
-    grid-template-columns: 24px minmax(0, 1fr);
-    padding: 12px 9px;
-  }
-
-  .forecast-result-fact b {
-    font-size: 22px;
-  }
-
-  .forecast-result-fact strong {
-    font-size: 14px;
-    line-height: 1.1;
-    overflow: hidden;
-    overflow-wrap: normal;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    word-break: normal;
+    display: none;
   }
 
   .forecast-result-legend {
-    gap: 8px;
-    margin-top: 12px;
-    padding: 12px;
+    gap: 7px;
+    margin-top: 9px;
+    padding: 10px;
   }
 }
 
 @media (max-width: 390px) {
   .forecast-result-row {
-    grid-template-columns: 26px minmax(0, 1fr) 48px 78px;
+    grid-template-columns: 22px minmax(0, 1fr) 48px;
   }
 
   .forecast-result-player strong {
-    font-size: 15px;
+    font-size: 13px;
   }
 
   .forecast-result-mobile-score b {
-    min-width: 32px;
-  }
-
-  .forecast-result-fact {
-    grid-template-columns: 22px minmax(0, 1fr);
-    padding-left: 7px;
-    padding-right: 7px;
-  }
-
-  .forecast-result-fact b {
-    font-size: 20px;
-  }
-
-  .forecast-result-fact strong {
-    font-size: 13px;
+    min-width: 30px;
   }
 }

@@ -2627,6 +2627,46 @@ function LockedPredictionsScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPr
 }
 
 function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament }) {
+  const getForecastSortTime = (tournament) => {
+    const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
+    if (deadline !== null) {
+      return deadline;
+    }
+    const dateMs = Date.parse(tournament.date);
+    return Number.isFinite(dateMs) ? dateMs : Number.MAX_SAFE_INTEGER;
+  };
+  const sortedForecastTournaments = [...forecastTournaments].sort((a, b) => {
+    return getForecastSortTime(a) - getForecastSortTime(b);
+  });
+  const upcomingForecastTournaments = sortedForecastTournaments.filter((tournament) => !tournament.completedResultId);
+  const completedForecastTournaments = sortedForecastTournaments.filter((tournament) => tournament.completedResultId);
+  const renderForecastTournament = (tournament, mode) => {
+    const isUpcoming = mode === "upcoming";
+    const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
+    const isOpen = isUpcoming && (deadline === null || deadline > Date.now());
+
+    return (
+      <button
+        className={`tournament-row forecast-registry-row ${isUpcoming ? "forecast-open" : "forecast-completed"}`}
+        type="button"
+        onClick={() => onOpenTournament(tournament.id)}
+        key={tournament.id}
+      >
+        <img src={tournament.image} alt="" />
+        <div className="tournament-copy">
+          <span>{formatVladivostokDate(tournament.date)} · {tournament.time} VLAT · {tournament.club}</span>
+          <strong>{tournament.title}</strong>
+          <p>{tournament.format} · {tournament.players}</p>
+        </div>
+        <div className={`tournament-result ${isUpcoming ? "forecast-cta" : ""}`}>
+          <span>{isUpcoming ? (isOpen ? "Можно поставить" : "Прием закрыт") : "Итоги готовы"}</span>
+          <strong>{isUpcoming ? "Прием прогнозов" : "Результаты прогнозов"}</strong>
+          <small>{isUpcoming && tournament.predictionCloseAt ? formatForecastTimeLeft(tournament.predictionCloseAt) : "Открыть"}</small>
+        </div>
+      </button>
+    );
+  };
+
   return (
     <main className="predictions-shell">
       <MainNav
@@ -2658,44 +2698,48 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
       </section>
 
       <section className="home-layout forecast-registry-layout" id="registry">
-        <section className="surface registry-card">
-          <div className="registry-head">
-            <div>
-              <span>Реестр прогнозов</span>
-              <h2>Турниры, которые еще впереди</h2>
-            </div>
-          </div>
-
-          <div className="tournament-list">
-            {forecastTournaments.length === 0 && (
-              <div className="empty-registry">
-                <span>Forecast</span>
-                <strong>Турниров для прогнозов пока нет</strong>
-                <p>Когда админ добавит турнир в кабинете, он появится здесь.</p>
+        <div className="home-main-stack">
+          <section className="surface registry-card">
+            <div className="registry-head">
+              <div>
+                <span>Реестр прогнозов</span>
+                <h2>Турниры, которые еще впереди</h2>
               </div>
-            )}
-            {forecastTournaments.map((tournament) => (
-              <button
-                className="tournament-row featured"
-                type="button"
-                onClick={() => onOpenTournament(tournament.id)}
-                key={tournament.id}
-              >
-                <img src={tournament.image} alt="" />
-                <div className="tournament-copy">
-                  <span>{formatVladivostokDate(tournament.date)} · {tournament.time} VLAT · {tournament.club}</span>
-                  <strong>{tournament.title}</strong>
-                  <p>{tournament.format} · {tournament.players}</p>
+            </div>
+
+            <div className="tournament-list">
+              {forecastTournaments.length === 0 && (
+                <div className="empty-registry">
+                  <span>Forecast</span>
+                  <strong>Турниров для прогнозов пока нет</strong>
+                  <p>Когда админ добавит турнир в кабинете, он появится здесь.</p>
                 </div>
-                <div className="tournament-result">
-                  <span>{tournament.status}</span>
-                  <strong>Прогнозы</strong>
-                  <small>Открыть</small>
+              )}
+              {upcomingForecastTournaments.length === 0 && forecastTournaments.length > 0 && (
+                <div className="empty-registry compact">
+                  <span>Будущих нет</span>
+                  <strong>Сейчас нет турниров для прогноза</strong>
+                  <p>Когда появится новый турнир, он будет первым в этом блоке.</p>
                 </div>
-              </button>
-            ))}
-          </div>
-        </section>
+              )}
+              {upcomingForecastTournaments.map((tournament) => renderForecastTournament(tournament, "upcoming"))}
+            </div>
+          </section>
+
+          {completedForecastTournaments.length > 0 && (
+            <section className="surface registry-card forecast-history-card">
+              <div className="registry-head">
+                <div>
+                  <span>Архив прогнозов</span>
+                  <h2>Прошедшие турниры</h2>
+                </div>
+              </div>
+              <div className="tournament-list">
+                {completedForecastTournaments.map((tournament) => renderForecastTournament(tournament, "completed"))}
+              </div>
+            </section>
+          )}
+        </div>
 
         <aside className="home-side">
           <section className="surface side-panel prediction-teaser-panel" id="community">
