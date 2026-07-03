@@ -3,10 +3,15 @@ final result: passed
 source visual truth path:
 - /Users/eduard25rus/Downloads/Сгенерированное изображение 2 (2).png
 - /Users/eduard25rus/Downloads/Сгенерированное изображение 1 (3).png
+- /Users/eduard25rus/Downloads/IMG_2717.PNG
+- /Users/eduard25rus/Downloads/IMG_2716.PNG
+- /Users/eduard25rus/Desktop/Снимок экрана — 2026-07-03 в 14.54.04.png
 
 implementation screenshot path:
 - Computer Use capture, Chrome, 127.0.0.1:4173/predictions/forecast-qa, desktop-like window.
 - Computer Use capture, Chrome, 127.0.0.1:4173/predictions/forecast-qa, mobile-like narrow window.
+- Computer Use capture, Chrome, 127.0.0.1:4173/predictions/forecast-mobile-qa, narrow window after compact mobile overrides.
+- Computer Use capture, Chrome, 127.0.0.1:4173/predictions/forecast-open-qa, desktop window with open forecast composition state.
 
 viewport:
 - Desktop-like Chrome window: page shows header, forecaster carousel, unified forecast/fact table, right summary panel.
@@ -28,6 +33,8 @@ focused region comparison evidence:
 
 findings:
 - No P0/P1/P2 issues found in the checked desktop and mobile states.
+- Latest pass: mobile forecast results no longer use oversized carousel/table typography; fact names truncate instead of stacking vertically.
+- Latest pass: desktop forecast composition seed-board player names render as readable row text instead of single-letter columns.
 
 patches made since previous QA pass:
 - Replaced the old separated final-table/breakdown/leaderboard results layout with a unified results matrix.
@@ -36,6 +43,8 @@ patches made since previous QA pass:
 - Added mobile selected-forecaster summary and split forecast/fact rows.
 - Hid the old tournament hero on completed forecast result pages so the results page starts immediately after navigation.
 - Tuned mobile text wrapping in the fact column and summary card.
+- Tightened seed-board desktop columns, rank/avatar/rating sizing, and name wrapping for the forecast composition page.
+- Added final mobile overrides at the end of the stylesheet so legacy duplicate media blocks cannot re-enlarge the results page.
 
 follow-up polish:
 - Replace the temporary PB mark with the final club logo asset if a real logo file becomes available.
