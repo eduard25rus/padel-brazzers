@@ -369,6 +369,8 @@
 }
 
 html {
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
 }
 
@@ -376,6 +378,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
   color: var(--text);
   background:
     radial-gradient(circle at 10% 0%, rgba(228, 240, 222, 0.95), transparent 32%),
@@ -405,6 +409,7 @@ main {
   max-width: 1504px;
   min-height: 100vh;
   padding: 22px 24px 26px;
+  width: 100%;
 }
 
 .topbar {
@@ -413,6 +418,11 @@ main {
   gap: 24px;
   grid-template-columns: auto 1fr auto;
   margin-bottom: 18px;
+  min-width: 0;
+}
+
+.topbar > * {
+  min-width: 0;
 }
 
 .brand {
@@ -559,6 +569,8 @@ main {
   border-radius: 8px;
   display: flex;
   gap: 8px;
+  max-width: 100%;
+  min-width: 0;
   padding: 7px;
   position: relative;
 }
@@ -578,7 +590,7 @@ main {
 }
 
 .auth-user-card div {
-  min-width: 96px;
+  min-width: 0;
 }
 
 .auth-user-card strong,
@@ -2375,6 +2387,48 @@ main {
   margin-top: 12px;
 }
 
+.forecast-hero-action,
+.tournament-forecast-cta-card > button,
+.tournament-overview-forecast-card > button {
+  background: #b4232c;
+  border-radius: 8px;
+  color: #fffefa;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 950;
+  margin-top: 16px;
+  padding: 12px 16px;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.forecast-hero-action:hover,
+.tournament-forecast-cta-card > button:hover,
+.tournament-overview-forecast-card > button:hover {
+  background: #961f27;
+  transform: translateY(-1px);
+}
+
+.tournament-forecast-cta-card,
+.tournament-overview-forecast-card,
+.tournament-overview-predictions-card {
+  display: grid;
+  gap: 12px;
+}
+
+.tournament-forecast-cta-card p,
+.tournament-overview-forecast-card p {
+  color: #4f5a54;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.tournament-overview-forecast-card,
+.tournament-overview-predictions-card {
+  padding: 18px;
+}
+
 .prediction-scoring-summary {
   color: #526054;
   font-size: 13px;
@@ -3708,6 +3762,31 @@ main {
   border-color: var(--line);
   cursor: default;
   transform: none;
+}
+
+.prediction-mobile-card.saved-locked,
+.prediction-ranking-card.saved-locked {
+  background: rgba(245, 246, 241, 0.74);
+}
+
+.prediction-mobile-list.locked .prediction-mobile-row,
+.prediction-slot-grid.locked .prediction-slot {
+  background: rgba(242, 244, 239, 0.74);
+  border-color: rgba(21, 54, 31, 0.08);
+  color: #69736d;
+  cursor: default;
+  opacity: 0.72;
+}
+
+.prediction-mobile-list.locked .prediction-mobile-row > b,
+.prediction-slot-grid.locked .prediction-slot > span {
+  background: #aeb8b0;
+  color: #fffefa;
+}
+
+.prediction-mobile-list.locked .prediction-mobile-player small,
+.prediction-slot-grid.locked .prediction-slot b {
+  color: #8b948e;
 }
 
 .prediction-slot.filled:active {
@@ -5941,7 +6020,49 @@ p {
   }
 
   .auth-user-card {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     max-width: 100%;
+    padding: 6px;
+    width: 100%;
+  }
+
+  .auth-user-card > span {
+    flex: 0 0 30px;
+    height: 30px;
+    width: 30px;
+  }
+
+  .auth-user-card div {
+    flex: 1 1 calc(100% - 112px);
+    min-width: 120px;
+  }
+
+  .auth-user-card strong {
+    max-width: none;
+  }
+
+  .auth-user-card button {
+    font-size: 12px;
+    padding: 8px 9px;
+  }
+
+  .auth-user-card .profile-icon-button {
+    flex: 0 0 34px;
+    height: 34px;
+    width: 34px;
+  }
+
+  .auth-user-card .admin-mode-toggle {
+    flex: 1 1 112px;
+    justify-content: center;
+    padding: 7px 9px;
+  }
+
+  .auth-user-card > button:not(.profile-icon-button):not(.admin-mode-toggle) {
+    flex: 1 1 74px;
   }
 
   .registry-card,

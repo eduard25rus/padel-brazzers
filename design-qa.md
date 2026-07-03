@@ -37,6 +37,10 @@ findings:
 - Latest pass: mobile forecast results no longer use oversized carousel/table typography; fact names truncate instead of stacking vertically.
 - Latest pass: desktop forecast composition seed-board player names render as readable row text instead of single-letter columns.
 - Latest pass: forecast registry separates upcoming and completed tournaments; upcoming CTA uses a red "Прием прогнозов" treatment.
+- Latest pass: completed forecast results open on the logged-in user's card and center it in the forecaster carousel.
+- Latest pass: page-level horizontal overflow is locked, and the mobile account/admin controls wrap into a compact header block.
+- Latest pass: future tournament pages opened from "Турниры" now show an overview with roster, forecast CTA, and participant predictions instead of forecast scoring conditions.
+- Latest pass: saved forecasts render as a muted locked list until the user presses "Редактировать".
 
 patches made since previous QA pass:
 - Replaced the old separated final-table/breakdown/leaderboard results layout with a unified results matrix.
@@ -49,6 +53,9 @@ patches made since previous QA pass:
 - Added final mobile overrides at the end of the stylesheet so legacy duplicate media blocks cannot re-enlarge the results page.
 - Reworked the mobile results row to mirror the desktop structure: forecast player plus muted fact line, with only earned points on the right.
 - Split the forecast registry into upcoming and completed sections with a clearer red call-to-action for open forecast intake.
+- Centered the current user's result card in the completed-results carousel.
+- Added tournament-overview forecast CTA blocks and muted saved-forecast styling.
+- Added mobile wrapping rules for the authenticated user controls and page-level horizontal overflow protection.
 
 follow-up polish:
 - Replace the temporary PB mark with the final club logo asset if a real logo file becomes available.

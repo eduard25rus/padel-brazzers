@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const standings = [
   { place: 1, team: "Редько / Kh", short: "RK", rating: 6.6, record: "6 - 0 - 1", points: "34 - 14", delta: 20 },
@@ -3029,10 +3029,14 @@ function ForecastResultsImportScreen({
 }
 
 function ForecastResultsPanel({ currentUser, resultsSummary, tournament }) {
-  const [selectedUserId, setSelectedUserId] = useState(resultsSummary.viewerUserId ?? resultsSummary.leaderboard?.[0]?.userId ?? "");
+  const viewerResultId = resultsSummary.leaderboard.find((row) => row.userId === (resultsSummary.viewerUserId ?? currentUser?.id))?.userId ?? "";
+  const initialSelectedUserId = viewerResultId || resultsSummary.leaderboard?.[0]?.userId || "";
+  const [selectedUserId, setSelectedUserId] = useState(initialSelectedUserId);
   const [activeFilter, setActiveFilter] = useState("all");
+  const selectedPersonCardRef = useRef(null);
   const selectedResult = resultsSummary.leaderboard.find((row) => row.userId === selectedUserId)
     ?? resultsSummary.leaderboard.find((row) => row.userId === resultsSummary.viewerUserId)
+    ?? resultsSummary.leaderboard.find((row) => row.userId === currentUser?.id)
     ?? resultsSummary.leaderboard[0]
     ?? null;
   const totalForecastRows = resultsSummary.leaderboard.reduce((sum, row) => sum + Math.max(1, row.rows?.length ?? 1), 0);
@@ -3045,9 +3049,13 @@ function ForecastResultsPanel({ currentUser, resultsSummary, tournament }) {
   const selectedRows = selectedResult?.rows ?? [];
 
   useEffect(() => {
-    setSelectedUserId(resultsSummary.viewerUserId ?? resultsSummary.leaderboard?.[0]?.userId ?? "");
+    setSelectedUserId(initialSelectedUserId);
     setActiveFilter("all");
-  }, [resultsSummary.tournamentId, resultsSummary.viewerUserId]);
+  }, [resultsSummary.tournamentId, initialSelectedUserId]);
+
+  useEffect(() => {
+    selectedPersonCardRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [selectedResult?.userId]);
 
   const rowTone = (row) => {
     if (row.diff === 0) {
@@ -3137,7 +3145,13 @@ function ForecastResultsPanel({ currentUser, resultsSummary, tournament }) {
 
       <section className="forecast-person-carousel" aria-label="Прогнозисты">
         {resultsSummary.leaderboard.map((row) => (
-          <button className={selectedResult?.userId === row.userId ? "active" : ""} type="button" key={row.userId} onClick={() => setSelectedUserId(row.userId)}>
+          <button
+            className={selectedResult?.userId === row.userId ? "active" : ""}
+            ref={selectedResult?.userId === row.userId ? selectedPersonCardRef : null}
+            type="button"
+            key={row.userId}
+            onClick={() => setSelectedUserId(row.userId)}
+          >
             <b>{row.rank}</b>
             <span>
               <strong>{row.name}</strong>
@@ -3310,6 +3324,7 @@ function ForecastTournamentDetail({
   onLoadForecastPredictionSummary,
   onOpenHome,
   onOpenPlaceholder,
+  onOpenPredictionDetail,
   onOpenPredictions,
   onOpenResultsImport,
   onLoadForecastResultsSummary,
@@ -3641,6 +3656,9 @@ function ForecastTournamentDetail({
 
   const predictionCount = Number(tournament.predictionCount ?? 0);
   const needsReviewCount = adminPredictionSummary?.needsReviewCount ?? 0;
+  const openPredictionDetail = () => {
+    onOpenPredictionDetail?.(tournament.id);
+  };
 
   const submitTournamentUpdate = async (payload) => {
     const result = await onUpdateTournament(tournament.id, payload);
@@ -3695,6 +3713,11 @@ function ForecastTournamentDetail({
             {tournament.format === "Americano" && tournament.pointsToWin && (
               <p className="prediction-format-note">Americano до {tournament.pointsToWin} очков в розыгрыше.</p>
             )}
+            {isTournamentView && !hasCompletedResults && (
+              <button className="forecast-hero-action" type="button" onClick={openPredictionDetail}>
+                Сделать прогноз
+              </button>
+            )}
           </div>
           <div className="metric-strip">
             <div><strong>{tournament.roster.length || "—"}</strong><span>участников</span></div>
@@ -3704,6 +3727,7 @@ function ForecastTournamentDetail({
           </div>
         </section>
 
+        {!isTournamentView ? (
         <section className="surface prediction-tournament-card">
           <div className="section-title">
             <span>Условия прогноза</span>
@@ -3784,6 +3808,34 @@ function ForecastTournamentDetail({
             )}
           </div>
         </section>
+        ) : (
+        <section className="surface prediction-tournament-card tournament-forecast-cta-card">
+          <div className="section-title">
+            <span>Прогноз турнира</span>
+            <h2>Составь свой порядок игроков</h2>
+          </div>
+          <p>Сначала посмотри состав участников ниже, затем переходи к расстановке в разделе прогнозов.</p>
+          {!hasCompletedResults && (
+            <button type="button" onClick={openPredictionDetail}>
+              Сделать прогноз
+            </button>
+          )}
+          {canManageTournament && (
+            <div className="prediction-admin-actions">
+              <button type="button" onClick={() => { setAdminEditing((value) => !value); setAdminMessage(""); }}>
+                {adminEditing ? "Закрыть редактор" : "Редактировать турнир"}
+              </button>
+              <button type="button" onClick={() => onOpenResultsImport(tournament.id)}>
+                {hasCompletedResults ? "Обновить результаты" : "Добавить результаты"}
+              </button>
+              <button className="danger" disabled={deleting} type="button" onClick={deleteTournament}>
+                {deleting ? "Удаляем..." : "Удалить"}
+              </button>
+            </div>
+          )}
+          {adminMessage && <strong className="prediction-error">{adminMessage}</strong>}
+        </section>
+        )}
       </section>
       )}
 
@@ -3825,6 +3877,61 @@ function ForecastTournamentDetail({
               </div>
             )}
           </section>
+          <section className="surface tournament-overview-forecast-card">
+            <div className="section-title">
+              <span>Прогноз</span>
+              <h2>Готов поставить порядок?</h2>
+            </div>
+            <p>Откроем рабочий экран прогноза с расстановкой мест и сохранением ставки.</p>
+            {!hasCompletedResults && (
+              <button type="button" onClick={openPredictionDetail}>
+                Сделать прогноз
+              </button>
+            )}
+          </section>
+          <section className="surface tournament-overview-predictions-card">
+            <div className="section-title">
+              <span>Прогнозы участников</span>
+              <h2>{predictionCount} сохранено</h2>
+            </div>
+            <div className={`prediction-count-card ${canViewPredictionRegistry ? "can-open" : ""}`}>
+              <button
+                className="prediction-count-trigger"
+                disabled={!canViewPredictionRegistry}
+                type="button"
+                onClick={() => setPredictionRegistryOpen((value) => !value)}
+              >
+                <span>Прогнозы участников</span>
+                <strong>{predictionCount}</strong>
+                <p>столько игроков уже сделали прогноз на этот турнир</p>
+                {canManageTournament && (
+                  <b className={needsReviewCount > 0 ? "has-review" : ""}>{needsReviewCount} требуют корректировки</b>
+                )}
+                {canViewPredictionRegistry && (
+                  <small>{predictionRegistryOpen ? "Скрыть реестр" : "Показать реестр"}</small>
+                )}
+              </button>
+              {canViewPredictionRegistry && predictionRegistryOpen && (
+                <div className="admin-prediction-summary">
+                  {adminPredictionSummaryLoading ? (
+                    <small>Загружаем список...</small>
+                  ) : adminPredictionSummary?.predictions?.length ? (
+                    adminPredictionSummary.predictions.map((prediction) => (
+                      <article className={prediction.needsReview ? "needs-review" : ""} key={prediction.userId}>
+                        <div>
+                          <strong>{prediction.name}</strong>
+                          <small>{prediction.lundaNick || prediction.email || "Участник клуба"}</small>
+                        </div>
+                        <span>{prediction.needsReview ? "Корректировка" : "Готово"}</span>
+                      </article>
+                    ))
+                  ) : (
+                    <small>Пока никто не сохранил прогноз.</small>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
         </section>
       ) : hasCompletedResults ? (
         forecastResultsLoading ? (
@@ -3847,7 +3954,7 @@ function ForecastTournamentDetail({
         </section>
       ) : (
       <>
-      <section className="surface prediction-mobile-card" id="mobile-ranking">
+      <section className={`surface prediction-mobile-card ${isMobileSavedLocked ? "saved-locked" : ""}`} id="mobile-ranking">
         <div className="prediction-card-head">
           <div className="section-title">
             <span>Мой прогноз</span>
@@ -3881,7 +3988,7 @@ function ForecastTournamentDetail({
                 : "Перетаскивай игроков за ручку справа. При первом открытии порядок уже выставлен по рейтингу."}
             </div>
             <div
-              className="prediction-mobile-list"
+              className={`prediction-mobile-list ${!canEditMobileForecast ? "locked" : ""}`}
               onPointerCancel={() => setMobileDragIndex(null)}
               onPointerMove={handleMobilePointerMove}
               onPointerUp={() => setMobileDragIndex(null)}
@@ -4044,7 +4151,7 @@ function ForecastTournamentDetail({
           )}
         </section>
 
-        <section className="surface prediction-ranking-card" id="ranking">
+        <section className={`surface prediction-ranking-card ${isDesktopSavedLocked ? "saved-locked" : ""}`} id="ranking">
           <div className="prediction-card-head">
             <div className="section-title">
               <span>Мой прогноз</span>
@@ -5622,6 +5729,7 @@ export function App() {
           onLoadForecastResultsSummary={loadForecastResultsSummary}
           onOpenHome={() => navigate({ name: "home" })}
           onOpenPlaceholder={openPlaceholder}
+          onOpenPredictionDetail={(tournamentId) => navigate({ name: "forecast-detail", tournamentId })}
           onOpenPredictions={openPredictions}
           onOpenResultsImport={(tournamentId) => navigate({ name: "forecast-results-import", tournamentId })}
           onSaveForecastPrediction={saveForecastPrediction}
@@ -5751,6 +5859,7 @@ export function App() {
             onLoadForecastResultsSummary={loadForecastResultsSummary}
             onOpenHome={() => navigate({ name: "home" })}
             onOpenPlaceholder={openPlaceholder}
+            onOpenPredictionDetail={(tournamentId) => navigate({ name: "forecast-detail", tournamentId })}
             onOpenPredictions={openPredictions}
             onOpenResultsImport={(tournamentId) => navigate({ name: "forecast-results-import", tournamentId })}
             onSaveForecastPrediction={saveForecastPrediction}
