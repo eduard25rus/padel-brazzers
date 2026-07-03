@@ -6484,13 +6484,14 @@ p {
   }
 
   .forecast-result-row {
-    grid-template-columns: 24px minmax(0, 1fr) 52px;
+    gap: 5px;
+    grid-template-columns: 40px minmax(0, 1fr) 52px;
     min-height: 58px;
   }
 
   .forecast-result-row > b {
     font-size: 19px;
-    padding-left: 9px;
+    padding-left: 12px;
   }
 
   .forecast-result-player {
@@ -6543,7 +6544,7 @@ p {
 
 @media (max-width: 390px) {
   .forecast-result-row {
-    grid-template-columns: 22px minmax(0, 1fr) 48px;
+    grid-template-columns: 38px minmax(0, 1fr) 48px;
   }
 
   .forecast-result-player strong {
