@@ -41,6 +41,7 @@ findings:
 - Latest pass: page-level horizontal overflow is locked, and the mobile account/admin controls wrap into a compact header block.
 - Latest pass: future tournament pages opened from "Турниры" now show an overview with roster, forecast CTA, and participant predictions instead of forecast scoring conditions.
 - Latest pass: saved forecasts render as a muted locked list until the user presses "Редактировать".
+- Latest pass: tournament overview removes the duplicate hero forecast CTA, uses only tournament-facing hero metrics, and places the participant roster directly below the red forecast button.
 
 patches made since previous QA pass:
 - Replaced the old separated final-table/breakdown/leaderboard results layout with a unified results matrix.
@@ -56,6 +57,7 @@ patches made since previous QA pass:
 - Centered the current user's result card in the completed-results carousel.
 - Added tournament-overview forecast CTA blocks and muted saved-forecast styling.
 - Added mobile wrapping rules for the authenticated user controls and page-level horizontal overflow protection.
+- Simplified the future tournament hero for the "Турниры" entry path and made the overview roster a vertical list.
 
 follow-up polish:
 - Replace the temporary PB mark with the final club logo asset if a real logo file becomes available.

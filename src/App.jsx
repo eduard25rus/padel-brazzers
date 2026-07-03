@@ -3700,7 +3700,7 @@ function ForecastTournamentDetail({
         <section className="surface hero-card prediction-detail-hero">
           <img src={tournament.image} alt="" />
           <div className="hero-content">
-            <span className="eyebrow">{tournament.status}</span>
+            <span className="eyebrow">{isTournamentView ? "Будущий турнир" : tournament.status}</span>
             <h1>{tournament.title}</h1>
             <div className="meta-row">
               <span>{formatVladivostokDate(tournament.date)}</span>
@@ -3713,17 +3713,21 @@ function ForecastTournamentDetail({
             {tournament.format === "Americano" && tournament.pointsToWin && (
               <p className="prediction-format-note">Americano до {tournament.pointsToWin} очков в розыгрыше.</p>
             )}
-            {isTournamentView && !hasCompletedResults && (
-              <button className="forecast-hero-action" type="button" onClick={openPredictionDetail}>
-                Сделать прогноз
-              </button>
-            )}
           </div>
-          <div className="metric-strip">
-            <div><strong>{tournament.roster.length || "—"}</strong><span>участников</span></div>
-            <div><strong>{tournamentScoringMethod?.exactPlace ?? "—"}</strong><span>за точное место</span></div>
-            <div><strong>{hasCompletedResults ? "Итоги" : isPredictionClosed ? "Закрыто" : "До старта"}</strong><span>{hasCompletedResults ? "посчитано" : isPredictionClosed ? "ставка принята" : "редактирование"}</span></div>
-            <div><strong>{tournament.format}</strong><span>формат</span></div>
+          <div className={`metric-strip ${isTournamentView ? "overview" : ""}`}>
+            {isTournamentView ? (
+              <>
+                <div><strong>{tournament.roster.length || "—"}</strong><span>участников</span></div>
+                <div><strong>{tournament.format}</strong><span>формат</span></div>
+              </>
+            ) : (
+              <>
+                <div><strong>{tournament.roster.length || "—"}</strong><span>участников</span></div>
+                <div><strong>{tournamentScoringMethod?.exactPlace ?? "—"}</strong><span>за точное место</span></div>
+                <div><strong>{hasCompletedResults ? "Итоги" : isPredictionClosed ? "Закрыто" : "До старта"}</strong><span>{hasCompletedResults ? "посчитано" : isPredictionClosed ? "ставка принята" : "редактирование"}</span></div>
+                <div><strong>{tournament.format}</strong><span>формат</span></div>
+              </>
+            )}
           </div>
         </section>
 
@@ -3855,6 +3859,18 @@ function ForecastTournamentDetail({
 
       {isTournamentView ? (
         <section className="prediction-workspace tournament-overview-workspace">
+          <section className="surface tournament-overview-forecast-card">
+            <div className="section-title">
+              <span>Прогноз</span>
+              <h2>Готов поставить порядок?</h2>
+            </div>
+            <p>Откроем рабочий экран прогноза с расстановкой мест и сохранением ставки.</p>
+            {!hasCompletedResults && (
+              <button type="button" onClick={openPredictionDetail}>
+                Сделать прогноз
+              </button>
+            )}
+          </section>
           <section className="surface prediction-roster-card" id="roster">
             <div className="section-title">
               <span>Стартовый состав</span>
@@ -3875,18 +3891,6 @@ function ForecastTournamentDetail({
                   </article>
                 ))}
               </div>
-            )}
-          </section>
-          <section className="surface tournament-overview-forecast-card">
-            <div className="section-title">
-              <span>Прогноз</span>
-              <h2>Готов поставить порядок?</h2>
-            </div>
-            <p>Откроем рабочий экран прогноза с расстановкой мест и сохранением ставки.</p>
-            {!hasCompletedResults && (
-              <button type="button" onClick={openPredictionDetail}>
-                Сделать прогноз
-              </button>
             )}
           </section>
           <section className="surface tournament-overview-predictions-card">
