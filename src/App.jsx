@@ -3859,18 +3859,6 @@ function ForecastTournamentDetail({
 
       {isTournamentView ? (
         <section className="prediction-workspace tournament-overview-workspace">
-          <section className="surface tournament-overview-forecast-card">
-            <div className="section-title">
-              <span>Прогноз</span>
-              <h2>Готов поставить порядок?</h2>
-            </div>
-            <p>Откроем рабочий экран прогноза с расстановкой мест и сохранением ставки.</p>
-            {!hasCompletedResults && (
-              <button type="button" onClick={openPredictionDetail}>
-                Сделать прогноз
-              </button>
-            )}
-          </section>
           <section className="surface prediction-roster-card" id="roster">
             <div className="section-title">
               <span>Стартовый состав</span>

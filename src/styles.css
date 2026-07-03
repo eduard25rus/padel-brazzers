@@ -2387,8 +2387,7 @@ main {
   margin-top: 12px;
 }
 
-.tournament-forecast-cta-card > button,
-.tournament-overview-forecast-card > button {
+.tournament-forecast-cta-card > button {
   background: #b4232c;
   border-radius: 8px;
   color: #fffefa;
@@ -2402,27 +2401,23 @@ main {
     transform 160ms ease;
 }
 
-.tournament-forecast-cta-card > button:hover,
-.tournament-overview-forecast-card > button:hover {
+.tournament-forecast-cta-card > button:hover {
   background: #961f27;
   transform: translateY(-1px);
 }
 
 .tournament-forecast-cta-card,
-.tournament-overview-forecast-card,
 .tournament-overview-predictions-card {
   display: grid;
   gap: 12px;
 }
 
-.tournament-forecast-cta-card p,
-.tournament-overview-forecast-card p {
+.tournament-forecast-cta-card p {
   color: #4f5a54;
   font-size: 14px;
   line-height: 1.45;
 }
 
-.tournament-overview-forecast-card,
 .tournament-overview-predictions-card {
   padding: 18px;
 }
@@ -5949,6 +5944,10 @@ p {
 
   .prediction-workspace {
     display: none;
+  }
+
+  .prediction-workspace.tournament-overview-workspace {
+    display: grid;
   }
 
   .prediction-mobile-card {
