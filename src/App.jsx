@@ -3350,6 +3350,7 @@ function ForecastTournamentDetail({
   const [forecastSaving, setForecastSaving] = useState(false);
   const [forecastSaveMessage, setForecastSaveMessage] = useState("");
   const [forecastSaveTone, setForecastSaveTone] = useState("success");
+  const [replacementFlashIndex, setReplacementFlashIndex] = useState(null);
   const [adminPredictionSummary, setAdminPredictionSummary] = useState(null);
   const [adminPredictionSummaryLoading, setAdminPredictionSummaryLoading] = useState(false);
   const [predictionRegistryOpen, setPredictionRegistryOpen] = useState(false);
@@ -3361,6 +3362,10 @@ function ForecastTournamentDetail({
   const currentForecastSlots = forecastSlots.filter((slot) => slot && !slot.invalid);
   const filledSlots = currentForecastSlots.length;
   const forecastPlayerIds = new Set(currentForecastSlots.map((slot) => String(getPlayerKey(slot))));
+  const invalidSlotCount = forecastSlots.filter((slot) => slot?.invalid).length;
+  const replacementPlayers = invalidSlotCount
+    ? sortedRoster.filter((player) => !forecastPlayerIds.has(String(getPlayerKey(player))))
+    : [];
   const expectedPlayerIds = sortedRoster.map((player) => String(getPlayerKey(player)));
   const isForecastComplete = expectedPlayerIds.length > 0 && expectedPlayerIds.every((playerId) => forecastPlayerIds.has(playerId));
   const mobileForecastSlots = useMemo(() => {
@@ -3455,6 +3460,7 @@ function ForecastTournamentDetail({
     setDesktopEditing(false);
     setMobileEditing(false);
     setSelectedPlayerId(null);
+    setReplacementFlashIndex(null);
     setForecastSaveMessage("");
     setForecastSaveTone("success");
     setAdminEditing(false);
@@ -3500,6 +3506,15 @@ function ForecastTournamentDetail({
       ignore = true;
     };
   }, [auth.currentUser?.id, tournament.id, tournament.roster]);
+
+  useEffect(() => {
+    if (replacementFlashIndex === null) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setReplacementFlashIndex(null), 900);
+    return () => window.clearTimeout(timeout);
+  }, [replacementFlashIndex]);
 
   useEffect(() => {
     loadAdminPredictionSummary();
@@ -3564,6 +3579,39 @@ function ForecastTournamentDetail({
 
     setForecastSlots((current) => current.map((slot, index) => (index === slotIndex ? null : slot)));
     setForecastSaveMessage("");
+    setForecastSaveTone("success");
+  };
+
+  const replaceInvalidSlot = (slotIndex, replacementPlayerId = replacementPlayers[0] ? String(getPlayerKey(replacementPlayers[0])) : "") => {
+    if (!canEditMobileForecast && !canEditDesktopForecast) {
+      return;
+    }
+
+    const replacementPlayer = sortedRoster.find((player) => String(getPlayerKey(player)) === String(replacementPlayerId));
+    if (!replacementPlayer) {
+      return;
+    }
+
+    let replacedName = "";
+    setForecastSlots((current) => {
+      const next = current.map((slot, index) => {
+        if (index === slotIndex) {
+          replacedName = slot?.name ?? "";
+          return replacementPlayer;
+        }
+
+        if (slot && !slot.invalid && String(getPlayerKey(slot)) === String(replacementPlayerId)) {
+          return null;
+        }
+
+        return slot;
+      });
+
+      return next;
+    });
+    setSelectedPlayerId(null);
+    setReplacementFlashIndex(slotIndex);
+    setForecastSaveMessage(`${replacedName ? `${replacedName} заменен` : "Игрок заменен"} на ${replacementPlayer.name}. Проверь порядок и сохрани прогноз.`);
     setForecastSaveTone("success");
   };
 
@@ -3987,7 +4035,7 @@ function ForecastTournamentDetail({
             >
               {mobileForecastSlots.map((slot, index) => (
                 <article
-                  className={`prediction-mobile-row ${slot?.invalid ? "invalid" : ""} ${mobileDragIndex === index ? "dragging" : ""} ${!canEditMobileForecast ? "locked" : ""}`}
+                  className={`prediction-mobile-row ${slot?.invalid ? "invalid" : ""} ${slot?.invalid && replacementPlayers.length ? "replacement-ready" : ""} ${replacementFlashIndex === index ? "replaced" : ""} ${mobileDragIndex === index ? "dragging" : ""} ${!canEditMobileForecast ? "locked" : ""}`}
                   data-mobile-forecast-index={index}
                   draggable={Boolean(canEditMobileForecast && slot && !slot.invalid)}
                   key={`${slot?.id ?? slot?.name ?? "empty"}-${index}`}
@@ -4014,9 +4062,21 @@ function ForecastTournamentDetail({
                   <b>{index + 1}</b>
                   <div className="prediction-mobile-player">
                     <strong>{slot?.name ?? "Место свободно"}</strong>
-                    {slot?.invalid ? <small>Выбыл из состава</small> : <small>{slot ? Number(slot.rating).toFixed(2) : "—"}</small>}
+                    {slot?.invalid ? (
+                      <small>{replacementPlayers.length ? "Выбыл из состава, есть замена" : "Выбыл из состава"}</small>
+                    ) : (
+                      <small>{slot ? Number(slot.rating).toFixed(2) : "—"}</small>
+                    )}
                   </div>
-                  {canEditMobileForecast && (
+                  {canEditMobileForecast && slot?.invalid && replacementPlayers.length ? (
+                    <button
+                      className="prediction-replace-button"
+                      type="button"
+                      onClick={() => replaceInvalidSlot(index)}
+                    >
+                      Заменить на {replacementPlayers[0].name}
+                    </button>
+                  ) : canEditMobileForecast && (
                     <button
                       aria-label={`Перетащить место ${index + 1}`}
                       className="prediction-mobile-handle"
@@ -4100,10 +4160,11 @@ function ForecastTournamentDetail({
                     const rating = Number(player.rating);
                     const isSelected = selectedPlayerId === playerId;
                     const isPlaced = forecastSlots.some((slot) => slot && !slot.invalid && getPlayerKey(slot) === playerId);
+                    const isReplacementCandidate = replacementPlayers.some((candidate) => String(getPlayerKey(candidate)) === String(playerId));
 
                     return (
                       <button
-                        className={`seed-board-row forecast-seed-player ${seedIndex === 1 ? "top-seed" : ""} ${isSelected ? "selected" : ""} ${isPlaced ? "placed" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
+                        className={`seed-board-row forecast-seed-player ${seedIndex === 1 ? "top-seed" : ""} ${isSelected ? "selected" : ""} ${isReplacementCandidate ? "replacement-candidate" : ""} ${isPlaced ? "placed" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
                         draggable={canEditDesktopForecast}
                         key={playerId}
                         style={{ "--rating-progress": `${getRatingProgress(rating)}%` }}
@@ -4128,7 +4189,7 @@ function ForecastTournamentDetail({
                         <span className="seed-avatar">{getPlayerInitials(player.name)}</span>
                         <div className="seed-player-copy">
                           <strong>{player.name}</strong>
-                          <small>Seed #{seedIndex}</small>
+                          <small>{isReplacementCandidate ? "Новый участник" : `Seed #${seedIndex}`}</small>
                         </div>
                         <div className="seed-rating-cell">
                           <b>{Number.isFinite(rating) ? rating.toFixed(2) : "—"}</b>
@@ -4176,12 +4237,17 @@ function ForecastTournamentDetail({
               <div className={`prediction-slot-grid ${!canEditDesktopForecast ? "locked" : ""}`}>
                 {forecastSlots.map((slot, index) => (
                   <button
-                    className={`prediction-slot ${slot ? "filled" : ""} ${slot?.invalid ? "invalid" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
+                    className={`prediction-slot ${slot ? "filled" : ""} ${slot?.invalid ? "invalid" : ""} ${slot?.invalid && replacementPlayers.length ? "replacement-ready" : ""} ${replacementFlashIndex === index ? "replaced" : ""} ${!canEditDesktopForecast ? "locked" : ""}`}
                     draggable={Boolean(canEditDesktopForecast && slot && !slot.invalid)}
                     key={`slot-${index}`}
                     type="button"
                     onClick={() => {
                       if (!canEditDesktopForecast) {
+                        return;
+                      }
+
+                      if (slot?.invalid && replacementPlayers.length) {
+                        replaceInvalidSlot(index);
                         return;
                       }
 
@@ -4210,7 +4276,16 @@ function ForecastTournamentDetail({
                     {slot ? (
                       <div>
                         <strong>{slot.name}</strong>
-                        {slot.invalid ? <b>Выбыл из состава</b> : <b>{Number(slot.rating).toFixed(2)}</b>}
+                        {slot.invalid ? (
+                          <>
+                            <b>{replacementPlayers.length ? "Нажми, чтобы заменить" : "Выбыл из состава"}</b>
+                            {replacementPlayers.length > 0 && (
+                              <small className="prediction-replacement-note">На {replacementPlayers[0].name}</small>
+                            )}
+                          </>
+                        ) : (
+                          <b>{Number(slot.rating).toFixed(2)}</b>
+                        )}
                       </div>
                     ) : (
                       <em>Место свободно</em>

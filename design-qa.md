@@ -44,6 +44,7 @@ findings:
 - Latest pass: tournament overview removes the duplicate hero forecast CTA, uses only tournament-facing hero metrics, and places the participant roster directly below the red forecast button.
 - Latest pass: mobile tournament overview keeps the roster workspace visible instead of hiding it with the forecast-editor mobile rule.
 - Latest pass: mobile leaders page uses a single-column layout with compact hero, period buttons, stacked summary cards, and card-style leader rows.
+- Latest pass: forecast editing after roster changes now shows replacement players and lets users swap a departed player in-place before saving.
 
 patches made since previous QA pass:
 - Replaced the old separated final-table/breakdown/leaderboard results layout with a unified results matrix.
@@ -62,6 +63,7 @@ patches made since previous QA pass:
 - Simplified the future tournament hero for the "Турниры" entry path and made the overview roster a vertical list.
 - Removed the duplicate overview CTA block so the participant roster follows the red forecast card directly on mobile.
 - Added a late mobile override for the leaders page so desktop table widths no longer override the phone layout.
+- Added in-place replacement controls for invalid forecast slots, with a highlighted new participant and a short replacement animation.
 
 follow-up polish:
 - Replace the temporary PB mark with the final club logo asset if a real logo file becomes available.
