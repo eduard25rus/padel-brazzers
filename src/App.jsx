@@ -1175,7 +1175,7 @@ function LeaderCard({ eyebrow, name, meta, metric, image }) {
   );
 }
 
-function AmericanoStandingsTable({ pointMethod }) {
+function AmericanoStandingsTable({ isFocusedPlayer = () => false, onToggleFocusedPlayer = () => {}, pointMethod }) {
   return (
     <section className="surface standings-card americano-final-card" id="standings">
       <div className="section-title">
@@ -1192,7 +1192,12 @@ function AmericanoStandingsTable({ pointMethod }) {
       </div>
       <div className="standings-list">
         {americanoPlayers.map((item) => (
-          <article className="americano-standing-row" key={item.name}>
+          <button
+            className={`americano-standing-row selectable-player-row ${isFocusedPlayer(item.name) ? "focused-player-row" : ""}`}
+            key={item.name}
+            type="button"
+            onClick={() => onToggleFocusedPlayer(item.name)}
+          >
             <b>{item.place}</b>
             <div className="standing-team">
               <PlayerBadge player={item.name} small />
@@ -1202,7 +1207,7 @@ function AmericanoStandingsTable({ pointMethod }) {
             <span>{item.points}</span>
             <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
             <strong className="club-points">+{getLeaderboardPoints(pointMethod, "individual_12", item.place)}</strong>
-          </article>
+          </button>
         ))}
       </div>
       <footer>Победитель определяется по победам · Americano</footer>
@@ -1210,7 +1215,7 @@ function AmericanoStandingsTable({ pointMethod }) {
   );
 }
 
-function MexicanoStandingsTable({ pointMethod }) {
+function MexicanoStandingsTable({ isFocusedPlayer = () => false, onToggleFocusedPlayer = () => {}, pointMethod }) {
   return (
     <section className="surface standings-card americano-final-card" id="standings">
       <div className="section-title">
@@ -1227,7 +1232,12 @@ function MexicanoStandingsTable({ pointMethod }) {
       </div>
       <div className="standings-list">
         {mexicanoPlayers.map((item) => (
-          <article className="americano-standing-row" key={item.name}>
+          <button
+            className={`americano-standing-row selectable-player-row ${isFocusedPlayer(item.name) ? "focused-player-row" : ""}`}
+            key={item.name}
+            type="button"
+            onClick={() => onToggleFocusedPlayer(item.name)}
+          >
             <b>{item.place}</b>
             <div className="standing-team">
               <PlayerBadge player={item.name} playerPool={mexicanoPlayers} small />
@@ -1237,7 +1247,7 @@ function MexicanoStandingsTable({ pointMethod }) {
             <span>{item.points}</span>
             <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
             <strong className="club-points">+{getLeaderboardPoints(pointMethod, "individual_12", item.place)}</strong>
-          </article>
+          </button>
         ))}
       </div>
       <footer>Победитель определяется по дельте очков · Mexicano</footer>
@@ -1280,7 +1290,7 @@ function StandingsTable({ pointMethod }) {
   );
 }
 
-function AmericanoRoundPanel() {
+function AmericanoRoundPanel({ isFocusedPlayer = () => false, onToggleFocusedPlayer = () => {} }) {
   const [round, setRound] = useState(11);
   const shownMatches = useMemo(
     () => americanoMatches.filter((match) => match.round === round),
@@ -1319,32 +1329,38 @@ function AmericanoRoundPanel() {
             <span>Пары</span>
             <span>Счет</span>
           </div>
-          {shownMatches.map((match) => (
-            <article className="match-row americano-match-row" key={match.court}>
-              <span>Корт {match.court}</span>
-              <div>
-                <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
-                  <PairRatingBadge players={match.a} />
-                  <span className="americano-pair-name">
-                    <span>{match.a[0]}</span>
-                    <span>{match.a[1]}</span>
-                  </span>
-                </p>
-                <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
-                  <PairRatingBadge players={match.b} />
-                  <span className="americano-pair-name">
-                    <span>{match.b[0]}</span>
-                    <span>{match.b[1]}</span>
-                  </span>
-                </p>
-              </div>
-              <strong>
-                {match.scoreA}
-                <small>:</small>
-                {match.scoreB}
-              </strong>
-            </article>
-          ))}
+          {shownMatches.map((match) => {
+            const focusOnTeamA = match.a.some(isFocusedPlayer);
+            const focusOnTeamB = match.b.some(isFocusedPlayer);
+            const matchHasFocus = focusOnTeamA || focusOnTeamB;
+
+            return (
+              <article className={`match-row americano-match-row ${matchHasFocus ? "focused-match-row" : ""}`} key={match.court}>
+                <span>Корт {match.court}</span>
+                <div>
+                  <p className={`${match.scoreA > match.scoreB ? "winner" : "loser"} ${focusOnTeamA ? "focused-match-side" : ""}`}>
+                    <PairRatingBadge players={match.a} />
+                    <span className="americano-pair-name">
+                      <span className={isFocusedPlayer(match.a[0]) ? "focused-player-name" : ""}>{match.a[0]}</span>
+                      <span className={isFocusedPlayer(match.a[1]) ? "focused-player-name" : ""}>{match.a[1]}</span>
+                    </span>
+                  </p>
+                  <p className={`${match.scoreB > match.scoreA ? "winner" : "loser"} ${focusOnTeamB ? "focused-match-side" : ""}`}>
+                    <PairRatingBadge players={match.b} />
+                    <span className="americano-pair-name">
+                      <span className={isFocusedPlayer(match.b[0]) ? "focused-player-name" : ""}>{match.b[0]}</span>
+                      <span className={isFocusedPlayer(match.b[1]) ? "focused-player-name" : ""}>{match.b[1]}</span>
+                    </span>
+                  </p>
+                </div>
+                <strong className="match-score">
+                  <span className={focusOnTeamA ? "focused-score" : ""}>{match.scoreA}</span>
+                  <small>:</small>
+                  <span className={focusOnTeamB ? "focused-score" : ""}>{match.scoreB}</span>
+                </strong>
+              </article>
+            );
+          })}
         </div>
         <div className="round-standings americano-live-table">
           <div className="round-standings-title">
@@ -1359,7 +1375,12 @@ function AmericanoRoundPanel() {
             <span>+/-</span>
           </div>
           {roundStandings.map((player, index) => (
-            <article className="americano-live-row" key={player.name}>
+            <button
+              className={`americano-live-row selectable-player-row ${isFocusedPlayer(player.name) ? "focused-player-row" : ""}`}
+              key={player.name}
+              type="button"
+              onClick={() => onToggleFocusedPlayer(player.name)}
+            >
               <b>{index + 1}</b>
               <div>
                 <PlayerBadge player={player.name} small />
@@ -1370,7 +1391,7 @@ function AmericanoRoundPanel() {
               <em className={player.delta >= 0 ? "positive" : "negative"}>
                 {player.delta > 0 ? `+${player.delta}` : player.delta}
               </em>
-            </article>
+            </button>
           ))}
         </div>
       </div>
@@ -1378,7 +1399,7 @@ function AmericanoRoundPanel() {
   );
 }
 
-function MexicanoRoundPanel() {
+function MexicanoRoundPanel({ isFocusedPlayer = () => false, onToggleFocusedPlayer = () => {} }) {
   const [round, setRound] = useState(11);
   const shownMatches = useMemo(
     () => mexicanoMatches.filter((match) => match.round === round),
@@ -1420,32 +1441,38 @@ function MexicanoRoundPanel() {
             <span>Пары</span>
             <span>Счет</span>
           </div>
-          {shownMatches.map((match) => (
-            <article className="match-row americano-match-row" key={match.court}>
-              <span>Корт {match.court}</span>
-              <div>
-                <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
-                  <PairRatingBadge players={match.a} playerPool={mexicanoPlayers} />
-                  <span className="americano-pair-name">
-                    <span>{match.a[0]}</span>
-                    <span>{match.a[1]}</span>
-                  </span>
-                </p>
-                <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
-                  <PairRatingBadge players={match.b} playerPool={mexicanoPlayers} />
-                  <span className="americano-pair-name">
-                    <span>{match.b[0]}</span>
-                    <span>{match.b[1]}</span>
-                  </span>
-                </p>
-              </div>
-              <strong>
-                {match.scoreA}
-                <small>:</small>
-                {match.scoreB}
-              </strong>
-            </article>
-          ))}
+          {shownMatches.map((match) => {
+            const focusOnTeamA = match.a.some(isFocusedPlayer);
+            const focusOnTeamB = match.b.some(isFocusedPlayer);
+            const matchHasFocus = focusOnTeamA || focusOnTeamB;
+
+            return (
+              <article className={`match-row americano-match-row ${matchHasFocus ? "focused-match-row" : ""}`} key={match.court}>
+                <span>Корт {match.court}</span>
+                <div>
+                  <p className={`${match.scoreA > match.scoreB ? "winner" : "loser"} ${focusOnTeamA ? "focused-match-side" : ""}`}>
+                    <PairRatingBadge players={match.a} playerPool={mexicanoPlayers} />
+                    <span className="americano-pair-name">
+                      <span className={isFocusedPlayer(match.a[0]) ? "focused-player-name" : ""}>{match.a[0]}</span>
+                      <span className={isFocusedPlayer(match.a[1]) ? "focused-player-name" : ""}>{match.a[1]}</span>
+                    </span>
+                  </p>
+                  <p className={`${match.scoreB > match.scoreA ? "winner" : "loser"} ${focusOnTeamB ? "focused-match-side" : ""}`}>
+                    <PairRatingBadge players={match.b} playerPool={mexicanoPlayers} />
+                    <span className="americano-pair-name">
+                      <span className={isFocusedPlayer(match.b[0]) ? "focused-player-name" : ""}>{match.b[0]}</span>
+                      <span className={isFocusedPlayer(match.b[1]) ? "focused-player-name" : ""}>{match.b[1]}</span>
+                    </span>
+                  </p>
+                </div>
+                <strong className="match-score">
+                  <span className={focusOnTeamA ? "focused-score" : ""}>{match.scoreA}</span>
+                  <small>:</small>
+                  <span className={focusOnTeamB ? "focused-score" : ""}>{match.scoreB}</span>
+                </strong>
+              </article>
+            );
+          })}
         </div>
         <div className="round-standings americano-live-table">
           <div className="round-standings-title">
@@ -1460,7 +1487,12 @@ function MexicanoRoundPanel() {
             <span>+/-</span>
           </div>
           {roundStandings.map((player, index) => (
-            <article className="americano-live-row" key={player.name}>
+            <button
+              className={`americano-live-row selectable-player-row ${isFocusedPlayer(player.name) ? "focused-player-row" : ""}`}
+              key={player.name}
+              type="button"
+              onClick={() => onToggleFocusedPlayer(player.name)}
+            >
               <b>{index + 1}</b>
               <div>
                 <PlayerBadge player={player.name} playerPool={mexicanoPlayers} small />
@@ -1471,7 +1503,7 @@ function MexicanoRoundPanel() {
               <em className={player.delta >= 0 ? "positive" : "negative"}>
                 {player.delta > 0 ? `+${player.delta}` : player.delta}
               </em>
-            </article>
+            </button>
           ))}
         </div>
       </div>
@@ -2758,7 +2790,7 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
   );
 }
 
-function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, tournament }) {
+function ResultsImportPanel({ onConfirmResultsImport, onOpenImportedResult, onPreviewResultsImport, tournament }) {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState(null);
@@ -2865,6 +2897,11 @@ function ResultsImportPanel({ onConfirmResultsImport, onPreviewResultsImport, to
 
     if (!result.ok) {
       setMessage(result.message);
+      return;
+    }
+
+    if (result.result?.id) {
+      onOpenImportedResult(result.result.id);
       return;
     }
 
@@ -2990,6 +3027,7 @@ function ForecastResultsImportScreen({
   auth,
   onConfirmResultsImport,
   onOpenHome,
+  onOpenImportedResult,
   onOpenPlaceholder,
   onOpenPredictions,
   onOpenTournament,
@@ -3021,6 +3059,7 @@ function ForecastResultsImportScreen({
 
       <ResultsImportPanel
         onConfirmResultsImport={onConfirmResultsImport}
+        onOpenImportedResult={onOpenImportedResult}
         onPreviewResultsImport={onPreviewResultsImport}
         tournament={tournament}
       />
@@ -4305,6 +4344,7 @@ function ForecastTournamentDetail({
 
 function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, result }) {
   const [round, setRound] = useState(1);
+  const [focusedPlayerName, setFocusedPlayerName] = useState("");
   const rounds = useMemo(() => [...new Set((result.matches ?? []).map((match) => Number(match.round)).filter(Boolean))].sort((a, b) => a - b), [result.matches]);
   const shownMatches = result.matches?.filter((match) => Number(match.round) === round) ?? [];
   const roundStandings = useMemo(
@@ -4312,9 +4352,16 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
     [result.standings, result.matches, round],
   );
   const formatLabel = String(result.format || "турнир").toUpperCase();
+  const focusKey = focusedPlayerName.trim().toLowerCase();
+  const isFocusedPlayer = (name) => focusKey && String(name ?? "").trim().toLowerCase() === focusKey;
+  const toggleFocusedPlayer = (name) => {
+    const nextName = String(name ?? "").trim();
+    setFocusedPlayerName((current) => (current === nextName ? "" : nextName));
+  };
 
   useEffect(() => {
     setRound(rounds[0] ?? 1);
+    setFocusedPlayerName("");
   }, [result.id]);
 
   return (
@@ -4368,7 +4415,12 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
           </div>
           <div className="standings-list">
             {(result.standings ?? []).map((item) => (
-              <article className="americano-standing-row" key={`${item.place}-${item.playerName}`}>
+              <button
+                className={`americano-standing-row selectable-player-row ${isFocusedPlayer(item.playerName) ? "focused-player-row" : ""}`}
+                key={`${item.place}-${item.playerName}`}
+                type="button"
+                onClick={() => toggleFocusedPlayer(item.playerName)}
+              >
                 <b>{item.place}</b>
                 <div className="standing-team">
                   <span className="team-badge player-rating small">{Number(item.ratingAfter || item.ratingBefore || 0).toFixed(1)}</span>
@@ -4379,7 +4431,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
                 <em className={item.delta >= 0 ? "positive" : "negative"}>{item.delta > 0 ? `+${item.delta}` : item.delta}</em>
                 <em className={Number(item.ratingChange) >= 0 ? "positive" : "negative"}>{formatRatingChange(item.ratingChange)}</em>
                 <strong className="club-points">+{item.clubPoints}</strong>
-              </article>
+              </button>
             ))}
           </div>
           <footer>{result.meta?.winner_rule ? `Победитель определяется: ${result.meta.winner_rule}` : `Итоговая таблица · ${formatLabel}`}</footer>
@@ -4412,26 +4464,36 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
                 <span>Пары</span>
                 <span>Счет</span>
               </div>
-              {shownMatches.map((match) => (
-                <article className="match-row americano-match-row" key={match.matchId || `${match.round}-${match.court}`}>
-                  <span>Корт {match.court}</span>
-                  <div>
-                    <p className={match.scoreA > match.scoreB ? "winner" : "loser"}>
-                      <span className="americano-pair-name">
-                        <span>{match.teamAPlayer1}</span>
-                        <span>{match.teamAPlayer2}</span>
-                      </span>
-                    </p>
-                    <p className={match.scoreB > match.scoreA ? "winner" : "loser"}>
-                      <span className="americano-pair-name">
-                        <span>{match.teamBPlayer1}</span>
-                        <span>{match.teamBPlayer2}</span>
-                      </span>
-                    </p>
-                  </div>
-                  <strong>{match.scoreA}<small>:</small>{match.scoreB}</strong>
-                </article>
-              ))}
+              {shownMatches.map((match) => {
+                const focusOnTeamA = isFocusedPlayer(match.teamAPlayer1) || isFocusedPlayer(match.teamAPlayer2);
+                const focusOnTeamB = isFocusedPlayer(match.teamBPlayer1) || isFocusedPlayer(match.teamBPlayer2);
+                const matchHasFocus = focusOnTeamA || focusOnTeamB;
+
+                return (
+                  <article className={`match-row americano-match-row ${matchHasFocus ? "focused-match-row" : ""}`} key={match.matchId || `${match.round}-${match.court}`}>
+                    <span>Корт {match.court}</span>
+                    <div>
+                      <p className={`${match.scoreA > match.scoreB ? "winner" : "loser"} ${focusOnTeamA ? "focused-match-side" : ""}`}>
+                        <span className="americano-pair-name">
+                          <span className={isFocusedPlayer(match.teamAPlayer1) ? "focused-player-name" : ""}>{match.teamAPlayer1}</span>
+                          <span className={isFocusedPlayer(match.teamAPlayer2) ? "focused-player-name" : ""}>{match.teamAPlayer2}</span>
+                        </span>
+                      </p>
+                      <p className={`${match.scoreB > match.scoreA ? "winner" : "loser"} ${focusOnTeamB ? "focused-match-side" : ""}`}>
+                        <span className="americano-pair-name">
+                          <span className={isFocusedPlayer(match.teamBPlayer1) ? "focused-player-name" : ""}>{match.teamBPlayer1}</span>
+                          <span className={isFocusedPlayer(match.teamBPlayer2) ? "focused-player-name" : ""}>{match.teamBPlayer2}</span>
+                        </span>
+                      </p>
+                    </div>
+                    <strong className="match-score">
+                      <span className={focusOnTeamA ? "focused-score" : ""}>{match.scoreA}</span>
+                      <small>:</small>
+                      <span className={focusOnTeamB ? "focused-score" : ""}>{match.scoreB}</span>
+                    </strong>
+                  </article>
+                );
+              })}
             </div>
             <div className="round-standings americano-live-table">
               <div className="round-standings-title">
@@ -4446,7 +4508,12 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
                 <span>+/-</span>
               </div>
               {roundStandings.map((player, index) => (
-                <article className="americano-live-row" key={player.name}>
+                <button
+                  className={`americano-live-row selectable-player-row ${isFocusedPlayer(player.name) ? "focused-player-row" : ""}`}
+                  key={player.name}
+                  type="button"
+                  onClick={() => toggleFocusedPlayer(player.name)}
+                >
                   <b>{index + 1}</b>
                   <div>
                     <span className="team-badge player-rating small">{player.rating ? player.rating.toFixed(1) : "—"}</span>
@@ -4457,7 +4524,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
                   <em className={player.delta >= 0 ? "positive" : "negative"}>
                     {player.delta > 0 ? `+${player.delta}` : player.delta}
                   </em>
-                </article>
+                </button>
               ))}
             </div>
           </div>
@@ -4697,6 +4764,13 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
 
 function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
+  const [focusedPlayerName, setFocusedPlayerName] = useState("");
+  const focusKey = focusedPlayerName.trim().toLowerCase();
+  const isFocusedPlayer = (name) => focusKey && String(name ?? "").trim().toLowerCase() === focusKey;
+  const toggleFocusedPlayer = (name) => {
+    const nextName = String(name ?? "").trim();
+    setFocusedPlayerName((current) => (current === nextName ? "" : nextName));
+  };
 
   return (
     <main>
@@ -4738,7 +4812,11 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
           </div>
         </section>
 
-        <AmericanoStandingsTable pointMethod={pointMethod} />
+        <AmericanoStandingsTable
+          isFocusedPlayer={isFocusedPlayer}
+          onToggleFocusedPlayer={toggleFocusedPlayer}
+          pointMethod={pointMethod}
+        />
       </section>
 
       <section className="leaders-row americano-highlights">
@@ -4759,7 +4837,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
       </section>
 
       <section className="lower-grid americano-lower-grid">
-        <AmericanoRoundPanel />
+        <AmericanoRoundPanel isFocusedPlayer={isFocusedPlayer} onToggleFocusedPlayer={toggleFocusedPlayer} />
         <section className="surface stories-card" id="stories">
           <div className="section-title">
             <span>Главные сюжеты Americano</span>
@@ -4786,6 +4864,13 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
 
 function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
   const [descriptionOpen, setDescriptionOpen] = useState(true);
+  const [focusedPlayerName, setFocusedPlayerName] = useState("");
+  const focusKey = focusedPlayerName.trim().toLowerCase();
+  const isFocusedPlayer = (name) => focusKey && String(name ?? "").trim().toLowerCase() === focusKey;
+  const toggleFocusedPlayer = (name) => {
+    const nextName = String(name ?? "").trim();
+    setFocusedPlayerName((current) => (current === nextName ? "" : nextName));
+  };
 
   return (
     <main>
@@ -4827,7 +4912,11 @@ function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, po
           </div>
         </section>
 
-        <MexicanoStandingsTable pointMethod={pointMethod} />
+        <MexicanoStandingsTable
+          isFocusedPlayer={isFocusedPlayer}
+          onToggleFocusedPlayer={toggleFocusedPlayer}
+          pointMethod={pointMethod}
+        />
       </section>
 
       <section className="leaders-row americano-highlights">
@@ -4848,7 +4937,7 @@ function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, po
       </section>
 
       <section className="lower-grid americano-lower-grid">
-        <MexicanoRoundPanel />
+        <MexicanoRoundPanel isFocusedPlayer={isFocusedPlayer} onToggleFocusedPlayer={toggleFocusedPlayer} />
         <section className="surface stories-card" id="stories">
           <div className="section-title">
             <span>Важное турнира</span>
@@ -5834,6 +5923,7 @@ export function App() {
           auth={auth}
           onConfirmResultsImport={confirmTournamentResultsImport}
           onOpenHome={() => navigate({ name: "home" })}
+          onOpenImportedResult={(tournamentId) => navigate({ name: "detail", tournamentId }, { replace: true })}
           onOpenPlaceholder={openPlaceholder}
           onOpenPredictions={openPredictions}
           onOpenTournament={(tournamentId) => navigate({ name: "detail", tournamentId })}

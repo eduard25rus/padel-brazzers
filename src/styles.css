@@ -4602,6 +4602,47 @@ p {
   padding: 7px 6px;
 }
 
+.selectable-player-row {
+  appearance: none;
+  background: transparent;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
+  width: 100%;
+}
+
+.selectable-player-row:hover {
+  background: rgba(124, 31, 47, 0.06);
+}
+
+.selectable-player-row:focus-visible {
+  outline: 2px solid rgba(124, 31, 47, 0.58);
+  outline-offset: -2px;
+}
+
+.focused-player-row {
+  background: rgba(124, 31, 47, 0.1);
+  box-shadow: inset 3px 0 0 #7c1f2f;
+}
+
+.focused-player-row .team-badge,
+.focused-player-row .player-rating {
+  border-color: rgba(124, 31, 47, 0.45);
+  color: #7c1f2f;
+}
+
+.focused-player-row .standing-team strong,
+.focused-player-row div > strong {
+  color: #7c1f2f;
+}
+
 .americano-standing-row:last-child {
   border-bottom: 0;
 }
@@ -5435,6 +5476,41 @@ p {
   color: #a5ada5;
   font-size: 14px;
   margin: 0 3px;
+}
+
+.focused-match-row {
+  background: rgba(124, 31, 47, 0.05);
+  border-radius: 8px;
+  margin-inline: -6px;
+  padding-inline: 6px;
+}
+
+.match-row p.focused-match-side {
+  background: rgba(124, 31, 47, 0.08);
+  border: 1px solid rgba(124, 31, 47, 0.18);
+  border-radius: 8px;
+  color: #7c1f2f;
+  padding: 5px 7px;
+}
+
+.americano-pair-name .focused-player-name {
+  color: #7c1f2f;
+  font-weight: 950;
+}
+
+.match-score {
+  align-items: baseline;
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.match-score .focused-score {
+  background: #7c1f2f;
+  border-radius: 7px;
+  color: #fffefa;
+  min-width: 30px;
+  padding: 2px 6px;
+  text-align: center;
 }
 
 .round-standings {

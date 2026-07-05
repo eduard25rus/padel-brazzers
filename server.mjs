@@ -1896,6 +1896,7 @@ async function handleApi(request, response, url) {
     };
     writeStore(store);
     jsonResponse(response, 200, {
+      forecastLeaders: getForecastLeaderboard(store),
       result: sanitizeCompletedTournamentResult(previousResultIndex >= 0 ? store.completedTournamentResults[previousResultIndex] : built.result),
       results: store.completedTournamentResults.map(sanitizeCompletedTournamentResult),
       tournament: sanitizeTournament(store.forecastTournaments[tournamentIndex], store.forecastPredictions),
