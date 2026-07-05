@@ -519,9 +519,53 @@ function rowsToObjects(rows) {
 function normalizeImportPlayerName(value) {
   return String(value ?? "")
     .replace(/\s*\|\s*LOCKED IN\s*$/i, "")
+    .replace(/[._-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+function transliterateCyrillicToLatin(value) {
+  const map = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "y",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "kh",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "sch",
+    ъ: "",
+    ы: "y",
+    ь: "",
+    э: "e",
+    ю: "yu",
+    я: "ya",
+  };
+
+  return normalizeImportPlayerName(value)
+    .split("")
+    .map((char) => map[char] ?? char)
+    .join("");
 }
 
 function getPlayerNameKeys(value) {
@@ -530,12 +574,33 @@ function getPlayerNameKeys(value) {
     return [];
   }
 
-  const parts = normalized.split(" ").filter(Boolean);
-  const keys = new Set([normalized]);
-  if (parts.length === 2) {
-    keys.add(`${parts[1]} ${parts[0]}`);
+  const variants = new Set([
+    normalized,
+    transliterateCyrillicToLatin(normalized),
+  ]);
+
+  for (const variant of [...variants]) {
+    const parts = variant.split(" ").filter(Boolean);
+    if (parts.length === 2) {
+      variants.add(`${parts[1]} ${parts[0]}`);
+    }
+    if (parts.length > 1 && parts.length <= 4) {
+      variants.add([...parts].sort().join(" "));
+    }
   }
-  return [...keys];
+
+  return [...variants].filter(Boolean);
+}
+
+function getCanonicalPlayerNameKey(value) {
+  const transliterated = transliterateCyrillicToLatin(value);
+  const parts = transliterated.split(" ").filter(Boolean);
+  return parts.length > 1 ? parts.sort().join(" ") : transliterated;
+}
+
+function areSamePlayerName(left, right) {
+  const rightKeys = new Set(getPlayerNameKeys(right));
+  return getPlayerNameKeys(left).some((key) => rightKeys.has(key));
 }
 
 function addImportRecordPlayer(records, name, scoreFor, scoreAgainst) {
@@ -957,7 +1022,7 @@ function scoreForecastPrediction({ prediction, result, scoringMethod, tournament
     }
     actualByName.set(getPlayerKey(player), actual);
   }
-  const actualTop3 = finalRows.slice(0, 3).map((row) => normalizeImportPlayerName(row.playerName));
+  const actualTop3 = finalRows.slice(0, 3).map((row) => getCanonicalPlayerNameKey(row.playerName));
   const actualLast = finalRows.at(-1);
   const details = getPredictionDetails(prediction, tournament);
   const rows = details.effectivePlacements
@@ -996,13 +1061,13 @@ function scoreForecastPrediction({ prediction, result, scoringMethod, tournament
     })
     .sort((a, b) => a.predictedPlace - b.predictedPlace);
 
-  const predictedTop3 = rows.slice(0, 3).map((row) => normalizeImportPlayerName(row.playerName));
+  const predictedTop3 = rows.slice(0, 3).map((row) => getCanonicalPlayerNameKey(row.playerName));
   const top3Exact = actualTop3.length === 3 && actualTop3.every((name, index) => name === predictedTop3[index]);
   const top3AnyOrder = actualTop3.length === 3
     && actualTop3.every((name) => predictedTop3.includes(name))
     && !top3Exact;
   const predictedLast = rows.find((row) => row.predictedPlace === finalRows.length);
-  const lastExact = actualLast && predictedLast && normalizeImportPlayerName(predictedLast.playerName) === normalizeImportPlayerName(actualLast.playerName);
+  const lastExact = actualLast && predictedLast && areSamePlayerName(predictedLast.playerName, actualLast.playerName);
   const bonuses = [];
 
   if (top3Exact) {
