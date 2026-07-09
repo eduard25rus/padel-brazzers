@@ -758,6 +758,13 @@ function parseResultsWorkbook(fileBuffer) {
     warnings.push("На листе matches нет матчей.");
   }
 
+  warnings.push(...getIndividualAmericanoPartnerWarnings({
+    matches,
+    meta,
+    participants,
+    standings,
+  }));
+
   const roundsCount = new Set(matches.map((match) => Number(match.round)).filter(Boolean)).size;
   const winner = standings.find((row) => Number(row.place) === 1)?.player_name ?? standings[0]?.player_name ?? "";
 
@@ -821,8 +828,68 @@ function normalizeImportInsightRow(row = {}) {
   };
 }
 
+function getIndividualAmericanoPartnerWarnings({ matches = [], meta = {}, standings = [], participants = [] }) {
+  const format = String(meta.format ?? "").trim().toLowerCase();
+  const drawType = String(meta.draw_type ?? "").trim().toLowerCase();
+  if (format !== "americano" || drawType !== "individual") {
+    return [];
+  }
+
+  const expectedPartnerCount = (standings.length || participants.length) - 1;
+  if (expectedPartnerCount <= 0) {
+    return [];
+  }
+
+  const partnersByPlayer = new Map();
+  const addPartner = (player, partner, match) => {
+    const playerName = cleanImportPlayerName(player);
+    const partnerName = cleanImportPlayerName(partner);
+    if (!playerName || !partnerName) {
+      return;
+    }
+
+    const partners = partnersByPlayer.get(playerName) ?? new Map();
+    const rounds = partners.get(partnerName) ?? [];
+    rounds.push(`${match.round}.${match.court}`);
+    partners.set(partnerName, rounds);
+    partnersByPlayer.set(playerName, partners);
+  };
+
+  for (const match of matches) {
+    addPartner(match.team_a_player_1, match.team_a_player_2, match);
+    addPartner(match.team_a_player_2, match.team_a_player_1, match);
+    addPartner(match.team_b_player_1, match.team_b_player_2, match);
+    addPartner(match.team_b_player_2, match.team_b_player_1, match);
+  }
+
+  const warnings = [];
+  for (const [player, partners] of partnersByPlayer.entries()) {
+    const duplicatePartners = [...partners.entries()]
+      .filter(([, rounds]) => rounds.length > 1)
+      .map(([partner, rounds]) => `${partner} (${rounds.join(", ")})`);
+    if (duplicatePartners.length) {
+      warnings.push(`${player}: повтор партнера ${duplicatePartners.join("; ")}.`);
+    }
+
+    if (partners.size !== expectedPartnerCount) {
+      warnings.push(`${player}: ${partners.size} уникальных партнеров вместо ${expectedPartnerCount}.`);
+    }
+  }
+
+  return warnings;
+}
+
+function isCriticalImportWarning(warning) {
+  return /повтор партнера|уникальных партнеров вместо/i.test(String(warning ?? ""));
+}
+
 function buildCompletedResultFromImport({ fileName, preview, tournament }) {
   const meta = preview.meta ?? {};
+  const criticalWarnings = (preview.warnings ?? []).filter(isCriticalImportWarning);
+  if (criticalWarnings.length) {
+    return { error: `Исправь матчи перед импортом: ${criticalWarnings[0]}` };
+  }
+
   const standings = (preview.standings ?? []).map((row) => ({
     clubPoints: Number(row.club_points ?? 0),
     delta: Number(row.delta ?? 0),
@@ -2181,8 +2248,11 @@ if (process.argv[2] === "--validate-results-import") {
     }
 
     const preview = parseResultsWorkbook(readFileSync(filePath));
+    const criticalWarnings = preview.warnings.filter(isCriticalImportWarning);
+    const ok = criticalWarnings.length === 0;
     console.log(JSON.stringify({
-      ok: true,
+      ok,
+      criticalWarnings,
       sheets: ["meta", "participants", "matches", "standings", "insights", "validation"],
       summary: preview.summary,
       warnings: preview.warnings,
@@ -2199,7 +2269,7 @@ if (process.argv[2] === "--validate-results-import") {
         title: insight.title,
       })),
     }, null, 2));
-    process.exit(0);
+    process.exit(ok ? 0 : 1);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
