@@ -27,5 +27,6 @@ This workflow is mandatory before giving the user an Excel file. Do not skip the
    `/Users/eduard25rus/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node server.mjs --validate-results-import "/absolute/path/to/file.xlsx"`
 9. Do not deliver any `.xlsx` if validation says required sheets are missing, `format_version` is wrong, there are zero matches/standings, or the preview summary does not match the tournament (player count, match count, rounds, winner).
 10. Always include exactly four primary insights unless the user explicitly asks otherwise.
-11. Keep rating fields and club points separate: `rating_before`, `rating_after`, and `rating_change` must come from the Lunda ratings/rating deltas; `club_points` must come only from the configured leaderboard scale.
-12. Record uncertain OCR/video gaps in `meta.parser_note`, row `notes`, or `validation`; do not silently guess missing players or scores.
+11. On the `insights` sheet, use the documented columns exactly: `insight_order`, `insight_type`, `title`, `player_name`, `related_player_2`, `metric_label`, `metric_value`, `summary`, `evidence`, `source_ref`. The visible site subtitle under each insight title comes from `summary`; never put the only description in a non-format column like `body`.
+12. Keep rating fields and club points separate: `rating_before`, `rating_after`, and `rating_change` must come from the Lunda ratings/rating deltas; `club_points` must come only from the configured leaderboard scale.
+13. Record uncertain OCR/video gaps in `meta.parser_note`, row `notes`, or `validation`; do not silently guess missing players or scores.

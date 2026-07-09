@@ -746,7 +746,7 @@ function parseResultsWorkbook(fileBuffer) {
   const participants = rowsToObjects(sheets.participants);
   const matches = rowsToObjects(sheets.matches);
   const standings = enrichImportStandingsWithMatchRecords(rowsToObjects(sheets.standings), matches);
-  const insights = rowsToObjects(sheets.insights);
+  const insights = rowsToObjects(sheets.insights).map(normalizeImportInsightRow);
   const validation = rowsToObjects(sheets.validation);
   const warnings = [];
 
@@ -791,6 +791,36 @@ function toNumberOrBlank(value) {
   return Number.isFinite(number) && String(value).trim() !== "" ? number : "";
 }
 
+function firstNonBlank(...values) {
+  return values.find((value) => String(value ?? "").trim() !== "") ?? "";
+}
+
+function getImportInsightOrder(row) {
+  const explicitOrder = Number(row.insight_order);
+  if (Number.isInteger(explicitOrder)) {
+    return explicitOrder;
+  }
+
+  const idMatch = String(row.insight_id ?? "").match(/\d+/);
+  return idMatch ? Number(idMatch[0]) : NaN;
+}
+
+function normalizeImportInsightRow(row = {}) {
+  return {
+    ...row,
+    evidence: firstNonBlank(row.evidence, row.notes),
+    insight_order: getImportInsightOrder(row),
+    insight_type: firstNonBlank(row.insight_type, row.type, "custom"),
+    metric_label: firstNonBlank(row.metric_label, row.metricLabel),
+    metric_value: firstNonBlank(row.metric_value, row.metricValue, row.metric),
+    player_name: firstNonBlank(row.player_name, row.playerName),
+    related_player_2: firstNonBlank(row.related_player_2, row.relatedPlayer2),
+    source_ref: firstNonBlank(row.source_ref, row.sourceRef),
+    summary: firstNonBlank(row.summary, row.body, row.description),
+    title: firstNonBlank(row.title, row.name),
+  };
+}
+
 function buildCompletedResultFromImport({ fileName, preview, tournament }) {
   const meta = preview.meta ?? {};
   const standings = (preview.standings ?? []).map((row) => ({
@@ -826,7 +856,7 @@ function buildCompletedResultFromImport({ fileName, preview, tournament }) {
     teamBPlayer2: row.team_b_player_2 ?? "",
     winner: row.winner ?? "",
   })).filter((row) => Number.isInteger(row.round) && Number.isFinite(row.scoreA) && Number.isFinite(row.scoreB));
-  const insights = (preview.insights ?? []).map((row) => ({
+  const insights = (preview.insights ?? []).map(normalizeImportInsightRow).map((row) => ({
     evidence: row.evidence ?? "",
     insightOrder: Number(row.insight_order),
     insightType: row.insight_type ?? "custom",
@@ -2163,6 +2193,11 @@ if (process.argv[2] === "--validate-results-import") {
         standings: preview.standings.length,
         validation: preview.validation.length,
       },
+      insightsPreview: preview.insights.slice(0, 4).map((insight) => ({
+        order: insight.insight_order,
+        summary: insight.summary,
+        title: insight.title,
+      })),
     }, null, 2));
     process.exit(0);
   } catch (error) {
