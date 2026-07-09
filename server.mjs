@@ -376,6 +376,8 @@ function sanitizeCompletedTournamentResult(result) {
 
 function xmlDecode(value) {
   return String(value ?? "")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 10)))
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, "\"")
@@ -493,10 +495,15 @@ function getWorkbookSheets(entries) {
     throw new Error("В .xlsx нет workbook.xml.");
   }
 
+  const normalizeRelationshipTarget = (target) => {
+    const normalizedTarget = String(target ?? "").replace(/^\/+/, "");
+    return normalizedTarget.startsWith("xl/") ? normalizedTarget : `xl/${normalizedTarget}`;
+  };
+
   const rels = new Map([...relsXml.matchAll(/<Relationship\b([^>]*)\/>/g)].map((match) => {
     const id = getXmlAttribute(match[1], "Id");
     const target = getXmlAttribute(match[1], "Target");
-    return [id, target.startsWith("xl/") ? target : `xl/${target}`];
+    return [id, normalizeRelationshipTarget(target)];
   }));
 
   return [...workbookXml.matchAll(/<sheet\b([^>]*)\/>/g)].map((match) => ({
@@ -2134,6 +2141,34 @@ function serveStatic(request, response, url) {
   const extension = extname(filePath);
   response.writeHead(200, { "Content-Type": mimeTypes[extension] ?? "application/octet-stream" });
   createReadStream(filePath).pipe(response);
+}
+
+if (process.argv[2] === "--validate-results-import") {
+  try {
+    const filePath = process.argv[3];
+    if (!filePath) {
+      throw new Error("Укажи путь к .xlsx файлу для проверки.");
+    }
+
+    const preview = parseResultsWorkbook(readFileSync(filePath));
+    console.log(JSON.stringify({
+      ok: true,
+      sheets: ["meta", "participants", "matches", "standings", "insights", "validation"],
+      summary: preview.summary,
+      warnings: preview.warnings,
+      rows: {
+        insights: preview.insights.length,
+        matches: preview.matches.length,
+        participants: preview.participants.length,
+        standings: preview.standings.length,
+        validation: preview.validation.length,
+      },
+    }, null, 2));
+    process.exit(0);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }
 
 const server = createServer(async (request, response) => {
