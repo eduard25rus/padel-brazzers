@@ -457,21 +457,21 @@ function readZipEntries(buffer) {
 }
 
 function parseSharedStrings(xml = "") {
-  return [...xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map((match) => stripXmlTags(match[1]));
+  return [...xml.matchAll(/<(?:\w+:)?si\b[^>]*>([\s\S]*?)<\/(?:\w+:)?si>/g)].map((match) => stripXmlTags(match[1]));
 }
 
 function parseWorksheetRows(xml = "", sharedStrings = []) {
-  return [...xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)].map((rowMatch) => {
+  return [...xml.matchAll(/<(?:\w+:)?row\b[^>]*>([\s\S]*?)<\/(?:\w+:)?row>/g)].map((rowMatch) => {
     const values = [];
-    for (const cellMatch of rowMatch[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>|<c\b([^>]*)\/>/g)) {
+    for (const cellMatch of rowMatch[1].matchAll(/<(?:\w+:)?c\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?c>|<(?:\w+:)?c\b([^>]*)\/>/g)) {
       const attrs = cellMatch[1] ?? cellMatch[3] ?? "";
       const body = cellMatch[2] ?? "";
       const ref = getXmlAttribute(attrs, "r");
       const columnIndex = columnIndexFromCellRef(ref);
       const type = getXmlAttribute(attrs, "t");
       let value = "";
-      const inlineMatch = body.match(/<is\b[^>]*>([\s\S]*?)<\/is>/);
-      const valueMatch = body.match(/<v\b[^>]*>([\s\S]*?)<\/v>/);
+      const inlineMatch = body.match(/<(?:\w+:)?is\b[^>]*>([\s\S]*?)<\/(?:\w+:)?is>/);
+      const valueMatch = body.match(/<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/);
 
       if (type === "inlineStr" && inlineMatch) {
         value = stripXmlTags(inlineMatch[1]);
@@ -500,13 +500,13 @@ function getWorkbookSheets(entries) {
     return normalizedTarget.startsWith("xl/") ? normalizedTarget : `xl/${normalizedTarget}`;
   };
 
-  const rels = new Map([...relsXml.matchAll(/<Relationship\b([^>]*)\/>/g)].map((match) => {
+  const rels = new Map([...relsXml.matchAll(/<(?:\w+:)?Relationship\b([^>]*)\/>/g)].map((match) => {
     const id = getXmlAttribute(match[1], "Id");
     const target = getXmlAttribute(match[1], "Target");
     return [id, normalizeRelationshipTarget(target)];
   }));
 
-  return [...workbookXml.matchAll(/<sheet\b([^>]*)\/>/g)].map((match) => ({
+  return [...workbookXml.matchAll(/<(?:\w+:)?sheet\b([^>]*)\/>/g)].map((match) => ({
     name: getXmlAttribute(match[1], "name"),
     path: rels.get(getXmlAttribute(match[1], "r:id")),
   }));
@@ -841,6 +841,7 @@ function getIndividualAmericanoPartnerWarnings({ matches = [], meta = {}, standi
   }
 
   const partnersByPlayer = new Map();
+  const appearancesByPlayer = new Map();
   const addPartner = (player, partner, match) => {
     const playerName = cleanImportPlayerName(player);
     const partnerName = cleanImportPlayerName(partner);
@@ -848,6 +849,7 @@ function getIndividualAmericanoPartnerWarnings({ matches = [], meta = {}, standi
       return;
     }
 
+    appearancesByPlayer.set(playerName, (appearancesByPlayer.get(playerName) ?? 0) + 1);
     const partners = partnersByPlayer.get(playerName) ?? new Map();
     const rounds = partners.get(partnerName) ?? [];
     rounds.push(`${match.round}.${match.court}`);
@@ -860,6 +862,14 @@ function getIndividualAmericanoPartnerWarnings({ matches = [], meta = {}, standi
     addPartner(match.team_a_player_2, match.team_a_player_1, match);
     addPartner(match.team_b_player_1, match.team_b_player_2, match);
     addPartner(match.team_b_player_2, match.team_b_player_1, match);
+  }
+
+  const roundsCount = new Set(matches.map((match) => Number(match.round)).filter(Boolean)).size;
+  const hasFullPartnerRotation = roundsCount === expectedPartnerCount
+    && [...partnersByPlayer.keys()].length === expectedPartnerCount + 1
+    && [...appearancesByPlayer.values()].every((count) => count === expectedPartnerCount);
+  if (!hasFullPartnerRotation) {
+    return [];
   }
 
   const warnings = [];
