@@ -2668,7 +2668,7 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
     return Number.isFinite(dateMs) ? dateMs : Number.MAX_SAFE_INTEGER;
   };
   const sortedForecastTournaments = [...forecastTournaments].sort((a, b) => {
-    return getForecastSortTime(a) - getForecastSortTime(b);
+    return getForecastSortTime(b) - getForecastSortTime(a);
   });
   const upcomingForecastTournaments = sortedForecastTournaments.filter((tournament) => !tournament.completedResultId);
   const completedForecastTournaments = sortedForecastTournaments.filter((tournament) => tournament.completedResultId);
