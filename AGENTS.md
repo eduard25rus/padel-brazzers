@@ -4,7 +4,9 @@
 
 - The target production platform is Timeweb Cloud at `72.56.8.42`; Railway is
   retained only as a migration/rollback source and is not to be deleted without
-  explicit approval. Until DNS cutover, treat Railway as the live write source.
+  explicit approval. The `www.padelbrazzers.ru` DNS cutover to Timeweb was
+  initiated on 2026-07-21; treat Timeweb as the live write source and Railway as
+  rollback-only.
 - After every completed code change, run tests, commit only related changes,
   push `main`, and deploy the exact pushed SHA with `deploy/timeweb/deploy.sh`.
 - A normal code deployment must never replace

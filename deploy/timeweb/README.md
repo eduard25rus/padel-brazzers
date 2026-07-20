@@ -36,7 +36,9 @@ timer runs it daily. Every deployment also runs it first.
 ## Migration and DNS cutover
 
 The parallel test URL is `https://padel-brazzers-test.72-56-8-42.sslip.io`.
-Keep `www.padelbrazzers.ru` on Railway until the test copy is approved.
+The approved `www.padelbrazzers.ru` cutover was initiated on 2026-07-21 by
+replacing the Railway CNAME with `A www 72.56.8.42` in REG.RU. Timeweb is the
+live write source; Railway remains stopped and recoverable as rollback only.
 
 At cutover, prevent writes on Railway, take a final consistent export, verify
 SHA256 and collection counts, back up the Timeweb copy, replace only
