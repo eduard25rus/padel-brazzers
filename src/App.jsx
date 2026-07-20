@@ -4637,7 +4637,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
   );
 }
 
-function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament, onRenameCompletedTournament, pointMethod }) {
+function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecastTournaments, onOpenHome, onOpenLeaders, onOpenPlaceholder, onOpenPredictions, onOpenTournament, onRenameCompletedTournament, pointMethod }) {
   const daylightRef = useDaylightMotion();
   const tournaments = [
     ...completedTournamentResults.map(completedResultToRegistryItem),
@@ -4645,50 +4645,45 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
   ].sort((a, b) => String(b.dateOrder).localeCompare(String(a.dateOrder)));
   const plannedTournaments = forecastTournaments
     .filter((tournament) => !tournament.completedResultId)
-    .sort((a, b) => String(`${a.date ?? ""} ${a.time ?? ""}`).localeCompare(String(`${b.date ?? ""} ${b.time ?? ""}`)));
-  const openForecastTournaments = forecastTournaments
-    .filter((tournament) => !tournament.completedResultId)
     .filter((tournament) => {
-      const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
-      return !deadline || deadline > Date.now();
+      const startTime = String(tournament.time || "").match(/\d{1,2}:\d{2}/)?.[0] ?? "23:59";
+      const startAt = Date.parse(`${tournament.date}T${startTime}:00+10:00`);
+      return !Number.isFinite(startAt) || startAt >= Date.now();
     })
-    .sort((a, b) => (getVladivostokDeadlineMs(a.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER) - (getVladivostokDeadlineMs(b.predictionCloseAt) ?? Number.MAX_SAFE_INTEGER));
-  const nearestForecast = openForecastTournaments[0];
+    .sort((a, b) => String(`${a.date ?? ""} ${a.time ?? ""}`).localeCompare(String(`${b.date ?? ""} ${b.time ?? ""}`)));
   const proLeader = getTournamentLeaders(pointMethod, "all", "pro", completedTournamentResults)[0];
   const liteLeader = getTournamentLeaders(pointMethod, "all", "lite", completedTournamentResults)[0];
   const forecastLeader = getForecastLeadersForPeriod(forecastLeaders, "all")[0];
-  const heroTournament = plannedTournaments[0] ?? {
-    club: "Padel Pro Club",
-    date: "2026-07-18",
-    format: "Americano",
-    id: "americano-brazzers-pro",
-    players: "16 игроков",
-    title: "Americano Brazzers PRO",
-  };
-  const [heroLead, ...heroRest] = String(heroTournament.title || "Americano Brazzers PRO").split(/\s+/);
-  const nearestRows = [
-    ...[heroTournament].map((tournament) => ({
+  const heroTournament = plannedTournaments[0] ?? null;
+  const heroTitle = heroTournament?.title || "Новая игра скоро";
+  const [heroLead, ...heroRest] = heroTitle.split(/\s+/);
+  const nearestRows = plannedTournaments.slice(0, 3).map((tournament) => ({
       club: tournament.club,
       date: formatClubDate(tournament.date),
       id: tournament.id,
       meta: `${tournament.format} · ${tournament.players}`,
       title: tournament.title,
-    })),
-    ...tournaments.filter((tournament) => tournament.id !== heroTournament.id).slice(0, 3).map((tournament) => ({
-      club: tournament.club,
-      date: tournament.date,
-      id: tournament.id,
-      meta: `${tournament.format} · ${tournament.teams} · ${tournament.rounds}`,
-      title: tournament.title,
-    })),
+    }));
+  const homeLeaders = [
     {
-      club: "Падел-клуб «Небо»",
-      date: "11 июля",
-      id: "americano-brazzers-pro",
-      meta: "Americano · 12 игроков · 19 раундов",
-      title: "Sky Americano 12/2 exp.",
+      key: "pro",
+      label: "Лучший PRO",
+      meta: proLeader ? `${proLeader.points} очков · ${proLeader.tournaments} турн.` : "Результатов пока нет",
+      name: proLeader?.name ?? "Пока нет лидера",
     },
-  ].slice(0, 3);
+    {
+      key: "lite",
+      label: "Лучший LITE",
+      meta: liteLeader ? `${liteLeader.points} очков · ${liteLeader.tournaments} турн.` : "Результатов пока нет",
+      name: liteLeader?.name ?? "Пока нет лидера",
+    },
+    {
+      key: "forecast",
+      label: "Лучший прогнозист",
+      meta: forecastLeader ? `${forecastLeader.periodPoints} очков · ${forecastLeader.periodPredictions} прогн.` : "Прогнозов пока нет",
+      name: forecastLeader?.name ?? "Пока нет лидера",
+    },
+  ];
 
   return (
     <main ref={daylightRef} className="home-shell daylight-home daylight-route-enter">
@@ -4697,9 +4692,10 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
         auth={auth}
         label="Club"
         onOpenHome={onOpenHome}
+        onOpenLeaders={onOpenLeaders}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
-        scrollTitle={heroTournament.title}
+        scrollTitle={heroTournament?.title || "Padel Brazzers Club"}
         action={<AuthControls {...auth} />}
       />
 
@@ -4709,16 +4705,25 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
             <img src="/assets/daylight-hero-reference.png" alt="Игрок Padel Brazzers в фирменной форме на корте" />
           </div>
           <div className="home-hero-copy">
-            <span className="eyebrow">Следующая игра</span>
-            <h1 aria-label={heroTournament.title} data-scroll-title>
+            <span className="eyebrow">{heroTournament ? "Следующая игра" : "Клубный календарь"}</span>
+            <h1 aria-label={heroTitle} data-scroll-title>
               <span>{heroLead}</span>
               <em>{heroRest.join(" ")}</em>
             </h1>
-            <p className="daylight-hero-date"><strong>{formatClubDate(heroTournament.date)}</strong> · {heroTournament.club}</p>
-            <p className="daylight-hero-meta">{heroTournament.players || "16 игроков"} · 15 раундов</p>
+            {heroTournament ? (
+              <>
+                <p className="daylight-hero-date"><strong>{formatClubDate(heroTournament.date)}</strong> · {heroTournament.club}</p>
+                <p className="daylight-hero-meta">{heroTournament.players || "Состав уточняется"} · {heroTournament.format}</p>
+              </>
+            ) : (
+              <>
+                <p className="daylight-hero-date"><strong>Ближайших турниров нет</strong></p>
+                <p className="daylight-hero-meta">Следите за анонсами клуба и итогами игроков</p>
+              </>
+            )}
             <div className="home-actions">
-              <button type="button" onClick={() => onOpenTournament(heroTournament.id)}>Записаться</button>
-              <a href="#registry">Смотреть турнир</a>
+              <button className="primary" type="button" onClick={() => onOpenPredictions()}>Сделать прогноз</button>
+              <button className="secondary" type="button" onClick={onOpenLeaders}>Смотреть лидеров</button>
             </div>
           </div>
         </div>
@@ -4733,6 +4738,12 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
           </div>
 
           <div className="daylight-tournament-list">
+            {nearestRows.length === 0 && (
+              <div className="daylight-nearest-empty">
+                <strong>Ближайших турниров пока нет</strong>
+                <p>Как только появится новая дата, турнир автоматически будет показан в этом блоке.</p>
+              </div>
+            )}
             {nearestRows.map((tournament) => {
               const [dateDay, ...dateMonth] = String(tournament.date || "").split(/\s+/);
               return (
@@ -4750,25 +4761,24 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
         </section>
 
         <aside className="home-side daylight-side">
-          <section className="surface daylight-leader" id="leaders" data-daylight-reveal>
-            <span>Лидер недели</span>
+          <section className="surface daylight-leaders-panel" id="leaders" data-daylight-reveal>
+            <header>
+              <span>Лидеры клуба</span>
+              <button type="button" onClick={onOpenLeaders}>Все лидеры</button>
+            </header>
             <div>
-              <img src="/assets/leader-week-reference.png" alt="" />
-              <div>
-                <strong>{proLeader?.name ?? "Дмитрий Гудини"}</strong>
-                <p>{proLeader ? `${proLeader.points} очков · ${proLeader.tournaments} турнира` : "300 очков · 4 турнира"}</p>
-              </div>
+              {homeLeaders.map((leader, index) => (
+                <article key={leader.key}>
+                  <b>{String(index + 1).padStart(2, "0")}</b>
+                  <span>
+                    <small>{leader.label}</small>
+                    <strong>{leader.name}</strong>
+                    <em>{leader.meta}</em>
+                  </span>
+                </article>
+              ))}
             </div>
           </section>
-
-          <button className="surface daylight-prediction" id="community" type="button" onClick={() => onOpenPredictions(nearestForecast?.id)} data-daylight-reveal>
-            <img src="/assets/icon-chart-reference.png" alt="" />
-            <span>
-              <small>Прогнозы</small>
-              <strong>{nearestForecast ? "Соберите свой топ до старта" : "Соберите свой топ до старта"}</strong>
-            </span>
-            <img src="/assets/icon-arrow-reference.png" alt="" />
-          </button>
         </aside>
       </section>
 
@@ -6199,6 +6209,7 @@ export function App() {
         forecastLeaders={forecastLeaders}
         forecastTournaments={forecastTournaments}
         onOpenHome={() => navigate({ name: "home" })}
+        onOpenLeaders={() => navigate({ name: "leaders" })}
         onOpenPlaceholder={openPlaceholder}
         onOpenPredictions={openPredictions}
         onOpenTournament={(tournamentId) => {
