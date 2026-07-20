@@ -2637,6 +2637,64 @@ function MainNav({ active = "home", auth = null, onOpenHome, onOpenLeaders, onOp
   );
 }
 
+function useDaylightMotion() {
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const hero = root.querySelector("[data-scroll-hero]");
+    const revealItems = [...root.querySelectorAll("[data-daylight-reveal]")];
+    let frame = 0;
+
+    window.scrollTo(0, 0);
+
+    const updateScrollState = () => {
+      frame = 0;
+      document.body.classList.toggle("daylight-scrolled", window.scrollY > 72);
+
+      if (!hero || reducedMotion) return;
+      const bounds = hero.getBoundingClientRect();
+      const distance = Math.max(hero.offsetHeight - window.innerHeight, 1);
+      const progress = Math.min(1, Math.max(0, -bounds.top / distance));
+      hero.style.setProperty("--hero-progress", progress.toFixed(4));
+    };
+
+    const requestScrollUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateScrollState);
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-revealed");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { rootMargin: "0px 0px -10%", threshold: 0.08 },
+    );
+
+    revealItems.forEach((item) => observer.observe(item));
+    updateScrollState();
+    window.addEventListener("scroll", requestScrollUpdate, { passive: true });
+    window.addEventListener("resize", requestScrollUpdate);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("scroll", requestScrollUpdate);
+      window.removeEventListener("resize", requestScrollUpdate);
+      document.body.classList.remove("daylight-scrolled");
+    };
+  }, []);
+
+  return rootRef;
+}
+
 function LockedPredictionsScreen({ auth, onOpenHome, onOpenPlaceholder, onOpenPredictions }) {
   return (
     <main className="predictions-shell">
@@ -4343,6 +4401,7 @@ function ForecastTournamentDetail({
 }
 
 function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, result }) {
+  const daylightRef = useDaylightMotion();
   const [round, setRound] = useState(1);
   const [focusedPlayerName, setFocusedPlayerName] = useState("");
   const rounds = useMemo(() => [...new Set((result.matches ?? []).map((match) => Number(match.round)).filter(Boolean))].sort((a, b) => a - b), [result.matches]);
@@ -4365,7 +4424,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
   }, [result.id]);
 
   return (
-    <main>
+    <main ref={daylightRef} className="daylight-tournament daylight-route-enter">
       <MainNav
         active="tournaments"
         auth={auth}
@@ -4377,7 +4436,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
       />
 
       <section className="page-grid americano-page-grid" id="top">
-        <section className="surface hero-card americano-hero-card">
+        <section className="surface hero-card americano-hero-card daylight-result-hero" data-daylight-reveal>
           <img src={result.image || "/assets/trophy.png"} alt="" />
           <div className="hero-content americano-hero-content">
             <span className="eyebrow">{getTournamentLeagueLabel(result.league)} · {formatLabel}</span>
@@ -4399,7 +4458,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
           </div>
         </section>
 
-        <section className="surface standings-card americano-final-card imported-rating-table" id="standings">
+        <section className="surface standings-card americano-final-card imported-rating-table" id="standings" data-daylight-reveal>
           <div className="section-title">
             <span>Итоговая таблица</span>
             <h2>{result.standings?.length ?? 0} игроков после турнира</h2>
@@ -4438,7 +4497,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
         </section>
       </section>
 
-      <section className="lower-grid americano-lower-grid imported-lower-grid">
+      <section className="lower-grid americano-lower-grid imported-lower-grid" data-daylight-reveal>
         <section className="surface round-card americano-round-card imported-round-card" id="rounds">
           <div className="round-head">
             <div>
@@ -4530,7 +4589,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
           </div>
         </section>
 
-        <section className="surface stories-card imported-insights">
+        <section className="surface stories-card imported-insights" data-daylight-reveal>
           <div className="section-title">
             <span>Инсайты</span>
             <h2>Сюжеты турнира</h2>
@@ -4552,6 +4611,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
 }
 
 function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecastTournaments, onOpenHome, onOpenPlaceholder, onOpenPredictions, onOpenTournament, onRenameCompletedTournament, pointMethod }) {
+  const daylightRef = useDaylightMotion();
   const tournaments = [
     ...completedTournamentResults.map(completedResultToRegistryItem),
     ...tournamentRegistry,
@@ -4572,7 +4632,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
   const forecastLeader = getForecastLeadersForPeriod(forecastLeaders, "all")[0];
 
   return (
-    <main className="home-shell">
+    <main ref={daylightRef} className="home-shell daylight-home daylight-route-enter">
       <MainNav
         active="tournaments"
         auth={auth}
@@ -4583,31 +4643,42 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
         action={<AuthControls {...auth} />}
       />
 
-      <section className="home-hero surface" id="top">
-        <img src="/assets/hero-court.png" alt="Падел корт Padel Brazzers" />
-        <div className="home-hero-copy">
-          <span className="eyebrow">Vladivostok padel community</span>
-          <h1>Добро пожаловать в Padel Brazzers</h1>
-          <p>
-            Архив турниров, таблицы после каждого раунда, результаты всех кортов и
-            аналитика по главным матчам. Все турниры идут единым реестром: новые
-            даты сверху.
-          </p>
-          <div className="home-actions">
-            <a href="#registry">Смотреть турниры</a>
-            <button type="button" onClick={onOpenPredictions}>Сделать прогноз</button>
+      <section className="home-hero daylight-scroll-hero" data-scroll-hero id="top">
+        <div className="daylight-hero-sticky">
+          <div className="daylight-hero-grid" aria-hidden="true" />
+          <div className="daylight-hero-index" aria-hidden="true"><span>01</span> / CLUBHOUSE</div>
+          <div className="daylight-hero-media">
+            <img src="/assets/hero-court.png" alt="Матч на корте Padel Brazzers во Владивостоке" />
+            <span className="daylight-image-caption">Vladivostok · 43.1155° N</span>
           </div>
-        </div>
-        <div className="home-hero-stats" aria-label="Статистика сообщества">
-          <div><strong>{tournaments.length}</strong><span>боевых турниров в архиве</span></div>
-          <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.teams, 10) || 0), 0)}</strong><span>игроков в турнирах</span></div>
-          <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.matches, 10) || 0), 0)}</strong><span>матчей разобрано</span></div>
+          <div className="home-hero-copy">
+            <span className="eyebrow">Daylight clubhouse · Владивосток</span>
+            <h1 aria-label="Играй. Считай. Запоминай.">
+              <span>Играй.</span>
+              <span>Считай.</span>
+              <em>Запоминай.</em>
+            </h1>
+            <p>
+              Турниры, раунды, рейтинги и прогнозы — в одном клубном архиве,
+              который читается так же быстро, как табло на корте.
+            </p>
+            <div className="home-actions">
+              <a href="#registry">Смотреть турниры</a>
+              <button type="button" onClick={onOpenPredictions}>Сделать прогноз</button>
+            </div>
+          </div>
+          <div className="home-hero-stats" aria-label="Статистика сообщества">
+            <div><strong>{tournaments.length}</strong><span>турниров в архиве</span></div>
+            <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.teams, 10) || 0), 0)}</strong><span>игроков в турнирах</span></div>
+            <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.matches, 10) || 0), 0)}</strong><span>матчей разобрано</span></div>
+          </div>
+          <div className="daylight-scroll-cue" aria-hidden="true"><span /> Листайте</div>
         </div>
       </section>
 
-      <section className="home-layout" id="registry">
+      <section className="home-layout" id="registry" data-daylight-reveal>
         <div className="home-main-stack">
-          <section className="surface registry-card planned-registry-card">
+          <section className="surface registry-card planned-registry-card" data-daylight-reveal>
             <div className="registry-head">
               <div>
                 <span>Планируемые турниры</span>
@@ -4657,7 +4728,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
             </div>
           </section>
 
-          <section className="surface registry-card">
+          <section className="surface registry-card" data-daylight-reveal>
             <div className="registry-head">
               <div>
                 <span>Реестр турниров</span>
@@ -4704,7 +4775,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
         </div>
 
         <aside className="home-side">
-          <section className="surface side-panel" id="leaders">
+          <section className="surface side-panel" id="leaders" data-daylight-reveal>
             <div className="section-title">
               <span>Лидеры сообщества</span>
               <h2>Кто сейчас задает темп</h2>
@@ -4732,7 +4803,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
             />
           </section>
 
-          <section className="surface side-panel prediction-teaser-panel" id="community">
+          <section className="surface side-panel prediction-teaser-panel" id="community" data-daylight-reveal>
             <div className="section-title">
               <span>Прогнозы</span>
               <h2>{openForecastTournaments.length ? "Доступные турниры для прогнозов" : "Соберите свой топ до старта"}</h2>
@@ -4763,6 +4834,7 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
 }
 
 function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, pointMethod }) {
+  const daylightRef = useDaylightMotion();
   const [descriptionOpen, setDescriptionOpen] = useState(true);
   const [focusedPlayerName, setFocusedPlayerName] = useState("");
   const focusKey = focusedPlayerName.trim().toLowerCase();
@@ -4773,7 +4845,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
   };
 
   return (
-    <main>
+    <main ref={daylightRef} className="daylight-tournament daylight-route-enter">
       <MainNav
         active="tournaments"
         auth={auth}
@@ -4785,7 +4857,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
       />
 
       <section className="page-grid americano-page-grid" id="top">
-        <section className="surface hero-card americano-hero-card">
+        <section className="surface hero-card americano-hero-card daylight-result-hero" data-daylight-reveal>
           <img src="/assets/handshake.png" alt="Игроки после матча Americano" />
           <div className="hero-content americano-hero-content">
             <span className="eyebrow">PRO category · личный зачет</span>
@@ -4819,7 +4891,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
         />
       </section>
 
-      <section className="leaders-row americano-highlights">
+      <section className="leaders-row americano-highlights" data-daylight-reveal>
         <LeaderCard
           eyebrow="Победитель турнира"
           image="/assets/trophy.png"
@@ -4836,7 +4908,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
         />
       </section>
 
-      <section className="lower-grid americano-lower-grid">
+      <section className="lower-grid americano-lower-grid" data-daylight-reveal>
         <AmericanoRoundPanel isFocusedPlayer={isFocusedPlayer} onToggleFocusedPlayer={toggleFocusedPlayer} />
         <section className="surface stories-card" id="stories">
           <div className="section-title">
