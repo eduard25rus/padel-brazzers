@@ -4,6 +4,15 @@ set -euo pipefail
 server=${PB_TIMEWEB_SERVER:-root@72.56.8.42}
 identity_file=${PB_TIMEWEB_IDENTITY_FILE:-$HOME/.ssh/padel_brazzers_timeweb_deploy_ed25519}
 project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+bundled_node_dir=/Users/eduard25rus/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin
+
+if ! command -v node >/dev/null 2>&1 && [[ -x "$bundled_node_dir/node" ]]; then
+  export PATH="$bundled_node_dir:$PATH"
+fi
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js is required for tests and the production build" >&2
+  exit 1
+fi
 
 cd "$project_root"
 
