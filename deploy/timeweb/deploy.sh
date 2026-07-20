@@ -37,5 +37,5 @@ git archive --format=tar.gz --output="$archive_path" "$release_sha"
 
 ssh_options=(-i "$identity_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new)
 remote_archive="/srv/padel-brazzers/state/incoming/$release_sha.tar.gz"
-scp "${ssh_options[@]}" "$archive_path" "$server:$remote_archive"
+scp -O "${ssh_options[@]}" "$archive_path" "$server:$remote_archive"
 ssh "${ssh_options[@]}" "$server" "/srv/padel-brazzers/config/release.sh '$release_sha' '$remote_archive'"
