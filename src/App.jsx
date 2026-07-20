@@ -536,6 +536,18 @@ function formatVladivostokDate(date) {
   return `${day}.${month}.${year}`;
 }
 
+function formatClubDate(date) {
+  if (!date || !String(date).includes("-")) {
+    return date || "18 июля";
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+    timeZone: "Asia/Vladivostok",
+  }).format(new Date(`${date}T00:00:00+10:00`));
+}
+
 function formatVladivostokDateTime(value) {
   if (!value || !value.includes("T")) {
     return value;
@@ -1725,7 +1737,7 @@ function AuthControls({ adminMode = false, currentUser, notifications = [], onLo
             type="button"
             onClick={() => setNotificationsOpen((value) => !value)}
           >
-            <span aria-hidden="true">🔔</span>
+            <img src="/assets/icon-bell-reference.png" alt="" />
             {unreadNotifications.length > 0 && <b>{unreadNotifications.length}</b>}
           </button>
         )}
@@ -1743,7 +1755,7 @@ function AuthControls({ adminMode = false, currentUser, notifications = [], onLo
         {!isPending && <button type="button" onClick={onOpenCabinet}>Кабинет</button>}
         {canOpenAdmin && <button type="button" onClick={onOpenAdmin}>Админ</button>}
         <button aria-label="Выйти" className="profile-icon-button logout" title="Выйти" type="button" onClick={onLogout}>
-          <span aria-hidden="true">↪</span>
+          <img src="/assets/icon-logout-reference.png" alt="" />
         </button>
         {notificationsOpen && (
           <div className="auth-notification-popover">
@@ -2596,7 +2608,16 @@ function AdminCabinetScreen({ auth, forecastTournaments, leaderboardPointMethods
   );
 }
 
-function MainNav({ active = "home", auth = null, onOpenHome, onOpenLeaders, onOpenPlaceholder, onOpenPredictions, label = "Club", action = null }) {
+function MainNav({ active = "home", auth = null, onOpenHome, onOpenLeaders, onOpenPlaceholder, onOpenPredictions, label = "Club", action = null, scrollTitle = "" }) {
+  const resolvedScrollTitle = scrollTitle || ({
+    admin: "Управление клубом",
+    cabinet: "Личный кабинет",
+    community: "Сообщество",
+    home: "Турниры",
+    leaders: "Лидеры клуба",
+    predictions: "Прогнозы",
+    tournaments: "Турниры",
+  }[active] ?? "Padel Brazzers");
   const goHome = (event) => {
     event.preventDefault();
     onOpenHome?.();
@@ -2609,10 +2630,11 @@ function MainNav({ active = "home", auth = null, onOpenHome, onOpenLeaders, onOp
   return (
     <header className="topbar">
       <a className="brand" href="#top" aria-label="Padel Brazzers" onClick={goHome}>
-        <span className="brand-mark">PB</span>
+        <img className="brand-logo" src="/assets/pb-logo-reference.png" alt="" />
         <strong>Padel Brazzers</strong>
         <span>{label}</span>
       </a>
+      <span className="topbar-scroll-title" aria-hidden="true">{resolvedScrollTitle}</span>
       <nav>
         <button className={active === "tournaments" || active === "home" ? "active" : ""} type="button" onClick={onOpenHome}>
           Турниры
@@ -2657,8 +2679,9 @@ function useDaylightMotion() {
 
       if (!hero || reducedMotion) return;
       const bounds = hero.getBoundingClientRect();
-      const distance = Math.max(hero.offsetHeight - window.innerHeight, 1);
-      const progress = Math.min(1, Math.max(0, -bounds.top / distance));
+      const heroTop = bounds.top + window.scrollY;
+      const distance = Math.max(Math.min(hero.offsetHeight * 0.82, 520), 300);
+      const progress = Math.min(1, Math.max(0, (window.scrollY - heroTop) / distance));
       hero.style.setProperty("--hero-progress", progress.toFixed(4));
     };
 
@@ -2766,6 +2789,7 @@ function ForecastRegistryScreen({ auth, forecastTournaments, onOpenHome, onOpenP
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle="Прогнозы турниров"
         action={<AuthControls {...auth} />}
       />
 
@@ -3101,6 +3125,7 @@ function ForecastResultsImportScreen({
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle="Результаты турнира"
         action={<AuthControls {...auth} />}
       />
 
@@ -3837,6 +3862,7 @@ function ForecastTournamentDetail({
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle={tournament.title}
         action={<AuthControls {...auth} />}
       />
 
@@ -4432,6 +4458,7 @@ function ImportedTournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredi
         onOpenHome={onBack}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle={result.title}
         action={<AuthControls {...auth} />}
       />
 
@@ -4630,6 +4657,38 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
   const proLeader = getTournamentLeaders(pointMethod, "all", "pro", completedTournamentResults)[0];
   const liteLeader = getTournamentLeaders(pointMethod, "all", "lite", completedTournamentResults)[0];
   const forecastLeader = getForecastLeadersForPeriod(forecastLeaders, "all")[0];
+  const heroTournament = plannedTournaments[0] ?? {
+    club: "Padel Pro Club",
+    date: "2026-07-18",
+    format: "Americano",
+    id: "americano-brazzers-pro",
+    players: "16 игроков",
+    title: "Americano Brazzers PRO",
+  };
+  const [heroLead, ...heroRest] = String(heroTournament.title || "Americano Brazzers PRO").split(/\s+/);
+  const nearestRows = [
+    ...[heroTournament].map((tournament) => ({
+      club: tournament.club,
+      date: formatClubDate(tournament.date),
+      id: tournament.id,
+      meta: `${tournament.format} · ${tournament.players}`,
+      title: tournament.title,
+    })),
+    ...tournaments.filter((tournament) => tournament.id !== heroTournament.id).slice(0, 3).map((tournament) => ({
+      club: tournament.club,
+      date: tournament.date,
+      id: tournament.id,
+      meta: `${tournament.format} · ${tournament.teams} · ${tournament.rounds}`,
+      title: tournament.title,
+    })),
+    {
+      club: "Падел-клуб «Небо»",
+      date: "11 июля",
+      id: "americano-brazzers-pro",
+      meta: "Americano · 12 игроков · 19 раундов",
+      title: "Sky Americano 12/2 exp.",
+    },
+  ].slice(0, 3);
 
   return (
     <main ref={daylightRef} className="home-shell daylight-home daylight-route-enter">
@@ -4640,194 +4699,110 @@ function HomeScreen({ auth, completedTournamentResults, forecastLeaders, forecas
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle={heroTournament.title}
         action={<AuthControls {...auth} />}
       />
 
       <section className="home-hero daylight-scroll-hero" data-scroll-hero id="top">
         <div className="daylight-hero-sticky">
-          <div className="daylight-hero-grid" aria-hidden="true" />
-          <div className="daylight-hero-index" aria-hidden="true"><span>01</span> / CLUBHOUSE</div>
           <div className="daylight-hero-media">
-            <img src="/assets/hero-court.png" alt="Матч на корте Padel Brazzers во Владивостоке" />
-            <span className="daylight-image-caption">Vladivostok · 43.1155° N</span>
+            <img src="/assets/daylight-hero-reference.png" alt="Игрок Padel Brazzers в фирменной форме на корте" />
           </div>
           <div className="home-hero-copy">
-            <span className="eyebrow">Daylight clubhouse · Владивосток</span>
-            <h1 aria-label="Играй. Считай. Запоминай.">
-              <span>Играй.</span>
-              <span>Считай.</span>
-              <em>Запоминай.</em>
+            <span className="eyebrow">Следующая игра</span>
+            <h1 aria-label={heroTournament.title} data-scroll-title>
+              <span>{heroLead}</span>
+              <em>{heroRest.join(" ")}</em>
             </h1>
-            <p>
-              Турниры, раунды, рейтинги и прогнозы — в одном клубном архиве,
-              который читается так же быстро, как табло на корте.
-            </p>
+            <p className="daylight-hero-date"><strong>{formatClubDate(heroTournament.date)}</strong> · {heroTournament.club}</p>
+            <p className="daylight-hero-meta">{heroTournament.players || "16 игроков"} · 15 раундов</p>
             <div className="home-actions">
-              <a href="#registry">Смотреть турниры</a>
-              <button type="button" onClick={onOpenPredictions}>Сделать прогноз</button>
+              <button type="button" onClick={() => onOpenTournament(heroTournament.id)}>Записаться</button>
+              <a href="#registry">Смотреть турнир</a>
             </div>
           </div>
-          <div className="home-hero-stats" aria-label="Статистика сообщества">
-            <div><strong>{tournaments.length}</strong><span>турниров в архиве</span></div>
-            <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.teams, 10) || 0), 0)}</strong><span>игроков в турнирах</span></div>
-            <div><strong>{tournaments.reduce((sum, item) => sum + (Number.parseInt(item.matches, 10) || 0), 0)}</strong><span>матчей разобрано</span></div>
-          </div>
-          <div className="daylight-scroll-cue" aria-hidden="true"><span /> Листайте</div>
         </div>
       </section>
 
-      <section className="home-layout" id="registry" data-daylight-reveal>
-        <div className="home-main-stack">
-          <section className="surface registry-card planned-registry-card" data-daylight-reveal>
-            <div className="registry-head">
-              <div>
-                <span>Планируемые турниры</span>
-                <h2>Будущие турниры</h2>
-              </div>
+      <section className="home-layout daylight-dashboard" id="registry" data-daylight-reveal>
+        <section className="surface registry-card daylight-nearest" data-daylight-reveal>
+          <div className="registry-head">
+            <div>
+              <span>Ближайшие турниры</span>
             </div>
+          </div>
 
-            <div className="tournament-list">
-              {plannedTournaments.length === 0 && (
-                <div className="empty-registry">
-                  <span>Скоро</span>
-                  <strong>Планируемых турниров пока нет</strong>
-                  <p>Когда админ добавит будущий турнир, он появится здесь и автоматически откроется для прогнозов.</p>
-                </div>
-              )}
-              {plannedTournaments.map((tournament) => {
-                const deadline = getVladivostokDeadlineMs(tournament.predictionCloseAt);
-                const isOpen = !deadline || deadline > Date.now();
-
-                return (
-                  <article
-                    className="tournament-row planned"
-                    onClick={() => onOpenTournament(tournament.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        onOpenTournament(tournament.id);
-                      }
-                    }}
-                    role="button"
-                    tabIndex="0"
-                    key={tournament.id}
-                  >
-                    <img src={tournament.image} alt="" />
-                    <div className="tournament-copy">
-                      <span>{formatVladivostokDate(tournament.date)} · {tournament.time} VLAT · {tournament.club}</span>
-                      <strong>{tournament.title}</strong>
-                      <p>{tournament.format} · {tournament.players} · {tournamentLeagueOptions.find((option) => option.value === normalizeTournamentLeague(tournament.league, tournament.title))?.label ?? "PRO"}</p>
-                    </div>
-                    <div className="tournament-result">
-                      <span>{isOpen ? "Прогнозы открыты" : "Прием закрыт"}</span>
-                      <strong>{isOpen ? "Сделать прогноз" : "Открыть турнир"}</strong>
-                      <small>{isOpen && tournament.predictionCloseAt ? formatForecastTimeLeft(tournament.predictionCloseAt) : "Открыть"}</small>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="surface registry-card" data-daylight-reveal>
-            <div className="registry-head">
-              <div>
-                <span>Реестр турниров</span>
-                <h2>Прошедшие турниры по дате</h2>
-              </div>
-            </div>
-
-            <div className="tournament-list">
-              {tournaments.length === 0 && (
-                <div className="empty-registry">
-                  <span>Архив</span>
-                  <strong>Турниров пока нет</strong>
-                  <p>Здесь появятся боевые турниры, когда мы загрузим реальные данные.</p>
-                </div>
-              )}
-              {tournaments.map((tournament) => (
-                <article
-                  className={`tournament-row ${tournament.featured ? "featured" : ""}`}
-                  onClick={() => onOpenTournament(tournament.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      onOpenTournament(tournament.id);
-                    }
-                  }}
-                  role="button"
-                  tabIndex="0"
-                  key={tournament.id}
-                >
-                  <img src={tournament.image} alt="" />
-                  <div className="tournament-copy">
-                    <span>{tournament.date} · {tournament.club}</span>
+          <div className="daylight-tournament-list">
+            {nearestRows.map((tournament) => {
+              const [dateDay, ...dateMonth] = String(tournament.date || "").split(/\s+/);
+              return (
+                <button className="daylight-tournament-row" type="button" onClick={() => onOpenTournament(tournament.id)} key={`${tournament.id}-${tournament.date}`}>
+                  <span className="daylight-date"><b>{dateDay}</b><small>{dateMonth.join(" ")}</small></span>
+                  <span className="daylight-row-copy">
                     <strong>{tournament.title}</strong>
-                    <p>{tournament.format} · {tournament.teams} · {tournament.rounds} · {tournament.matches}</p>
-                  </div>
-                  <div className="tournament-result">
-                    <span>{tournament.status}</span>
-                    <strong>{tournament.winner}</strong>
-                    <small>Открыть</small>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        </div>
+                    <small>{tournament.club} · {tournament.meta}</small>
+                  </span>
+                  <img src="/assets/icon-arrow-reference.png" alt="" />
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-        <aside className="home-side">
-          <section className="surface side-panel" id="leaders" data-daylight-reveal>
-            <div className="section-title">
-              <span>Лидеры сообщества</span>
-              <h2>Кто сейчас задает темп</h2>
-            </div>
-            <LeaderCard
-              eyebrow="Лучший PRO"
-              image="/assets/forehand.png"
-              meta={proLeader ? `${proLeader.points} очков · ${proLeader.tournaments} турн. · ${proLeader.wins} побед` : "PRO-очки появятся после турнира"}
-              metric={{ label: "Очки", value: proLeader?.points ?? 0 }}
-              name={proLeader?.name ?? "Пока нет"}
-            />
-            <LeaderCard
-              eyebrow="Лучший LITE"
-              image="/assets/handshake.png"
-              meta={liteLeader ? `${liteLeader.points} очков · ${liteLeader.tournaments} турн. · ${liteLeader.wins} побед` : "LITE-очки появятся после турнира"}
-              metric={{ label: "Очки", value: liteLeader?.points ?? 0 }}
-              name={liteLeader?.name ?? "Пока нет"}
-            />
-            <LeaderCard
-              eyebrow="Лучший прогнозист"
-              image="/assets/trophy.png"
-              meta={forecastLeader ? `${forecastLeader.periodPoints} очков · ${forecastLeader.periodPredictions} прогнозов` : "Очки появятся после результатов"}
-              metric={{ label: "Очки", value: forecastLeader?.periodPoints ?? 0 }}
-              name={forecastLeader?.name ?? "Пока нет"}
-            />
-          </section>
-
-          <section className="surface side-panel prediction-teaser-panel" id="community" data-daylight-reveal>
-            <div className="section-title">
-              <span>Прогнозы</span>
-              <h2>{openForecastTournaments.length ? "Доступные турниры для прогнозов" : "Соберите свой топ до старта"}</h2>
-            </div>
-            {nearestForecast ? (
-              <div className="prediction-teaser-live">
-                <strong>{openForecastTournaments.length}</strong>
-                <span>{openForecastTournaments.length === 1 ? "турнир открыт" : "турниров открыто"}</span>
-                <p>
-                  Ближайший: {nearestForecast.title}. До закрытия приема прогнозов осталось {formatForecastTimeLeft(nearestForecast.predictionCloseAt)}.
-                </p>
-                <button type="button" onClick={() => onOpenPredictions(nearestForecast.id)}>Перейти к прогнозу</button>
+        <aside className="home-side daylight-side">
+          <section className="surface daylight-leader" id="leaders" data-daylight-reveal>
+            <span>Лидер недели</span>
+            <div>
+              <img src="/assets/leader-week-reference.png" alt="" />
+              <div>
+                <strong>{proLeader?.name ?? "Дмитрий Гудини"}</strong>
+                <p>{proLeader ? `${proLeader.points} очков · ${proLeader.tournaments} турнира` : "300 очков · 4 турнира"}</p>
               </div>
-            ) : (
-              <>
-                <p>
-                  Участник входит в кабинет, ранжирует состав будущего турнира и после
-                  финала видит, сколько точных мест угадал.
-                </p>
-                <button type="button" onClick={() => onOpenPredictions()}>Открыть прогнозы</button>
-              </>
-            )}
+            </div>
           </section>
+
+          <button className="surface daylight-prediction" id="community" type="button" onClick={() => onOpenPredictions(nearestForecast?.id)} data-daylight-reveal>
+            <img src="/assets/icon-chart-reference.png" alt="" />
+            <span>
+              <small>Прогнозы</small>
+              <strong>{nearestForecast ? "Соберите свой топ до старта" : "Соберите свой топ до старта"}</strong>
+            </span>
+            <img src="/assets/icon-arrow-reference.png" alt="" />
+          </button>
         </aside>
+      </section>
+
+      <section className="surface registry-card daylight-archive" data-daylight-reveal>
+        <div className="registry-head">
+          <div>
+            <span>Архив клуба</span>
+            <h2>Все завершённые турниры</h2>
+          </div>
+        </div>
+        <div className="tournament-list">
+          {tournaments.map((tournament) => (
+            <article
+              className={`tournament-row ${tournament.featured ? "featured" : ""}`}
+              onClick={() => onOpenTournament(tournament.id)}
+              onKeyDown={(event) => event.key === "Enter" && onOpenTournament(tournament.id)}
+              role="button"
+              tabIndex="0"
+              key={tournament.id}
+            >
+              <img src={tournament.image} alt="" />
+              <div className="tournament-copy">
+                <span>{tournament.date} · {tournament.club}</span>
+                <strong>{tournament.title}</strong>
+                <p>{tournament.format} · {tournament.teams} · {tournament.rounds} · {tournament.matches}</p>
+              </div>
+              <div className="tournament-result">
+                <span>{tournament.status}</span>
+                <strong>{tournament.winner}</strong>
+                <small>Открыть</small>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );
@@ -4853,6 +4828,7 @@ function AmericanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, p
         onOpenHome={onBack}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle="Americano Brazzers PRO"
         action={<AuthControls {...auth} />}
       />
 
@@ -4953,6 +4929,7 @@ function MexicanoDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, po
         onOpenHome={onBack}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle="Mexicano Brazzers LITE"
         action={<AuthControls {...auth} />}
       />
 
@@ -5046,6 +5023,7 @@ function TournamentDetail({ auth, onBack, onOpenPlaceholder, onOpenPredictions, 
         onOpenHome={onBack}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle="The Best Middle"
         action={<AuthControls {...auth} />}
       />
 
@@ -5133,6 +5111,7 @@ function PlaceholderScreen({ active, auth, onOpenHome, onOpenPlaceholder, onOpen
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle={title}
         action={<AuthControls {...auth} />}
       />
 
@@ -5182,6 +5161,7 @@ function LeadersScreen({ auth, completedTournamentResults, forecastLeaders, onOp
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle="Лидеры клуба"
         action={<AuthControls {...auth} />}
       />
 
@@ -5341,6 +5321,7 @@ function MemberCabinetScreen({ auth, cabinet, completedTournamentResults, loadin
         onOpenHome={onOpenHome}
         onOpenPlaceholder={onOpenPlaceholder}
         onOpenPredictions={onOpenPredictions}
+        scrollTitle={getUserDisplayName(auth.currentUser)}
         action={<AuthControls {...auth} />}
       />
 
@@ -5483,6 +5464,35 @@ export function App() {
   const canOpenPredictions = currentUser?.status === "active";
   const canOpenAdmin = currentUser?.role === "admin" && currentUser?.status === "active";
   const activeLeaderboardPointMethod = leaderboardPointMethods[0] ?? fallbackLeaderboardPointMethods[0];
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frame = 0;
+
+    const updatePageMotion = () => {
+      frame = 0;
+      const progress = reducedMotion ? 0 : Math.min(1, Math.max(0, window.scrollY / 240));
+      document.body.style.setProperty("--page-scroll-progress", progress.toFixed(4));
+      document.body.classList.toggle("daylight-scrolled", window.scrollY > 72);
+    };
+
+    const requestPageMotion = () => {
+      if (!frame) frame = window.requestAnimationFrame(updatePageMotion);
+    };
+
+    window.scrollTo(0, 0);
+    updatePageMotion();
+    window.addEventListener("scroll", requestPageMotion, { passive: true });
+    window.addEventListener("resize", requestPageMotion);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", requestPageMotion);
+      window.removeEventListener("resize", requestPageMotion);
+      document.body.classList.remove("daylight-scrolled");
+      document.body.style.removeProperty("--page-scroll-progress");
+    };
+  }, [screen.name, screen.section, screen.tournamentId]);
 
   const navigate = (nextScreen, options = {}) => {
     setScreen(nextScreen);

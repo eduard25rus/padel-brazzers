@@ -4,6 +4,17 @@ Run the local server yourself and open the preview in the in-app browser. Do not
 
 Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.
 
+## Selected Design Direction
+
+The user evolved the selected `Midnight Clubhouse` concept into a light `Daylight Clubhouse` direction on 2026-07-20. Use the light direction for the product UI while preserving the original club character.
+
+- Visual source of truth: `docs/design-references/padel-brazzers-homepage-daylight-clubhouse.png`
+- Internal design rules: `docs/design-system.md`
+- Core palette: warm off-white and paper surfaces, charcoal text, dusty powder pink, and warm gold. Do not reintroduce the old green theme.
+- Core character: premium padel clubhouse, fashion-led sports editorial, condensed display typography paired with highly readable body type, real action photography, restrained gold geometry, and compact data-rich surfaces.
+- Core motion: text-led scroll behavior in page headers: the large title shifts, separates and fades into a compact sticky-header title while the header compacts. The hero image keeps its original crop and dimensions and must never expand to fill the block. Keep section reveals restrained, provide complete `prefers-reduced-motion` fallbacks, and never scroll-jack.
+- For future implementation, preserve the selected mock's hierarchy, density, spacing, and component anatomy, translated onto accessible light surfaces. Apply the accessibility and responsive requirements from `docs/design-system.md` where the static image cannot express behavior.
+
 When implementing from a selected generated mock, treat that image as the source of truth for layout, component anatomy, density, spacing, color, typography, visible content, and hierarchy.
 
 ## Tournament Video Recognition

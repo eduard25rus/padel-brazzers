@@ -1,0 +1,341 @@
+/* Site-wide Daylight Clubhouse layer. Keep this import last. */
+:root {
+  --page-scroll-progress: 0;
+  --pb-paper: #fbf8f3;
+  --pb-surface: #fffdf9;
+  --pb-ink: #151416;
+  --pb-muted: #746f6c;
+  --pb-pink: #d38a9a;
+  --pb-pink-deep: #b65d72;
+  --pb-gold: #b88732;
+  --pb-border: rgba(35, 29, 28, 0.14);
+}
+
+body {
+  background: var(--pb-paper);
+}
+
+main:not(.daylight-home) {
+  max-width: 1487px;
+  padding: 0 42px 64px;
+}
+
+main > .topbar {
+  background: rgba(255, 254, 251, 0.98);
+  border: 0;
+  border-bottom: 1px solid var(--pb-border);
+  border-radius: 0;
+  box-shadow: none;
+  height: 84px;
+  margin: 0 -42px 16px;
+  padding: 0 42px;
+  position: sticky;
+  top: 0;
+  transform: none;
+  transition: height 280ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease;
+  width: calc(100% + 84px);
+  z-index: 40;
+}
+
+body.daylight-scrolled main > .topbar {
+  background: rgba(255, 254, 251, 0.985);
+  box-shadow: 0 12px 30px rgba(36, 28, 25, 0.08);
+  height: 68px;
+  padding-block: 0;
+  transform: none;
+}
+
+main > .topbar .brand-logo {
+  height: 48px;
+  width: 55px;
+}
+
+main > .topbar nav {
+  justify-content: center;
+}
+
+main > .topbar nav button {
+  color: var(--pb-ink);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+main > .topbar nav button.active::after {
+  background: var(--pb-pink);
+}
+
+.surface,
+.admin-menu-card,
+.forecast-result-board,
+.forecast-result-side,
+.forecast-selected-mobile {
+  background: rgba(255, 253, 249, 0.97);
+  border-color: var(--pb-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.eyebrow,
+.section-title span,
+.round-head span,
+.leader-copy span,
+.leader-metric span,
+.description-panel span,
+.story-row span,
+.admin-menu-card span,
+.admin-section-head span,
+.member-profile-card span,
+.member-forecast-card header span,
+.member-forecast-compare section > span,
+.leaders-summary-card > span,
+.leaders-board .section-title span {
+  color: var(--pb-pink-deep);
+  letter-spacing: 0.16em;
+}
+
+h1,
+.prediction-access-gate h1,
+.prediction-hero-copy h1,
+.leaders-hero h1,
+.admin-cabinet-hero h1,
+.member-cabinet-hero h1,
+.results-import-hero h1,
+.forecast-results-heading h1 {
+  color: var(--pb-ink);
+  font-family: "PB Display", "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+h2,
+.admin-menu-card strong,
+.leaders-summary-card strong,
+.member-profile-card strong {
+  color: var(--pb-ink);
+}
+
+p,
+.leaders-empty,
+.leaders-summary-card small,
+.leaders-table-row small,
+.member-cabinet-stats span,
+.member-tournament-summary span,
+.member-forecast-card header small {
+  color: var(--pb-muted);
+}
+
+.prediction-hero,
+.leaders-hero,
+.admin-cabinet-hero,
+.member-cabinet-hero,
+.placeholder-section,
+.results-import-hero {
+  border-top: 3px solid var(--pb-pink);
+}
+
+.prediction-hero-copy h1,
+.leaders-hero h1,
+.admin-cabinet-hero h1,
+.member-cabinet-hero h1,
+.placeholder-section h1,
+.results-import-hero h1,
+.prediction-access-gate h1,
+.daylight-result-hero h1,
+.hero-card h1 {
+  opacity: max(0, calc(1 - var(--page-scroll-progress) * 1.6));
+  transform: translate3d(calc(var(--page-scroll-progress) * -28px), 0, 0);
+  transition: letter-spacing 80ms linear;
+}
+
+.leaders-periods button,
+.leaders-league-switch button,
+.member-cabinet-tabs button,
+.back-link {
+  background: var(--pb-surface);
+  border-color: var(--pb-border);
+  color: var(--pb-pink-deep);
+}
+
+.leaders-periods button.active,
+.leaders-league-switch button.active,
+.member-cabinet-tabs button.active,
+.prediction-login-form button,
+.member-profile-card button,
+.admin-form-grid button,
+.admin-settings-form footer button,
+.results-import-form button,
+.results-preview-grid footer button {
+  background: var(--pb-ink);
+  border-color: var(--pb-ink);
+  color: #fffaf3;
+}
+
+.leaders-summary-card:first-child,
+.admin-menu-card:first-child {
+  border-top-color: var(--pb-gold);
+}
+
+.leaders-summary-card:nth-child(2) {
+  background: #dda0ad;
+  border-color: rgba(182, 93, 114, 0.32);
+}
+
+.leaders-summary-card b,
+.leaders-table-row > span:first-of-type,
+.member-cabinet-stats strong,
+.member-tournament-summary strong,
+.member-forecast-card header b,
+.forecast-result-placeholder b,
+.club-points,
+.positive {
+  color: var(--pb-pink-deep);
+}
+
+.admin-cabinet-stats div,
+.member-cabinet-stats div,
+.member-tournament-summary div,
+.account-summary,
+.member-forecast-card,
+.member-forecast-compare section {
+  background: rgba(211, 138, 154, 0.07);
+  border-color: rgba(182, 93, 114, 0.18);
+}
+
+.admin-cabinet-stats strong,
+.admin-menu-card span,
+.admin-section-head span {
+  color: var(--pb-pink-deep);
+}
+
+.admin-menu-card {
+  border-top: 3px solid var(--pb-pink);
+  min-height: 224px;
+}
+
+.admin-menu-card:hover {
+  border-color: var(--pb-pink);
+  box-shadow: 0 16px 32px rgba(47, 35, 31, 0.08);
+}
+
+.prediction-access-gate {
+  border-top: 3px solid var(--pb-pink);
+}
+
+.prediction-access-gate > div {
+  background: var(--pb-surface);
+}
+
+.prediction-access-gate button,
+.auth-actions button:last-child,
+.auth-form button[type="submit"] {
+  background: var(--pb-pink-deep);
+  color: #fffaf3;
+}
+
+.auth-modal-backdrop {
+  background: rgba(21, 20, 22, 0.56);
+}
+
+.auth-modal {
+  border-top: 4px solid var(--pb-pink);
+}
+
+.auth-note {
+  background: rgba(211, 138, 154, 0.12);
+  border-color: rgba(182, 93, 114, 0.2);
+  color: #6e3442;
+}
+
+.team-badge {
+  background: #f7e8eb;
+  border-color: rgba(182, 93, 114, 0.2);
+  color: var(--pb-pink-deep);
+}
+
+.standing-row.focus,
+.focused-player-row {
+  background: rgba(211, 138, 154, 0.11);
+  border-color: rgba(182, 93, 114, 0.24);
+}
+
+@media (max-width: 1020px) {
+  main:not(.daylight-home) {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  main > .topbar {
+    margin-left: -24px;
+    margin-right: -24px;
+    padding-left: 24px;
+    padding-right: 24px;
+    width: calc(100% + 48px);
+  }
+}
+
+@media (max-width: 820px) {
+  main:not(.daylight-home) {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  main > .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: 72px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    width: calc(100% + 32px);
+  }
+
+  main > .topbar nav {
+    display: none;
+  }
+
+  main > .topbar .brand-logo {
+    height: 42px;
+    width: 48px;
+  }
+
+  main > .topbar .brand strong {
+    font-size: 13px;
+  }
+
+  main > .topbar .topbar-scroll-title {
+    left: 72px;
+    max-width: 42vw;
+  }
+
+  .prediction-hero-copy h1,
+  .leaders-hero h1,
+  .admin-cabinet-hero h1,
+  .member-cabinet-hero h1,
+  .placeholder-section h1,
+  .results-import-hero h1,
+  .prediction-access-gate h1,
+  .daylight-result-hero h1,
+  .hero-card h1 {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main > .topbar,
+  .topbar-scroll-title,
+  .brand strong,
+  .prediction-hero-copy h1,
+  .leaders-hero h1,
+  .admin-cabinet-hero h1,
+  .member-cabinet-hero h1,
+  .placeholder-section h1,
+  .results-import-hero h1,
+  .prediction-access-gate h1,
+  .daylight-result-hero h1,
+  .hero-card h1 {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

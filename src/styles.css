@@ -7055,3 +7055,847 @@ p {
     min-width: 30px;
   }
 }
+
+/* Daylight Clubhouse — selected 2026-07-20 reference direction. */
+@font-face {
+  font-family: "PB Display";
+  src: local("DIN Condensed Bold"), local("DINCondensed-Bold");
+  font-display: swap;
+}
+
+:root {
+  --bg: #f7f3ee;
+  --surface: #fffdf9;
+  --surface-strong: #fffefa;
+  --line: rgba(35, 29, 28, 0.13);
+  --line-strong: rgba(181, 132, 54, 0.42);
+  --text: #171617;
+  --muted: #746f6c;
+  --green: #c47285;
+  --green-2: #a94e64;
+  --green-soft: #f0d7db;
+  --yellow: #b98732;
+  --loss: #b64655;
+  --shadow: 0 18px 50px rgba(47, 35, 31, 0.09);
+  --pb-paper: #fbf8f3;
+  --pb-pink: #d38a9a;
+  --pb-pink-deep: #b65d72;
+  --pb-gold: #b88732;
+  --pb-ink: #151416;
+}
+
+body {
+  background: #f7f3ee;
+  color: var(--pb-ink);
+  font-family: "Helvetica Neue", Avenir, Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.surface {
+  background: rgba(255, 253, 249, 0.96);
+  border-color: rgba(35, 29, 28, 0.13);
+  box-shadow: 0 14px 36px rgba(47, 35, 31, 0.055);
+}
+
+.brand-logo {
+  flex: 0 0 auto;
+  height: 48px;
+  object-fit: contain;
+  width: 55px;
+}
+
+.brand > span:last-child {
+  display: none;
+}
+
+.topbar-scroll-title {
+  color: var(--pb-pink-deep);
+  font-family: "PB Display", "Arial Narrow", Impact, sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  left: 112px;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  top: 50%;
+  transform: translate3d(0, 12px, 0);
+  transition: opacity 220ms ease, transform 320ms cubic-bezier(.2,.8,.2,1);
+  white-space: nowrap;
+}
+
+body.daylight-scrolled .topbar-scroll-title {
+  opacity: 1;
+  transform: translate3d(0, -50%, 0);
+}
+
+body.daylight-scrolled .brand strong {
+  opacity: 0;
+  transform: translate3d(-8px, -8px, 0);
+}
+
+.daylight-home {
+  background: var(--pb-paper);
+  max-width: none;
+  overflow: clip;
+  padding: 0 0 64px;
+}
+
+.daylight-home .topbar {
+  background: rgba(255, 254, 251, 0.97);
+  border-bottom: 1px solid rgba(35, 29, 28, 0.14);
+  gap: 28px;
+  height: 84px;
+  margin: 0;
+  padding: 0 clamp(24px, 3vw, 44px);
+  position: sticky;
+  top: 0;
+  transition: height 260ms cubic-bezier(.2,.8,.2,1), box-shadow 260ms ease;
+  z-index: 80;
+}
+
+body.daylight-scrolled .daylight-home .topbar {
+  box-shadow: 0 12px 30px rgba(36, 28, 25, 0.08);
+  height: 68px;
+}
+
+.daylight-home .brand {
+  gap: 16px;
+  min-width: 270px;
+  position: relative;
+}
+
+.daylight-home .brand strong {
+  color: var(--pb-ink);
+  font-size: 16px;
+  letter-spacing: 0.22em;
+  transition: opacity 180ms ease, transform 280ms cubic-bezier(.2,.8,.2,1);
+}
+
+.daylight-home .topbar nav {
+  gap: clamp(26px, 3vw, 54px);
+}
+
+.daylight-home .topbar nav button {
+  color: var(--pb-ink);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 28px 0 20px;
+  transition: color 160ms ease;
+}
+
+.daylight-home .topbar nav button:hover,
+.daylight-home .topbar nav button:focus-visible {
+  color: var(--pb-pink-deep);
+}
+
+.daylight-home .topbar nav button.active::after {
+  background: var(--pb-pink);
+  border-radius: 0;
+  height: 2px;
+}
+
+.daylight-home .auth-user-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  gap: 9px;
+  padding: 0;
+}
+
+.daylight-home .auth-user-card > span {
+  background: var(--pb-ink);
+  border: 0;
+  color: #fff;
+  height: 42px;
+  width: 42px;
+}
+
+.daylight-home .auth-user-card > div strong {
+  color: var(--pb-ink);
+  font-size: 14px;
+}
+
+.daylight-home .auth-user-card > div small {
+  color: var(--pb-pink-deep);
+}
+
+.daylight-home .auth-user-card > button {
+  background: #fffefa;
+  border: 1px solid rgba(35, 29, 28, 0.18);
+  border-radius: 9px;
+  color: var(--pb-ink);
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.daylight-home .auth-user-card > button:hover {
+  border-color: var(--pb-gold);
+  color: var(--pb-ink);
+  transform: none;
+}
+
+.daylight-home .auth-user-card .profile-icon-button {
+  height: 44px;
+  padding: 0;
+  width: 44px;
+}
+
+.daylight-home .profile-icon-button img {
+  border-radius: 8px;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.daylight-home .admin-mode-toggle > span {
+  background: var(--pb-pink);
+}
+
+.daylight-scroll-hero {
+  --hero-progress: 0;
+  background: var(--pb-paper);
+  border-bottom: 1px solid rgba(35, 29, 28, 0.13);
+  height: clamp(520px, 38vw, 570px);
+  margin: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.daylight-hero-sticky {
+  display: grid;
+  grid-template-columns: minmax(500px, 42%) minmax(0, 58%);
+  height: 100%;
+  inset: auto;
+  position: relative;
+}
+
+.daylight-hero-media {
+  grid-column: 2;
+  grid-row: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.daylight-hero-media img {
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: none;
+  width: 100%;
+}
+
+.daylight-home .home-hero-copy {
+  align-self: center;
+  display: block;
+  grid-column: 1;
+  grid-row: 1;
+  max-width: none;
+  padding: 38px clamp(38px, 5.9vw, 90px);
+  position: relative;
+  text-align: left;
+  z-index: 2;
+}
+
+.daylight-home .home-hero-copy::after {
+  color: rgba(184, 135, 50, 0.07);
+  content: "PB";
+  font-family: "PB Display", "Arial Narrow", Impact, sans-serif;
+  font-size: clamp(180px, 22vw, 350px);
+  font-weight: 800;
+  line-height: 0.75;
+  pointer-events: none;
+  position: absolute;
+  right: -6vw;
+  top: 46%;
+  transform: translateY(-50%);
+  z-index: -1;
+}
+
+.daylight-home .home-hero-copy .eyebrow {
+  color: var(--pb-pink-deep);
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+.daylight-home .home-hero-copy h1 {
+  color: var(--pb-ink);
+  font-family: "PB Display", "Arial Narrow", Impact, sans-serif;
+  font-size: clamp(76px, 7.2vw, 112px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 0.86;
+  margin: 0 0 24px;
+  max-width: 650px;
+  text-transform: uppercase;
+}
+
+.daylight-home .home-hero-copy h1 span,
+.daylight-home .home-hero-copy h1 em {
+  display: block;
+  font-style: normal;
+  transform-origin: left center;
+  will-change: transform, letter-spacing;
+}
+
+.daylight-home .home-hero-copy h1 span {
+  transform: translate3d(calc(var(--hero-progress) * -58px), 0, 0);
+}
+
+.daylight-home .home-hero-copy h1 em {
+  transform: translate3d(calc(var(--hero-progress) * 44px), 0, 0);
+}
+
+.daylight-home .home-hero-copy h1 span,
+.daylight-home .home-hero-copy h1 em {
+  letter-spacing: calc(-0.025em + var(--hero-progress) * 0.055em);
+}
+
+.daylight-hero-date,
+.daylight-hero-meta {
+  margin: 0;
+}
+
+.daylight-home .home-hero-copy .daylight-hero-date {
+  color: var(--pb-ink);
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.daylight-hero-date strong {
+  color: var(--pb-gold);
+  font-weight: 800;
+}
+
+.daylight-home .home-hero-copy .daylight-hero-meta {
+  color: var(--muted);
+  font-size: 15px;
+  margin-top: 10px;
+}
+
+.daylight-home .home-actions {
+  display: flex;
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.daylight-home .home-actions a,
+.daylight-home .home-actions button {
+  align-items: center;
+  border-radius: 7px;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 800;
+  height: 52px;
+  justify-content: center;
+  letter-spacing: 0.05em;
+  min-width: 220px;
+  padding: 0 52px 0 24px;
+  position: relative;
+  text-transform: uppercase;
+}
+
+.daylight-home .home-actions button {
+  background: var(--pb-ink);
+  color: #f4c76e;
+}
+
+.daylight-home .home-actions a {
+  background: transparent;
+  border: 1px solid var(--pb-gold);
+  color: var(--pb-gold);
+}
+
+.daylight-home .home-actions a::after,
+.daylight-home .home-actions button::after {
+  background: url("/assets/icon-arrow-reference.png") center / contain no-repeat;
+  content: "";
+  filter: sepia(1) saturate(2.4) hue-rotate(354deg) brightness(0.8);
+  height: 24px;
+  position: absolute;
+  right: 18px;
+  width: 24px;
+}
+
+.daylight-home .home-actions button::after {
+  filter: sepia(1) saturate(2.2) brightness(1.15);
+}
+
+.daylight-home .home-actions a:hover,
+.daylight-home .home-actions button:hover {
+  transform: translateY(-2px);
+}
+
+.daylight-dashboard {
+  align-items: stretch;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.37fr) minmax(360px, 0.96fr);
+  margin: 0;
+  padding: 22px clamp(24px, 3vw, 42px) 26px;
+}
+
+.daylight-dashboard .surface {
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.daylight-nearest {
+  padding: 22px 46px 18px;
+}
+
+.daylight-nearest .registry-head {
+  border-bottom: 1px solid rgba(196, 114, 133, 0.38);
+  margin-bottom: 0;
+  padding-bottom: 12px;
+}
+
+.daylight-nearest .registry-head span,
+.daylight-leader > span {
+  color: var(--pb-pink-deep);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.daylight-tournament-list {
+  display: grid;
+}
+
+.daylight-tournament-row {
+  align-items: center;
+  background: transparent;
+  border-bottom: 1px solid rgba(184, 135, 50, 0.28);
+  color: var(--pb-ink);
+  cursor: pointer;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 88px minmax(0, 1fr) 40px;
+  min-height: 102px;
+  padding: 12px 0;
+  text-align: left;
+  transition: padding 180ms ease, background 180ms ease;
+}
+
+.daylight-tournament-row:last-child {
+  border-bottom: 0;
+}
+
+.daylight-tournament-row:hover,
+.daylight-tournament-row:focus-visible {
+  background: rgba(211, 138, 154, 0.075);
+  outline: none;
+  padding-left: 10px;
+  padding-right: 8px;
+}
+
+.daylight-date {
+  border-right: 1px solid rgba(184, 135, 50, 0.38);
+  display: grid;
+  gap: 0;
+  justify-items: start;
+  min-height: 60px;
+}
+
+.daylight-date b {
+  color: var(--pb-pink-deep);
+  font-size: 39px;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+}
+
+.daylight-date small {
+  color: var(--pb-ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.daylight-row-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.daylight-row-copy strong {
+  font-size: clamp(19px, 1.6vw, 26px);
+  line-height: 1.05;
+}
+
+.daylight-row-copy small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.daylight-tournament-row > img {
+  height: 40px;
+  object-fit: cover;
+  width: 40px;
+}
+
+.daylight-side {
+  display: grid;
+  gap: 18px;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.daylight-leader {
+  background: #dd9aa8;
+  border-color: rgba(182, 93, 114, 0.34);
+  min-height: 226px;
+  overflow: hidden;
+  padding: 24px 30px;
+  position: relative;
+}
+
+.daylight-leader::after {
+  color: rgba(255, 255, 255, 0.18);
+  content: "PB";
+  font-family: "PB Display", "Arial Narrow", Impact, sans-serif;
+  font-size: 130px;
+  line-height: 1;
+  position: absolute;
+  right: 30px;
+  top: 50%;
+  transform: translateY(-42%);
+}
+
+.daylight-leader > span {
+  color: #fffaf5;
+}
+
+.daylight-leader > div {
+  align-items: center;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: 118px minmax(0, 1fr);
+  margin-top: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.daylight-leader > div > img {
+  border: 2px solid var(--pb-gold);
+  border-radius: 50%;
+  height: 112px;
+  object-fit: cover;
+  width: 112px;
+}
+
+.daylight-leader strong {
+  display: block;
+  font-family: "PB Display", "Arial Narrow", Impact, sans-serif;
+  font-size: clamp(36px, 3.1vw, 53px);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 0.92;
+  max-width: 270px;
+  text-transform: uppercase;
+}
+
+.daylight-leader p {
+  font-size: 15px;
+  margin: 14px 0 0;
+}
+
+.daylight-prediction {
+  align-items: center;
+  background: #fffefa;
+  cursor: pointer;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 60px minmax(0, 1fr) 40px;
+  min-height: 112px;
+  padding: 20px 28px;
+  text-align: left;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.daylight-prediction:hover,
+.daylight-prediction:focus-visible {
+  border-color: var(--pb-gold);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.daylight-prediction > img:first-child {
+  border-radius: 50%;
+  height: 60px;
+  width: 60px;
+}
+
+.daylight-prediction > img:last-child {
+  height: 40px;
+  width: 40px;
+}
+
+.daylight-prediction span {
+  display: grid;
+  gap: 7px;
+}
+
+.daylight-prediction small {
+  color: var(--pb-pink-deep);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.daylight-prediction strong {
+  color: var(--pb-ink);
+  font-size: clamp(17px, 1.5vw, 23px);
+}
+
+.daylight-archive {
+  margin: 30px clamp(24px, 3vw, 42px) 0;
+}
+
+.daylight-archive .registry-head span,
+.daylight-archive .tournament-copy > span,
+.daylight-archive .tournament-result > span {
+  color: var(--pb-pink-deep);
+}
+
+.daylight-archive .registry-head h2 {
+  color: var(--pb-ink);
+}
+
+.daylight-archive .tournament-row:hover,
+.daylight-archive .tournament-row:focus-visible {
+  background: rgba(211, 138, 154, 0.07);
+}
+
+[data-daylight-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition: opacity 520ms ease, transform 620ms cubic-bezier(.2,.8,.2,1);
+}
+
+[data-daylight-reveal].is-revealed {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+@media (max-width: 1180px) {
+  .daylight-home .topbar {
+    gap: 18px;
+  }
+
+  .daylight-home .brand {
+    min-width: 220px;
+  }
+
+  .daylight-home .brand strong {
+    font-size: 14px;
+    letter-spacing: 0.14em;
+  }
+
+  .daylight-home .topbar nav {
+    gap: 24px;
+  }
+
+  .daylight-home .auth-user-card > div,
+  .daylight-home .admin-mode-toggle {
+    display: none;
+  }
+
+  .daylight-hero-sticky {
+    grid-template-columns: minmax(430px, 44%) minmax(0, 56%);
+  }
+
+  .daylight-home .home-hero-copy {
+    padding-left: 42px;
+    padding-right: 30px;
+  }
+
+  .daylight-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .daylight-side {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+  }
+}
+
+@media (max-width: 820px) {
+  .daylight-home .topbar {
+    grid-template-columns: 1fr auto;
+    height: 72px;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .daylight-home .topbar nav {
+    display: none;
+  }
+
+  .daylight-home .brand {
+    min-width: 0;
+  }
+
+  .daylight-home .brand-logo {
+    height: 42px;
+    width: 48px;
+  }
+
+  .daylight-home .brand strong {
+    font-size: 13px;
+  }
+
+  .topbar-scroll-title {
+    left: 76px;
+    max-width: 44vw;
+  }
+
+  .daylight-home .auth-user-card > button:not(.profile-icon-button) {
+    display: none;
+  }
+
+  .daylight-scroll-hero {
+    height: auto;
+  }
+
+  .daylight-hero-sticky {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .daylight-hero-media {
+    grid-column: 1;
+    grid-row: 2;
+    height: min(62vw, 420px);
+  }
+
+  .daylight-home .home-hero-copy {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 42px 24px 36px;
+  }
+
+  .daylight-home .home-hero-copy h1 {
+    font-size: clamp(62px, 18vw, 92px);
+  }
+
+  .daylight-home .home-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .daylight-home .home-actions a,
+  .daylight-home .home-actions button {
+    min-width: 0;
+    padding-left: 14px;
+    padding-right: 42px;
+  }
+
+  .daylight-dashboard {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .daylight-nearest {
+    padding: 20px;
+  }
+
+  .daylight-tournament-row {
+    gap: 14px;
+    grid-template-columns: 64px minmax(0, 1fr) 34px;
+  }
+
+  .daylight-row-copy small {
+    line-height: 1.35;
+  }
+
+  .daylight-side {
+    grid-template-columns: 1fr;
+  }
+
+  .daylight-archive {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .daylight-home .brand strong {
+    letter-spacing: 0.08em;
+  }
+
+  .daylight-home .auth-user-card .profile-icon-button:not(.logout) {
+    display: none;
+  }
+
+  .daylight-home .home-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .daylight-tournament-row {
+    grid-template-columns: 52px minmax(0, 1fr) 30px;
+    min-height: 92px;
+  }
+
+  .daylight-date b {
+    font-size: 31px;
+  }
+
+  .daylight-row-copy strong {
+    font-size: 18px;
+  }
+
+  .daylight-row-copy small {
+    font-size: 11px;
+  }
+
+  .daylight-leader {
+    min-height: 210px;
+    padding: 22px;
+  }
+
+  .daylight-leader > div {
+    gap: 16px;
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .daylight-leader > div > img {
+    height: 84px;
+    width: 84px;
+  }
+
+  .daylight-leader strong {
+    font-size: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .daylight-home *,
+  .daylight-home *::before,
+  .daylight-home *::after,
+  [data-daylight-reveal] {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  [data-daylight-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+
+  .daylight-home .home-hero-copy h1 span,
+  .daylight-home .home-hero-copy h1 em {
+    letter-spacing: -0.025em;
+    transform: none;
+  }
+}
