@@ -1,5 +1,19 @@
 # Prototype Instructions
 
+## Production deployment
+
+- The target production platform is Timeweb Cloud at `72.56.8.42`; Railway is
+  retained only as a migration/rollback source and is not to be deleted without
+  explicit approval. Until DNS cutover, treat Railway as the live write source.
+- After every completed code change, run tests, commit only related changes,
+  push `main`, and deploy the exact pushed SHA with `deploy/timeweb/deploy.sh`.
+- A normal code deployment must never replace
+  `/srv/padel-brazzers/data/auth-store.json`.
+- Preserve unrelated changes in a dirty worktree and never include them in a
+  deployment commit.
+- Follow `deploy/timeweb/README.md` for backup, rollback, final data sync, and
+  DNS cutover procedures.
+
 Run the local server yourself and open the preview in the in-app browser. Do not give the user server-start instructions when you can run it.
 
 Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.

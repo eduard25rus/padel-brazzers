@@ -1,0 +1,6 @@
+[Unit]
+Description=Back up Padel Brazzers production store
+
+[Service]
+Type=oneshot
+ExecStart=/srv/padel-brazzers/config/backup.sh

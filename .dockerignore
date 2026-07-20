@@ -1,0 +1,12 @@
+.git
+.railway
+.env
+.env.*
+data
+dist
+node_modules
+outputs
+qa
+*.xlsx
+*.db
+*.sqlite*

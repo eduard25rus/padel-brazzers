@@ -6,6 +6,7 @@ data
 .env
 .env.*
 !.env.example
+.railway/
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*

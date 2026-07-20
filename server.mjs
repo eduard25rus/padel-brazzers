@@ -1,5 +1,5 @@
 import { createHash, pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ const port = Number(process.env.PORT ?? 4173);
 const resendApiKey = process.env.RESEND_API_KEY ?? "";
 const mailFrom = process.env.MAIL_FROM ?? "";
 const publicSiteUrl = String(process.env.PUBLIC_SITE_URL ?? "").replace(/\/+$/, "");
+const requireExistingStore = process.env.REQUIRE_EXISTING_STORE === "true";
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -98,6 +99,9 @@ function cleanTournamentTitle(value) {
 function ensureStore() {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(storePath)) {
+    if (requireExistingStore) {
+      throw new Error(`Required production store is missing: ${storePath}`);
+    }
     writeFileSync(storePath, JSON.stringify({ completedTournamentResults: [], forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] }, null, 2));
   }
 }
@@ -125,14 +129,30 @@ function readStore() {
       settings: sanitizeSettings(parsed.settings),
       users: Array.isArray(parsed.users) ? parsed.users : [],
     };
-  } catch {
+  } catch (error) {
+    if (requireExistingStore) {
+      throw new Error(`Required production store is unreadable: ${storePath}`, { cause: error });
+    }
     return { completedTournamentResults: [], forecastPredictions: [], forecastTournaments: [], leaderboardPointMethods: [defaultLeaderboardPointMethod], notifications: [], scoringMethods: [defaultScoringMethod], sessions: [], settings: defaultSettings, users: [] };
   }
 }
 
 function writeStore(store) {
   ensureStore();
-  writeFileSync(storePath, JSON.stringify(store, null, 2));
+  const temporaryStorePath = `${storePath}.tmp`;
+  writeFileSync(temporaryStorePath, JSON.stringify(store, null, 2), { mode: 0o600 });
+  renameSync(temporaryStorePath, storePath);
+}
+
+function getStoreHealth() {
+  const store = readStore();
+  return {
+    completedTournamentResults: store.completedTournamentResults.length,
+    forecastPredictions: store.forecastPredictions.length,
+    forecastTournaments: store.forecastTournaments.length,
+    status: "ok",
+    users: store.users.length,
+  };
 }
 
 function jsonResponse(response, status, payload) {
@@ -2286,10 +2306,19 @@ if (process.argv[2] === "--validate-results-import") {
   }
 }
 
+if (requireExistingStore) {
+  getStoreHealth();
+}
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
 
   try {
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      jsonResponse(response, 200, getStoreHealth());
+      return;
+    }
+
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
       return;
